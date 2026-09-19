@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.InputStream
 import java.util.zip.ZipInputStream
 
 /** Imports Yomitan/Yomichan dictionary zips (term banks and term meta banks). */
@@ -16,7 +17,12 @@ class YomitanImporter(
 
     class ImportException(message: String) : Exception(message)
 
-    fun import(uri: Uri, fileName: String, onProgress: (Progress) -> Unit): DictionaryInfo {
+    fun import(uri: Uri, fileName: String, onProgress: (Progress) -> Unit): DictionaryInfo =
+        import(fileName, onProgress) {
+            context.contentResolver.openInputStream(uri) ?: throw ImportException("Could not open $fileName")
+        }
+
+    fun import(fileName: String, onProgress: (Progress) -> Unit, open: () -> InputStream): DictionaryInfo {
         val db = database.writableDatabase
         val dictId = db.insertOrThrow(
             "dictionaries",
@@ -35,9 +41,7 @@ class YomitanImporter(
         var sawBank = false
 
         try {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw ImportException("Could not open $fileName")
-            ZipInputStream(input.buffered()).use { zip ->
+            ZipInputStream(open().buffered()).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     val name = entry.name.substringAfterLast('/')

@@ -37,7 +37,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import androidx.compose.runtime.collectAsState
 import io.github.immersionplayer.App
+import io.github.immersionplayer.dictionary.BundledDictionaries
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -91,6 +93,10 @@ fun LibraryScreen(
                     Text(if (root == null) "Choose folder" else "Change folder")
                 }
                 TextButton(onClick = onOpenSettings) { Text("Dictionaries & settings") }
+            }
+            val setupStatus by BundledDictionaries.status.collectAsState()
+            setupStatus?.let {
+                Text(it, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodyMedium)
             }
             Spacer(Modifier.padding(4.dp))
 

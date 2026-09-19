@@ -1,6 +1,7 @@
 package io.github.immersionplayer
 
 import android.app.Application
+import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryDatabase
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.mining.MiningStore
@@ -31,6 +32,9 @@ class App : Application() {
         lookup = DictionaryLookup(dictionaryDatabase)
         miningStore = MiningStore(this)
         subtitleLoader = SubtitleLoader(this)
-        Thread { dictionaryDatabase.deleteIncomplete() }.start()
+        Thread {
+            dictionaryDatabase.deleteIncomplete()
+            BundledDictionaries.installMissing(this, dictionaryDatabase)
+        }.start()
     }
 }

@@ -17,7 +17,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -51,6 +56,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.App
+import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.mining.MiningCard
@@ -113,7 +119,8 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
     var lookup by remember { mutableStateOf<ActiveLookup?>(null) }
     var showTranslation by remember { mutableStateOf(app.prefs.showTranslation) }
     var hasDictionaries by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
+    val dictionarySetup by BundledDictionaries.status.collectAsState()
+    LaunchedEffect(dictionarySetup) {
         hasDictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries().any { it.enabled } }
     }
 
@@ -190,6 +197,7 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                         DictionaryPanel(
                             lookup = current,
                             hasDictionaries = hasDictionaries,
+                            setupStatus = dictionarySetup,
                             onClose = { lookup = null },
                             onMine = { mine(it, current.lineIndex) },
                             isMined = { entry ->
@@ -367,30 +375,41 @@ private fun Controls(
             )
             Text(formatTime(duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
         }
+        // scrolls sideways rather than wrapping when the panel is narrow
         Row(
-            Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            TextButton(onClick = onBack) { Text("✕") }
-            FilledTonalButton(onClick = session::previousLine) { Text("◁ Prev") }
-            FilledTonalButton(onClick = session::replayLine) { Text("↻") }
-            FilledTonalButton(onClick = session::togglePause, modifier = Modifier.width(64.dp)) {
+            val compact = PaddingValues(horizontal = 14.dp)
+            TextButton(onClick = onBack, contentPadding = compact) { Text("✕") }
+            FilledTonalButton(onClick = session::previousLine, contentPadding = compact) { Text("◁ Prev") }
+            FilledTonalButton(onClick = session::replayLine, contentPadding = compact) { Text("↻") }
+            FilledTonalButton(onClick = session::togglePause, contentPadding = compact, modifier = Modifier.width(60.dp)) {
                 Text(if (paused) "▶" else "❚❚")
             }
-            FilledTonalButton(onClick = session::nextLine) { Text("Next ▷") }
-            Spacer(Modifier.weight(1f))
+            FilledTonalButton(onClick = session::nextLine, contentPadding = compact) { Text("Next ▷") }
+            Spacer(Modifier.width(6.dp))
             FilterChip(
                 selected = autoPause,
                 onClick = { session.setAutoPause(!autoPause) },
-                label = { Text("Stop at line end") },
+                label = { Text("Stop at end", maxLines = 1) },
             )
             if (hasTranslation) {
-                FilterChip(selected = showTranslation, onClick = onToggleTranslation, label = { Text("EN") })
+                FilterChip(selected = showTranslation, onClick = onToggleTranslation, label = { Text("EN", maxLines = 1) })
             }
-            TextButton(onClick = session::cycleMpvSubtitles) {
-                Text(if (mpvSubtitle == null) "mpv subs: off" else "mpv: $mpvSubtitle", maxLines = 1)
-            }
+            FilterChip(
+                selected = mpvSubtitle != null,
+                onClick = session::cycleMpvSubtitles,
+                label = {
+                    Text(
+                        if (mpvSubtitle == null) "mpv subs" else "mpv: $mpvSubtitle",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 160.dp),
+                    )
+                },
+            )
         }
     }
 }
