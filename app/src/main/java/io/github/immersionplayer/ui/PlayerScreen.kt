@@ -187,7 +187,10 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
             }
             fallback
         }
-        if (generation == lookupGeneration && found != null) lookup = found
+        // never leave the panel spinning: lines like ♪～ have nothing to look up
+        if (generation == lookupGeneration) {
+            lookup = found ?: ActiveLookup(lineIndex, text, 0, LookupResult(text, 0, 0, emptyList()))
+        }
     }
 
 

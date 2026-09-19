@@ -175,7 +175,7 @@ fun DictionaryPanel(
             !hasDictionaries && setupStatus != null -> Message("$setupStatus\nThis only happens once.")
             !hasDictionaries -> Message("No dictionaries yet. Import a Yomitan dictionary (e.g. Jitendex) under Dictionaries & settings.")
             result == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            result.entries.isEmpty() -> Message("No match.")
+            result.entries.isEmpty() -> Message("Nothing to look up here. Tap or drag across a word to try another spot.")
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(result.entries) { _, entry ->
                     TermCard(entry, colors)
