@@ -86,6 +86,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -955,6 +957,12 @@ private fun StudyPanel(
                 }
             }
 
+            // targets for phone game modes that map shoulder triggers to screen taps (RedMagic Game Space)
+            if (app.prefs.triggerTargets) {
+                TriggerTarget("◁", session::previousLine, Modifier.align(Alignment.TopStart).zIndex(2f))
+                TriggerTarget("▷", session::nextLine, Modifier.align(Alignment.TopEnd).zIndex(2f))
+            }
+
             AnimatedVisibility(
                 visible = notice != null,
                 enter = fadeIn(),
@@ -1061,6 +1069,27 @@ private fun CurrentLine(
             }
         }
 
+    }
+}
+
+/** Small tap target a shoulder trigger's screen mapping can be dropped onto. Consumes the tap. */
+@Composable
+private fun TriggerTarget(label: String, onTrigger: () -> Unit, modifier: Modifier) {
+    Box(
+        modifier
+            .padding(4.dp)
+            .size(40.dp)
+            .pointerInput(onTrigger) { detectTapGestures(onTap = { onTrigger() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 12.sp)
+        }
     }
 }
 

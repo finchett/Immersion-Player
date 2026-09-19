@@ -197,6 +197,13 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 description = "Step through lines with the phone's shoulder triggers (RedMagic and similar). Use the setup below to teach it your triggers.",
                 initial = app.prefs.shoulderTriggers,
             ) { app.prefs.shoulderTriggers = it }
+            SettingSwitch(
+                title = "Trigger tap targets",
+                description = "For Game Space, which maps triggers to screen taps: shows small ◁ ▷ targets in the " +
+                    "top corners of the study panel. Open a video, then in Game Space drag the left trigger's " +
+                    "marker onto ◁ and the right one onto ▷.",
+                initial = app.prefs.triggerTargets,
+            ) { app.prefs.triggerTargets = it }
             if (showTriggerSetup) {
                 TriggerSetupCard(app, onDone = { showTriggerSetup = false })
             } else {
