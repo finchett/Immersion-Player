@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play button over a rounded "highlighted word" pill, as used in the player. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#664F7BE0"
+        android:pathData="M36,63h36a8,8 0,0 1,8 8v0a8,8 0,0 1,-8 8h-36a8,8 0,0 1,-8 -8v0a8,8 0,0 1,8 -8z" />
+    <path
+        android:fillColor="#FF8AB4F8"
+        android:pathData="M45.5,30.5L67.5,44.2Q70,45.8 67.5,47.4L45.5,61.1Q42.5,63 42.5,59.4L42.5,32.2Q42.5,28.6 45.5,30.5Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M40,69.5h28a1.5,1.5 0,0 1,0 3h-28a1.5,1.5 0,0 1,0 -3z" />
+</vector>
