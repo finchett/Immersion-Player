@@ -52,11 +52,9 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
     var importing by remember { mutableStateOf<String?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<DictionaryInfo?>(null) }
-    var minedCount by remember { mutableIntStateOf(0) }
 
     suspend fun refresh() {
         dictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries() }
-        minedCount = withContext(Dispatchers.IO) { app.miningStore.all().size }
     }
     val setupStatus by BundledDictionaries.status.collectAsState()
     LaunchedEffect(setupStatus) { refresh() }
@@ -146,7 +144,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
             Text("Playback", style = MaterialTheme.typography.titleLarge)
             SettingSwitch(
                 title = "Stop at the end of each line",
-                description = "Pause when a line finishes, like mpvacious' play-up-to-next. Also toggled from the player.",
+                description = "Pause when a line finishes, like mpvacious' play-up-to-next. Double-tap the right panel to toggle it while watching.",
                 initial = app.prefs.autoPause,
             ) { app.prefs.autoPause = it }
             SettingSwitch(
@@ -167,13 +165,6 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 valueRange = 16f..44f,
                 onValueChange = { size = it },
                 onValueChangeFinished = { app.prefs.subtitleSize = size },
-            )
-
-            HorizontalDivider()
-            Text("Saved words", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "$minedCount saved. Each keeps the sentence, translation and timing for Anki export (coming later).",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             HorizontalDivider()

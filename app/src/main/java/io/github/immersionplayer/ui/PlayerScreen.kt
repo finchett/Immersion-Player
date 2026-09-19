@@ -80,7 +80,6 @@ import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
-import io.github.immersionplayer.mining.MiningCard
 import io.github.immersionplayer.player.MpvView
 import io.github.immersionplayer.player.PlayerSession
 import io.github.immersionplayer.subs.SubtitleLoader
@@ -187,22 +186,6 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
         if (generation == lookupGeneration && found != null) lookup = found
     }
 
-    fun mine(entry: TermEntry, line: Int) {
-        val cue = primary?.cues?.getOrNull(line) ?: return
-        val card = MiningCard(
-            expression = entry.expression,
-            reading = entry.reading,
-            glossary = entry.definitions.firstOrNull()?.let { Glossary.plainText(it.glossaryJson) }.orEmpty(),
-            sentence = cue.text,
-            translation = secondary?.let { translationFor(it, cue.start, cue.end) },
-            videoUri = session.videoUri,
-            videoName = session.videoName,
-            sentenceStart = cue.start,
-            sentenceEnd = cue.end,
-        )
-        scope.launch(Dispatchers.IO) { app.miningStore.export(card) }
-        Toast.makeText(context, "Saved ${entry.expression}", Toast.LENGTH_SHORT).show()
-    }
 
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -226,7 +209,6 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                     dictionarySetup = dictionarySetup,
                     onLookup = { line, text, start -> startLookup(line, text, start) },
                     onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
-                    onMine = ::mine,
                     modifier = modifier,
                 )
             }
@@ -410,7 +392,6 @@ private fun StudyPanel(
     dictionarySetup: String?,
     onLookup: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
-    onMine: (TermEntry, Int) -> Unit,
     modifier: Modifier,
 ) {
     val primary by session.primary.collectAsState()
@@ -503,11 +484,6 @@ private fun StudyPanel(
                             lookup = lookup,
                             hasDictionaries = hasDictionaries,
                             setupStatus = dictionarySetup,
-                            onMine = { onMine(it, lookup.lineIndex) },
-                            isMined = { entry ->
-                                val cue = primary?.cues?.getOrNull(lookup.lineIndex)
-                                cue != null && app.miningStore.contains(entry.expression, cue.text)
-                            },
                         )
                     } else if (dictionarySetup != null) {
                         Text(
