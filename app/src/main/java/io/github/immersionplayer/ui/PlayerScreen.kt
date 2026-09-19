@@ -125,16 +125,15 @@ private const val SCRUB_SECONDS_PER_WIDTH = 90.0
 private const val MIN_PANEL_FRACTION = 0.28f
 private const val MAX_PANEL_FRACTION = 0.5f
 
-/** Drag handle between the video and the study panel; the grip only shows while touched. */
+private val RESIZE_ZONE_WIDTH = 24.dp
+
+/** Invisible drag zone on the video/panel edge; a grip appears only while it's touched. */
 @Composable
-private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
+private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit, modifier: Modifier) {
     var touched by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     Box(
-        Modifier
-            .fillMaxHeight()
-            .width(12.dp)
-            .background(MaterialTheme.colorScheme.surface)
+        modifier
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -156,22 +155,16 @@ private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
                     },
                 )
             },
+        contentAlignment = Alignment.Center,
     ) {
-        // hairline where the video meets the panel
-        Box(Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
-        AnimatedVisibility(
-            visible = touched || dragging,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.Center),
-        ) {
+        AnimatedVisibility(visible = touched || dragging, enter = fadeIn(), exit = fadeOut()) {
             Box(
                 Modifier
-                    .width(4.dp)
-                    .height(44.dp)
+                    .width(5.dp)
+                    .height(48.dp)
                     .background(
-                        if (dragging) MaterialTheme.colorScheme.primary else Color(0xFF6A6E75),
-                        RoundedCornerShape(2.dp),
+                        if (dragging) MaterialTheme.colorScheme.primary else Color(0xFF8A8E95),
+                        RoundedCornerShape(3.dp),
                     ),
             )
         }
@@ -334,15 +327,24 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
             }
             if (landscape) {
                 val totalWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
-                Row(Modifier.fillMaxSize()) {
-                    videoArea(Modifier.weight(1f - panelFraction).fillMaxHeight())
+                val boundary = maxWidth * (1f - panelFraction)
+                Box(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxSize()) {
+                        videoArea(Modifier.weight(1f - panelFraction).fillMaxHeight())
+                        sidePanel(Modifier.weight(panelFraction).fillMaxHeight())
+                    }
+                    // invisible grab zone straddling the edge, mid-height; takes no layout space
                     ResizeHandle(
                         onDrag = { dx ->
                             panelFraction = (panelFraction - dx / totalWidthPx).coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION)
                         },
                         onDragEnd = { app.prefs.panelFraction = panelFraction },
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = boundary - RESIZE_ZONE_WIDTH / 2)
+                            .width(RESIZE_ZONE_WIDTH)
+                            .height(140.dp),
                     )
-                    sidePanel(Modifier.weight(panelFraction).fillMaxHeight())
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
