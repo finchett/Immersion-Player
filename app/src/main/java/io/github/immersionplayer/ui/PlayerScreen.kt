@@ -343,15 +343,23 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
     var lastJumpTap by remember { mutableStateOf(0L) }
     var jumpTotal by remember { mutableIntStateOf(0) }
     var jumpShown by remember { mutableIntStateOf(0) }
+    // what the pill displays; only changed by a jump so the fade-out keeps showing the last one
+    var jumpLabelZone by remember { mutableIntStateOf(0) }
+    var jumpLabelTotal by remember { mutableIntStateOf(0) }
+    var jumpLabelVisible by remember { mutableStateOf(false) }
     LaunchedEffect(jumpShown) {
         if (jumpShown > 0) {
             delay(JUMP_CONTINUE_MS)
+            jumpLabelVisible = false
             jumpZone = 0
             jumpTotal = 0
         }
     }
     fun jump(direction: Int) {
         jumpTotal += JUMP_SECONDS
+        jumpLabelZone = direction
+        jumpLabelTotal = jumpTotal
+        jumpLabelVisible = true
         val target = session.position.value + direction * JUMP_SECONDS
         val maxTime = session.duration.value.takeIf { it > 0 } ?: Double.MAX_VALUE
         session.seekTo(target.coerceIn(0.0, maxTime))
@@ -511,13 +519,13 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
 
         // ±seconds indicator on the tapped edge
         AnimatedVisibility(
-            visible = jumpZone != 0 && jumpTotal > 0,
+            visible = jumpLabelVisible,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(if (jumpZone < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 28.dp),
+            modifier = Modifier.align(if (jumpLabelZone < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 28.dp),
         ) {
             Text(
-                if (jumpZone < 0) "« −${jumpTotal}s" else "+${jumpTotal}s »",
+                if (jumpLabelZone < 0) "« −${jumpLabelTotal}s" else "+${jumpLabelTotal}s »",
                 color = Color.White,
                 fontSize = 20.sp,
                 modifier = Modifier
