@@ -48,9 +48,6 @@ class PlayerSession(
     private val _autoPause = MutableStateFlow(prefs.autoPause)
     val autoPause: StateFlow<Boolean> = _autoPause.asStateFlow()
 
-    private val _mpvSubtitle = MutableStateFlow<String?>(null)
-    val mpvSubtitle: StateFlow<String?> = _mpvSubtitle.asStateFlow()
-
     private var autoPausedLine = -1
     private var lastCopiedLine = -1
 
@@ -122,10 +119,6 @@ class PlayerSession(
         playLine((_lineIndex.value + 1).coerceAtMost(cues.lastIndex))
     }
 
-    fun cycleMpvSubtitles() {
-        view?.cycleMpvSubtitles()
-    }
-
     fun savePosition() {
         prefs.savePosition(videoUri, _position.value, _duration.value)
     }
@@ -171,10 +164,6 @@ class PlayerSession(
     override fun onPause(paused: Boolean) {
         _paused.value = paused
         if (paused) mainHandler.post { savePosition() }
-    }
-
-    override fun onMpvSubtitleChanged(title: String?) {
-        _mpvSubtitle.value = title
     }
 
     companion object {
