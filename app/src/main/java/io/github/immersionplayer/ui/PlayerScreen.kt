@@ -53,6 +53,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -243,6 +247,14 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
     var scrubOffset by remember { mutableStateOf(0.0) }
     var scrubSpeed by remember { mutableStateOf(1.0) }
     var flash by remember { mutableIntStateOf(0) }
+    var flashFill by remember { mutableIntStateOf(0) }
+    var fillNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(flashFill) {
+        if (flashFill > 0) {
+            delay(900)
+            fillNotice = null
+        }
+    }
     var showFlash by remember { mutableStateOf(false) }
     LaunchedEffect(flash) {
         if (flash > 0) {
@@ -267,7 +279,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
             factory = { ctx ->
                 MpvView(ctx).also { view ->
                     view.keepScreenOn = true
-                    view.initialize(startPosition)
+                    view.initialize(startPosition, session.fill.value)
                     session.attach(view)
                     view.playFile(session.videoUri)
                     mpvView = view
@@ -279,6 +291,31 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
         Box(
             Modifier
                 .fillMaxSize()
+                .pointerInput(Unit) {
+                    // pinch out = fill, pinch in = fit. Runs in the Initial pass so a second finger
+                    // cancels the scrub/tap the first finger started.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        var zoom = 1f
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.changes.count { it.pressed } >= 2) {
+                                zoom *= event.calculateZoom()
+                                event.changes.forEach { it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                        val fill = when {
+                            zoom > 1.12f -> true
+                            zoom < 0.9f -> false
+                            else -> null
+                        }
+                        if (fill != null && fill != session.fill.value) {
+                            session.setFill(fill)
+                            fillNotice = if (fill) "Fill" else "Fit"
+                            flashFill++
+                        }
+                    }
+                }
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = {
                         session.togglePause()
@@ -326,6 +363,18 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
             ) {
                 Text(if (paused) "❚❚" else "▶", color = Color.White, fontSize = 28.sp)
             }
+        }
+
+        // fill/fit notice
+        AnimatedVisibility(fillNotice != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+            Text(
+                fillNotice.orEmpty(),
+                color = Color.White,
+                fontSize = 20.sp,
+                modifier = Modifier
+                    .background(Color(0xAA000000), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            )
         }
 
         // scrub bubble

@@ -25,6 +25,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("pause_on_lookup", true)
         set(value) = prefs.edit { putBoolean("pause_on_lookup", value) }
 
+    /** Zoom the video to fill its area (mpv panscan) instead of fitting it. */
+    var videoFill: Boolean
+        get() = prefs.getBoolean("video_fill", false)
+        set(value) = prefs.edit { putBoolean("video_fill", value) }
+
     var subtitleSize: Float
         get() = prefs.getFloat("subtitle_size", 26f)
         set(value) = prefs.edit { putFloat("subtitle_size", value) }

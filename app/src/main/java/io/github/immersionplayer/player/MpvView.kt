@@ -51,7 +51,7 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         }
     }
 
-    fun initialize(startPosition: Double) {
+    fun initialize(startPosition: Double, fill: Boolean) {
         MPVLib.create(context.applicationContext)
 
         MPVLib.setOptionString("config", "no")
@@ -76,6 +76,7 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         MPVLib.setOptionString("hr-seek", "yes")
         MPVLib.setOptionString("keep-open", "yes")
         if (startPosition > 1) MPVLib.setOptionString("start", startPosition.toString())
+        MPVLib.setOptionString("panscan", if (fill) "1.0" else "0.0")
 
         MPVLib.init()
 
@@ -106,6 +107,11 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     var paused: Boolean
         get() = MPVLib.getPropertyBoolean("pause") ?: true
         set(value) = MPVLib.setPropertyBoolean("pause", value)
+
+    /** Crop to fill the view (1.0) or fit the whole picture (0.0). */
+    fun setFill(fill: Boolean) {
+        MPVLib.setPropertyDouble("panscan", if (fill) 1.0 else 0.0)
+    }
 
     fun seek(seconds: Double) {
         MPVLib.command(arrayOf("seek", seconds.coerceAtLeast(0.0).toString(), "absolute+exact"))
