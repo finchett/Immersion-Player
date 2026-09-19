@@ -30,6 +30,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("video_fill", false)
         set(value) = prefs.edit { putBoolean("video_fill", value) }
 
+    /** Share of the screen width used by the study panel in landscape. */
+    var panelFraction: Float
+        get() = prefs.getFloat("panel_fraction", 0.37f)
+        set(value) = prefs.edit { putFloat("panel_fraction", value) }
+
     var subtitleSize: Float
         get() = prefs.getFloat("subtitle_size", 26f)
         set(value) = prefs.edit { putFloat("subtitle_size", value) }
