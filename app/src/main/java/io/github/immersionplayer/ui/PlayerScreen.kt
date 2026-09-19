@@ -3,6 +3,9 @@ package io.github.immersionplayer.ui
 import android.app.Activity
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -512,7 +515,6 @@ private fun StudyPanel(
             peeking = hold
         }
     }
-    LaunchedEffect(lineIndex) { peeking = false }
 
     // brief "Stop at end: on/off" notice after a double tap
     val autoPause by session.autoPause.collectAsState()
@@ -554,11 +556,18 @@ private fun StudyPanel(
                     )
                 }
                 .pointerInput(onHold) {
+                    // observe (without consuming) so it also sees holds that started on the text,
+                    // even if that text is swapped out by a new line mid-hold
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                        } while (event.changes.any { it.pressed })
+                        onHold(false)
+                    }
+                }
+                .pointerInput(onHold) {
                     detectTapGestures(
-                        onPress = {
-                            tryAwaitRelease()
-                            onHold(false)
-                        },
                         onLongPress = { onHold(true) },
                         // single tap = play/pause after a short wait; a second tap within it = stop-at-end.
                         // (shorter than Android's 300ms double-tap timeout so pausing stays snappy)
@@ -593,8 +602,7 @@ private fun StudyPanel(
                     onCharTap = onLookup,
                     onSelect = onSelect,
                     onTapOutside = session::togglePause,
-                    // drawn above the definitions so the English peek can hang over them
-                    modifier = Modifier.fillMaxWidth().heightIn(max = maxLineHeight).zIndex(1f),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = maxLineHeight),
                 )
                 HorizontalDivider()
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -676,7 +684,9 @@ private fun CurrentLine(
                 }
                 val highlight = lookup?.takeIf { it.lineIndex == index && it.result != null && it.result.matchLength > 0 }
                     ?.let { it.start until it.start + it.result!!.matchLength }
-                // compact, but long lines shrink rather than grow past the panel's cap
+                // compact, but long lines shrink rather than grow past the panel's cap.
+                // While peeking the Japanese stays laid out (invisible) under the English.
+                val japaneseAlpha by animateFloatAsState(if (peeking) 0f else 1f, label = "japaneseAlpha")
                 TappableText(
                     text = cue.text,
                     highlight = highlight,
@@ -691,41 +701,26 @@ private fun CurrentLine(
                     onHold = onHold,
                     onSelect = { start, end -> onSelect(index, cue.text, start, end) },
                     onTapOutside = onTapOutside,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = japaneseAlpha },
                 )
+                val translation = secondary?.let { translationFor(it, cue.start, cue.end) }
+                AnimatedVisibility(peeking, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.matchParentSize()) {
+                    Box(contentAlignment = Alignment.Center) {
+                        BasicText(
+                            translation ?: "No English line here.",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = if (translation != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 1.3.em,
+                            ),
+                            autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 20.sp, stepSize = 1.sp),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
 
-        // English peek: hangs below the line and slides down from under the Japanese
-        val cue = track.cues.getOrNull(lineIndex)
-        val translation = if (cue != null && secondary != null) translationFor(secondary, cue.start, cue.end) else null
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                    layout(placeable.width, 0) { placeable.place(0, 0) }
-                },
-        ) {
-            AnimatedVisibility(
-                visible = peeking,
-                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
-            ) {
-                Text(
-                    translation ?: "No English line here.",
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                )
-            }
-        }
     }
 }
 
