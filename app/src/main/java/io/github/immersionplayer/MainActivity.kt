@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.MotionEvent
+import io.github.immersionplayer.player.TriggerSetup
 import io.github.immersionplayer.player.PlayerCommand
 import io.github.immersionplayer.player.PlayerCommands
 import androidx.activity.ComponentActivity
@@ -84,7 +86,13 @@ class MainActivity : ComponentActivity() {
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val app = application as App
-        val isTrigger = event.keyCode == KeyEvent.KEYCODE_F7 || event.keyCode == KeyEvent.KEYCODE_F8
+        if (TriggerSetup.active && event.keyCode != KeyEvent.KEYCODE_BACK) {
+            TriggerSetup.onKey(event)
+            return true
+        }
+        val previousKey = app.prefs.previousLineKey
+        val nextKey = app.prefs.nextLineKey
+        val isTrigger = event.keyCode == previousKey || event.keyCode == nextKey
         if (!isTrigger || screen !is Screen.Player || !app.prefs.shoulderTriggers) {
             return super.dispatchKeyEvent(event)
         }
@@ -94,9 +102,7 @@ class MainActivity : ComponentActivity() {
             KeyEvent.ACTION_DOWN -> {
                 val recentlyReleased = now - (triggerReleasedAt[key] ?: 0L) < TRIGGER_DEBOUNCE_MS
                 if (event.repeatCount == 0 && key !in triggerHeld && !recentlyReleased) {
-                    val left = key == KeyEvent.KEYCODE_F7
-                    val previous = left != app.prefs.swapShoulderTriggers
-                    PlayerCommands.send(if (previous) PlayerCommand.PreviousLine else PlayerCommand.NextLine)
+                    PlayerCommands.send(if (key == previousKey) PlayerCommand.PreviousLine else PlayerCommand.NextLine)
                 }
                 triggerHeld.add(key)
             }
@@ -106,6 +112,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         return true
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (TriggerSetup.active) TriggerSetup.onTouch(event)
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onNewIntent(intent: Intent) {
