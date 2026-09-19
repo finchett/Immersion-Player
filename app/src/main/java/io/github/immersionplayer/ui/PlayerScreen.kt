@@ -1,7 +1,6 @@
 package io.github.immersionplayer.ui
 
 import android.app.Activity
-import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -90,6 +89,7 @@ import io.github.immersionplayer.player.PlayerSession
 import io.github.immersionplayer.subs.SubtitleLoader
 import io.github.immersionplayer.subs.SubtitleTrack
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,6 +105,9 @@ data class ActiveLookup(
 
 /** Seconds covered by dragging across the full width of the video at normal speed. */
 private const val SCRUB_SECONDS_PER_WIDTH = 90.0
+
+/** Window for a second tap on the study panel to count as a double tap. */
+private const val PANEL_DOUBLE_TAP_MS = 180L
 
 /** Scrub speed multiplier when the finger has moved far up or down from where the drag began. */
 private const val SCRUB_MAX_SPEED = 10.0
@@ -473,7 +476,8 @@ private fun StudyPanel(
             notice = null
         }
     }
-    var lastPanelTap by remember { mutableStateOf(0L) }
+    val panelScope = rememberCoroutineScope()
+    var pendingPanelTap by remember { mutableStateOf<Job?>(null) }
     fun toggleStopAtEnd() {
         val enabled = !autoPause
         session.setAutoPause(enabled)
@@ -508,17 +512,19 @@ private fun StudyPanel(
                             onHold(false)
                         },
                         onLongPress = { onHold(true) },
-                        // play/pause right away (no double-tap wait); a quick second tap undoes
-                        // that and toggles stop-at-end instead
+                        // single tap = play/pause after a short wait; a second tap within it = stop-at-end.
+                        // (shorter than Android's 300ms double-tap timeout so pausing stays snappy)
                         onTap = {
-                            val now = SystemClock.uptimeMillis()
-                            if (now - lastPanelTap < viewConfiguration.doubleTapTimeoutMillis) {
-                                lastPanelTap = 0L
-                                session.togglePause()
+                            val pending = pendingPanelTap
+                            if (pending != null && pending.isActive) {
+                                pending.cancel()
+                                pendingPanelTap = null
                                 toggleStopAtEnd()
                             } else {
-                                lastPanelTap = now
-                                session.togglePause()
+                                pendingPanelTap = panelScope.launch {
+                                    delay(PANEL_DOUBLE_TAP_MS)
+                                    session.togglePause()
+                                }
                             }
                         },
                     )
