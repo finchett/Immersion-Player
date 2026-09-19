@@ -77,6 +77,15 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.roundToInt
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -112,6 +121,8 @@ import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.player.MpvView
+import io.github.immersionplayer.player.PlayerCommand
+import io.github.immersionplayer.player.PlayerCommands
 import io.github.immersionplayer.player.PlayerSession
 import io.github.immersionplayer.subs.SubtitleLoader
 import io.github.immersionplayer.subs.SubtitleTrack
@@ -132,6 +143,11 @@ data class ActiveLookup(
 
 /** Seconds covered by dragging across the full width of the video at normal speed. */
 private const val SCRUB_SECONDS_PER_WIDTH = 90.0
+
+/** Rounded-corners appearance: gap between the cards and their corner radius. */
+private val CARD_GAP = 6.dp
+private val CARD_RADIUS = 16.dp
+private val LocalRoundedCorners = compositionLocalOf { false }
 
 private const val MIN_PANEL_FRACTION = 0.28f
 private const val MAX_PANEL_FRACTION = 0.5f
@@ -246,6 +262,16 @@ fun PlayerScreen(
         }
     }
 
+    // hardware keys (shoulder triggers) forwarded by the activity
+    LaunchedEffect(session) {
+        PlayerCommands.events.collect { command ->
+            when (command) {
+                PlayerCommand.PreviousLine -> session.previousLine()
+                PlayerCommand.NextLine -> session.nextLine()
+            }
+        }
+    }
+
     var subtitleStatus by remember { mutableStateOf<String?>("Reading subtitles…") }
     LaunchedEffect(video) {
         val tracks = withContext(Dispatchers.IO) {
@@ -320,7 +346,12 @@ fun PlayerScreen(
         mutableFloatStateOf(app.prefs.panelFraction.coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION))
     }
 
-    Surface(Modifier.fillMaxSize(), color = Color.Black) {
+    val rounded = app.appearance.roundedCorners
+    val gap = if (rounded) CARD_GAP else 0.dp
+    val panelShape = if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape
+
+    Surface(Modifier.fillMaxSize(), color = if (rounded) MaterialTheme.colorScheme.background else Color.Black) {
+      CompositionLocalProvider(LocalRoundedCorners provides rounded) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val landscape = maxWidth > maxHeight
             val portraitVideoHeight = maxWidth * 9 / 16
@@ -353,8 +384,8 @@ fun PlayerScreen(
                 Box(Modifier.fillMaxSize()) {
                     Layout(
                         content = {
-                            videoArea(Modifier)
-                            sidePanel(Modifier)
+                            videoArea(Modifier.padding(start = gap, top = gap, bottom = gap, end = gap / 2))
+                            sidePanel(Modifier.padding(start = gap / 2, top = gap, end = gap, bottom = gap).clip(panelShape))
                         },
                         modifier = Modifier.fillMaxSize(),
                     ) { measurables, constraints ->
@@ -386,11 +417,12 @@ fun PlayerScreen(
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
-                    videoArea(Modifier.fillMaxWidth().height(portraitVideoHeight))
-                    sidePanel(Modifier.weight(1f).fillMaxWidth())
+                    videoArea(Modifier.fillMaxWidth().height(portraitVideoHeight).padding(start = gap, top = gap, end = gap, bottom = gap / 2))
+                    sidePanel(Modifier.weight(1f).fillMaxWidth().padding(start = gap, top = gap / 2, end = gap, bottom = gap).clip(panelShape))
                 }
             }
         }
+      }
     }
 }
 
@@ -474,7 +506,13 @@ private fun VideoArea(
         }
     }
 
-    BoxWithConstraints(modifier.clipToBounds().background(Color.Black)) {
+    val rounded = LocalRoundedCorners.current
+    val maskColor = MaterialTheme.colorScheme.background
+    BoxWithConstraints(
+        modifier
+            .clip(if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape)
+            .background(Color.Black),
+    ) {
         val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
         AndroidView(
@@ -489,6 +527,18 @@ private fun VideoArea(
                 }
             },
         )
+        if (rounded) {
+            // SurfaceView ignores Compose clipping, so paint the corners over it instead
+            Canvas(Modifier.fillMaxSize()) {
+                val radius = CARD_RADIUS.toPx()
+                val corners = Path().apply {
+                    fillType = PathFillType.EvenOdd
+                    addRect(Rect(0f, 0f, size.width, size.height))
+                    addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)))
+                }
+                drawPath(corners, maskColor)
+            }
+        }
 
         // gesture layer above the video surface
         Box(
@@ -976,7 +1026,11 @@ private fun CurrentLine(
                         fontSize = textSize.sp,
                         lineHeight = 1.35.em,
                         textAlign = TextAlign.Center,
-                        color = if (lineActive) Color.White else Color(0xFFC4C7CC),
+                        color = if (lineActive) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                        },
                     ),
                     autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = textSize.sp, stepSize = 1.sp),
                     onTap = { onCharTap(index, cue.text, it) },
@@ -991,7 +1045,11 @@ private fun CurrentLine(
                         BasicText(
                             translation ?: "No English line here.",
                             style = MaterialTheme.typography.bodyLarge.copy(
-                                color = if (translation != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (translation != null) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                                 textAlign = TextAlign.Center,
                                 lineHeight = 1.3.em,
                             ),

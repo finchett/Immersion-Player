@@ -3,17 +3,18 @@ package io.github.immersionplayer
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
+import io.github.immersionplayer.player.PlayerCommand
+import io.github.immersionplayer.player.PlayerCommands
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.ui.LibraryScreen
 import io.github.immersionplayer.ui.NaturalOrder
@@ -23,20 +24,13 @@ import io.github.immersionplayer.ui.isVideo
 import kotlinx.coroutines.android.awaitFrame
 import java.io.File
 
+private const val TRIGGER_DEBOUNCE_MS = 150L
+
 sealed interface Screen {
     data object Library : Screen
     data object Settings : Screen
     data class Player(val video: DocumentFile, val siblings: List<DocumentFile>) : Screen
 }
-
-private val colors = darkColorScheme(
-    primary = Color(0xFF8AB4F8),
-    secondary = Color(0xFFF2B8B5),
-    tertiary = Color(0xFFA8DAB5),
-    background = Color(0xFF111316),
-    surface = Color(0xFF111316),
-    surfaceVariant = Color(0xFF1E2126),
-)
 
 class MainActivity : ComponentActivity() {
     private var screen by mutableStateOf<Screen>(Screen.Library)
@@ -50,7 +44,7 @@ class MainActivity : ComponentActivity() {
         val app = application as App
         if (savedInstanceState == null) handleViewIntent(intent)
         setContent {
-            MaterialTheme(colorScheme = colors) {
+            MaterialTheme(colorScheme = app.appearance.theme.scheme) {
                 BackHandler(enabled = screen != Screen.Library) { screen = Screen.Library }
                 LaunchedEffect(pendingScreen) {
                     val next = pendingScreen ?: return@LaunchedEffect
@@ -79,6 +73,39 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private val triggerHeld = mutableSetOf<Int>()
+    private val triggerReleasedAt = mutableMapOf<Int, Long>()
+
+    /**
+     * Shoulder triggers (RedMagic and similar) arrive as F7/F8 key presses. They're capacitive
+     * and can flicker while a finger rests on them, so a press only counts after a real release.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val app = application as App
+        val isTrigger = event.keyCode == KeyEvent.KEYCODE_F7 || event.keyCode == KeyEvent.KEYCODE_F8
+        if (!isTrigger || screen !is Screen.Player || !app.prefs.shoulderTriggers) {
+            return super.dispatchKeyEvent(event)
+        }
+        val key = event.keyCode
+        val now = event.eventTime
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                val recentlyReleased = now - (triggerReleasedAt[key] ?: 0L) < TRIGGER_DEBOUNCE_MS
+                if (event.repeatCount == 0 && key !in triggerHeld && !recentlyReleased) {
+                    val left = key == KeyEvent.KEYCODE_F7
+                    val previous = left != app.prefs.swapShoulderTriggers
+                    PlayerCommands.send(if (previous) PlayerCommand.PreviousLine else PlayerCommand.NextLine)
+                }
+                triggerHeld.add(key)
+            }
+            KeyEvent.ACTION_UP -> {
+                triggerHeld.remove(key)
+                triggerReleasedAt[key] = now
+            }
+        }
+        return true
     }
 
     override fun onNewIntent(intent: Intent) {

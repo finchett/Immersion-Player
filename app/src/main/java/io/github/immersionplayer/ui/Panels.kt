@@ -48,8 +48,6 @@ import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.dictionary.Definition
 import io.github.immersionplayer.dictionary.TermEntry
 
-private val HighlightBackground = Color(0x664F7BE0)
-private val SelectionBackground = Color(0x668E6BD6)
 
 /**
  * Text where tapping a character reports its index and dragging selects a range.
@@ -76,10 +74,14 @@ fun TappableText(
     val annotated = remember(text, validRange) {
         buildAnnotatedString {
             append(text)
-            if (validRange != null) addStyle(SpanStyle(color = Color.White), validRange.first, validRange.last + 1)
+            if (validRange != null) addStyle(SpanStyle(color = style.color), validRange.first, validRange.last + 1)
         }
     }
-    val pillColor = if (selecting) SelectionBackground else HighlightBackground
+    val pillColor = if (selecting) {
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
+    }
     BasicText(
         text = annotated,
         style = style,
@@ -201,7 +203,7 @@ private fun TermCard(entry: TermEntry, colors: GlossaryColors) {
                 if (entry.reading != entry.expression) {
                     Text(entry.reading, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 }
-                Text(entry.expression, style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                Text(entry.expression, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
         if (entry.reasons.isNotEmpty() || entry.frequencies.isNotEmpty() || entry.pitchPositions.isNotEmpty()) {
