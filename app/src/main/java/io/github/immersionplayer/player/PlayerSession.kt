@@ -48,6 +48,9 @@ class PlayerSession(
     private val _autoPause = MutableStateFlow(prefs.autoPause)
     val autoPause: StateFlow<Boolean> = _autoPause.asStateFlow()
 
+    private val _fill = MutableStateFlow(prefs.videoFill)
+    val fill: StateFlow<Boolean> = _fill.asStateFlow()
+
     private var autoPausedLine = -1
     private var lastCopiedLine = -1
 
@@ -72,6 +75,12 @@ class PlayerSession(
         _autoPause.value = enabled
         prefs.autoPause = enabled
         autoPausedLine = _lineIndex.value.takeIf { enabled && _lineActive.value.not() } ?: -1
+    }
+
+    fun setFill(fill: Boolean) {
+        _fill.value = fill
+        prefs.videoFill = fill
+        view?.setFill(fill)
     }
 
     fun togglePause() {
