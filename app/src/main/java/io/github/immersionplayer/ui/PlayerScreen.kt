@@ -319,7 +319,6 @@ fun PlayerScreen(
     val panelFraction = remember {
         mutableFloatStateOf(app.prefs.panelFraction.coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION))
     }
-    var resizing by remember { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -329,7 +328,6 @@ fun PlayerScreen(
                 VideoArea(
                     session = session,
                     startPosition = app.prefs.position(session.videoUri),
-                    freezeSurface = resizing,
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
@@ -373,15 +371,12 @@ fun PlayerScreen(
                     }
                     // invisible grab zone straddling the edge, mid-height; takes no layout space
                     ResizeHandle(
-                        onDragStart = { resizing = true },
+                        onDragStart = {},
                         onDrag = { dx ->
                             panelFraction.floatValue = (panelFraction.floatValue - dx / totalWidthPx)
                                 .coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION)
                         },
-                        onDragEnd = {
-                            resizing = false
-                            app.prefs.panelFraction = panelFraction.floatValue
-                        },
+                        onDragEnd = { app.prefs.panelFraction = panelFraction.floatValue },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .offset { IntOffset((totalWidthPx * (1f - panelFraction.floatValue) - zonePx / 2).roundToInt(), 0) }
@@ -407,19 +402,13 @@ fun PlayerScreen(
 private fun VideoArea(
     session: PlayerSession,
     startPosition: Double,
-    freezeSurface: Boolean,
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier,
 ) {
     val ended by session.ended.collectAsState()
-    // While the divider is dragged the video surface keeps its size (centred, cropped or
-    // letterboxed) so mpv isn't reconfigured every frame; it resizes once on release.
-    val lastSurfaceSize = remember { intArrayOf(0, 0) }
-    val frozenSize = remember(freezeSurface) {
-        if (freezeSurface && lastSurfaceSize[0] > 0) IntSize(lastSurfaceSize[0], lastSurfaceSize[1]) else null
-    }
+
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
     val position by session.position.collectAsState()
@@ -489,18 +478,7 @@ private fun VideoArea(
         val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
         AndroidView(
-            modifier = Modifier.layout { measurable, constraints ->
-                val width = frozenSize?.width ?: constraints.maxWidth
-                val height = frozenSize?.height ?: constraints.maxHeight
-                if (frozenSize == null) {
-                    lastSurfaceSize[0] = width
-                    lastSurfaceSize[1] = height
-                }
-                val placeable = measurable.measure(Constraints.fixed(width, height))
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    placeable.place((constraints.maxWidth - width) / 2, (constraints.maxHeight - height) / 2)
-                }
-            },
+            modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 MpvView(ctx).also { view ->
                     view.keepScreenOn = true
