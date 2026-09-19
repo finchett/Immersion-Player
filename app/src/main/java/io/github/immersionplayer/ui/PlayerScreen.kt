@@ -1,6 +1,15 @@
 package io.github.immersionplayer.ui
 
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
@@ -198,6 +207,32 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
         onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+
+    // pause when the app is backgrounded or the screen turns off, and when headphones disconnect
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> session.savePosition()
+                Lifecycle.Event.ON_STOP -> session.pause()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        val noisyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) = session.pause()
+        }
+        ContextCompat.registerReceiver(
+            context,
+            noisyReceiver,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            context.unregisterReceiver(noisyReceiver)
+        }
     }
 
     var subtitleStatus by remember { mutableStateOf<String?>("Reading subtitles…") }

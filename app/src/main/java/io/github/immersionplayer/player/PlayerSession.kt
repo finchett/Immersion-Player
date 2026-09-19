@@ -3,6 +3,9 @@ package io.github.immersionplayer.player
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import io.github.immersionplayer.Prefs
@@ -51,6 +54,21 @@ class PlayerSession(
     private val _fill = MutableStateFlow(prefs.videoFill)
     val fill: StateFlow<Boolean> = _fill.asStateFlow()
 
+    // pause when another app (or a call) takes the audio; we don't auto-resume
+    private val audioManager = context.getSystemService(AudioManager::class.java)
+    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                .build()
+        )
+        .setOnAudioFocusChangeListener({ change ->
+            if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) pause()
+        }, mainHandler)
+        .build()
+    private var hasFocus = false
+
     private var autoPausedLine = -1
     private var lastCopiedLine = -1
 
@@ -61,6 +79,7 @@ class PlayerSession(
 
     fun detach() {
         savePosition()
+        abandonFocus()
         view?.listener = null
         view = null
     }
@@ -172,7 +191,20 @@ class PlayerSession(
 
     override fun onPause(paused: Boolean) {
         _paused.value = paused
-        if (paused) mainHandler.post { savePosition() }
+        mainHandler.post {
+            if (paused) savePosition() else requestFocus()
+        }
+    }
+
+    private fun requestFocus() {
+        if (hasFocus) return
+        hasFocus = audioManager?.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonFocus() {
+        if (!hasFocus) return
+        audioManager?.abandonAudioFocusRequest(focusRequest)
+        hasFocus = false
     }
 
     companion object {
