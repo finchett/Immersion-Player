@@ -476,7 +476,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
                     "${formatTime(position)} / ${formatTime(duration)}",
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 12.dp)
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 44.dp)
                         .background(Color(0x88000000), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
