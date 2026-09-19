@@ -165,19 +165,24 @@ class DictionaryLookup(private val database: DictionaryDatabase) {
         fun isKanji(c: Char): Boolean = c in '\u4E00'..'\u9FFF' || c in '\u3400'..'\u4DBF' || c == '々'
 
         /**
-         * Where to look up by default in a line: kanji first, then other text, skipping
-         * speaker names and readings in brackets, punctuation and spaces.
+         * Where to look up by default in a line: kanji first, then other text, skipping punctuation
+         * and spaces. Speaker names and readings in brackets are skipped, unless the whole line is
+         * bracketed (sound descriptions like （猫の鳴き声）), in which case the bracketed text is used.
          */
         fun defaultLookupPositions(text: String): List<Int> {
-            val candidates = mutableListOf<Int>()
+            val outside = mutableListOf<Int>()
+            val inside = mutableListOf<Int>()
             var depth = 0
             for ((i, c) in text.withIndex()) {
                 when (c) {
                     '（', '(', '［', '[', '【', '〔' -> depth++
                     '）', ')', '］', ']', '】', '〕' -> depth = (depth - 1).coerceAtLeast(0)
-                    else -> if (depth == 0 && !c.isWhitespace() && c !in STOP_CHARACTERS) candidates.add(i)
+                    else -> if (!c.isWhitespace() && c !in STOP_CHARACTERS) {
+                        if (depth == 0) outside.add(i) else inside.add(i)
+                    }
                 }
             }
+            val candidates = outside.ifEmpty { inside }
             return candidates.filter { isKanji(text[it]) } + candidates.filter { !isKanji(text[it]) }
         }
 

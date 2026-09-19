@@ -12,6 +12,17 @@ class DefaultLookupPositionsTest {
     }
 
     @Test
+    fun usesBracketedTextForSoundDescriptions() {
+        val text = "（猫の鳴き声）"
+        assertEquals('猫', text[DictionaryLookup.defaultLookupPositions(text).first()])
+    }
+
+    @Test
+    fun musicMarksHaveNothingToLookUp() {
+        assertEquals(emptyList<Int>(), DictionaryLookup.defaultLookupPositions("♪～"))
+    }
+
+    @Test
     fun skipsSpeakerNameAndReading() {
         val text = "（相生祐子(あいおいゆうこ)）ああ"
         val positions = DictionaryLookup.defaultLookupPositions(text)
