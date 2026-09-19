@@ -45,6 +45,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,6 +106,43 @@ data class ActiveLookup(
 
 /** Seconds covered by dragging across the full width of the video at normal speed. */
 private const val SCRUB_SECONDS_PER_WIDTH = 90.0
+
+private const val MIN_PANEL_FRACTION = 0.28f
+private const val MAX_PANEL_FRACTION = 0.5f
+
+/** Drag handle between the video and the study panel. */
+@Composable
+private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
+    var dragging by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .fillMaxHeight()
+            .width(14.dp)
+            .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragging = true },
+                    onDragEnd = { dragging = false; onDragEnd() },
+                    onDragCancel = { dragging = false; onDragEnd() },
+                    onHorizontalDrag = { change, dx ->
+                        change.consume()
+                        onDrag(dx)
+                    },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .width(if (dragging) 5.dp else 4.dp)
+                .height(44.dp)
+                .background(
+                    if (dragging) MaterialTheme.colorScheme.primary else Color(0xFF4A4E55),
+                    RoundedCornerShape(3.dp),
+                ),
+        )
+    }
+}
 
 /** Window for a second tap on the study panel to count as a double tap. */
 private const val PANEL_DOUBLE_TAP_MS = 180L
@@ -198,6 +236,10 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
     }
 
 
+    var panelFraction by remember {
+        mutableFloatStateOf(app.prefs.panelFraction.coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION))
+    }
+
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val landscape = maxWidth > maxHeight
@@ -224,10 +266,16 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                 )
             }
             if (landscape) {
+                val totalWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
                 Row(Modifier.fillMaxSize()) {
-                    videoArea(Modifier.weight(0.63f).fillMaxHeight())
-                    VerticalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                    sidePanel(Modifier.weight(0.37f).fillMaxHeight())
+                    videoArea(Modifier.weight(1f - panelFraction).fillMaxHeight())
+                    ResizeHandle(
+                        onDrag = { dx ->
+                            panelFraction = (panelFraction - dx / totalWidthPx).coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION)
+                        },
+                        onDragEnd = { app.prefs.panelFraction = panelFraction },
+                    )
+                    sidePanel(Modifier.weight(panelFraction).fillMaxHeight())
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
