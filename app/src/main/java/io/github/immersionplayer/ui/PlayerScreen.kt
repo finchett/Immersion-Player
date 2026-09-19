@@ -1,6 +1,7 @@
 package io.github.immersionplayer.ui
 
 import android.app.Activity
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -472,6 +473,7 @@ private fun StudyPanel(
             notice = null
         }
     }
+    var lastPanelTap by remember { mutableStateOf(0L) }
     fun toggleStopAtEnd() {
         val enabled = !autoPause
         session.setAutoPause(enabled)
@@ -506,8 +508,19 @@ private fun StudyPanel(
                             onHold(false)
                         },
                         onLongPress = { onHold(true) },
-                        onTap = { session.togglePause() },
-                        onDoubleTap = { toggleStopAtEnd() },
+                        // play/pause right away (no double-tap wait); a quick second tap undoes
+                        // that and toggles stop-at-end instead
+                        onTap = {
+                            val now = SystemClock.uptimeMillis()
+                            if (now - lastPanelTap < viewConfiguration.doubleTapTimeoutMillis) {
+                                lastPanelTap = 0L
+                                session.togglePause()
+                                toggleStopAtEnd()
+                            } else {
+                                lastPanelTap = now
+                                session.togglePause()
+                            }
+                        },
                     )
                 },
         ) {
