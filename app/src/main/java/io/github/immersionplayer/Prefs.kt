@@ -17,9 +17,14 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("shoulder_triggers", true)
         set(value) = prefs.edit { putBoolean("shoulder_triggers", value) }
 
-    var swapShoulderTriggers: Boolean
-        get() = prefs.getBoolean("swap_shoulder_triggers", false)
-        set(value) = prefs.edit { putBoolean("swap_shoulder_triggers", value) }
+    /** Key codes the triggers send; defaults are what RedMagic's trigger sensors report. */
+    var previousLineKey: Int
+        get() = prefs.getInt("previous_line_key", android.view.KeyEvent.KEYCODE_F7)
+        set(value) = prefs.edit { putInt("previous_line_key", value) }
+
+    var nextLineKey: Int
+        get() = prefs.getInt("next_line_key", android.view.KeyEvent.KEYCODE_F8)
+        set(value) = prefs.edit { putInt("next_line_key", value) }
 
     var theme: String?
         get() = prefs.getString("theme", null)

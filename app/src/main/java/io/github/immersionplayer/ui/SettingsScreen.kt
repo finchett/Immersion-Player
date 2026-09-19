@@ -30,6 +30,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.DisposableEffect
+import io.github.immersionplayer.player.TriggerSetup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +63,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
     var importing by remember { mutableStateOf<String?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<DictionaryInfo?>(null) }
+    var showTriggerSetup by remember { mutableStateOf(false) }
 
     suspend fun refresh() {
         dictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries() }
@@ -189,14 +194,14 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
 
             SettingSwitch(
                 title = "Shoulder triggers change lines",
-                description = "Left trigger: previous line, right trigger: next line. For phones whose triggers send F7/F8 keys (RedMagic).",
+                description = "Step through lines with the phone's shoulder triggers (RedMagic and similar). Use the setup below to teach it your triggers.",
                 initial = app.prefs.shoulderTriggers,
             ) { app.prefs.shoulderTriggers = it }
-            SettingSwitch(
-                title = "Swap shoulder triggers",
-                description = "Use this if the triggers go the wrong way.",
-                initial = app.prefs.swapShoulderTriggers,
-            ) { app.prefs.swapShoulderTriggers = it }
+            if (showTriggerSetup) {
+                TriggerSetupCard(app, onDone = { showTriggerSetup = false })
+            } else {
+                OutlinedButton(onClick = { showTriggerSetup = true }) { Text("Set up shoulder triggers…") }
+            }
 
             var size by remember { mutableStateOf(app.prefs.subtitleSize) }
             Text("Subtitle size: ${size.toInt()}")
@@ -281,5 +286,81 @@ private fun SettingSwitch(title: String, description: String, initial: Boolean, 
             Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Switch(checked = checked, onCheckedChange = { checked = it; onChange(it) })
+    }
+}
+
+/**
+ * Learns which keys the phone's shoulder triggers send (and reports taps if it sends those instead).
+ * Inline rather than a dialog: key presses only reach the activity when no dialog window has focus.
+ */
+@Composable
+private fun TriggerSetupCard(app: App, onDone: () -> Unit) {
+    DisposableEffect(Unit) {
+        TriggerSetup.start()
+        onDispose { TriggerSetup.stop() }
+    }
+    val lastKey by TriggerSetup.lastKey.collectAsState()
+    val lastTouch by TriggerSetup.lastTouch.collectAsState()
+    var step by remember { mutableIntStateOf(0) } // 0 = previous, 1 = next, 2 = done
+    var previousKey by remember { mutableStateOf<TriggerSetup.Seen?>(null) }
+    var nextKey by remember { mutableStateOf<TriggerSetup.Seen?>(null) }
+
+    LaunchedEffect(lastKey) {
+        val key = lastKey ?: return@LaunchedEffect
+        when (step) {
+            0 -> { previousKey = key; step = 1 }
+            1 -> if (key.keyCode != previousKey?.keyCode) { nextKey = key; step = 2 }
+        }
+    }
+
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Set up shoulder triggers", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "On RedMagic phones the triggers only work while the app runs in Game Space, " +
+                    "so add Immersion Player to Game Space first.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                when (step) {
+                    0 -> "Press the trigger for PREVIOUS line."
+                    1 -> "Now press the trigger for NEXT line."
+                    else -> "Done. Save to use these."
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            previousKey?.let { Text("Previous line: ${it.description}") }
+            nextKey?.let { Text("Next line: ${it.description}") }
+            lastTouch?.let {
+                Text(
+                    "Also received a screen $it. If that appeared when you pressed a trigger, " +
+                        "Game Space is sending taps instead of keys.",
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val previous = previousKey?.keyCode
+                        val next = nextKey?.keyCode
+                        if (previous != null && next != null) {
+                            app.prefs.previousLineKey = previous
+                            app.prefs.nextLineKey = next
+                            app.prefs.shoulderTriggers = true
+                        }
+                        onDone()
+                    },
+                    enabled = step == 2,
+                ) { Text("Save") }
+                TextButton(onClick = {
+                    step = 0
+                    previousKey = null
+                    nextKey = null
+                }) { Text("Start over") }
+                TextButton(onClick = onDone) { Text("Cancel") }
+            }
+        }
     }
 }
