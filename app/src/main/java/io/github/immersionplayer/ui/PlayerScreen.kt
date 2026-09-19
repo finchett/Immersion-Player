@@ -429,6 +429,24 @@ private fun StudyPanel(
     }
     LaunchedEffect(lineIndex) { peeking = false }
 
+    // brief "Stop at end: on/off" notice after a double tap
+    val autoPause by session.autoPause.collectAsState()
+    var notice by remember { mutableStateOf<String?>(null) }
+    var noticeCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(noticeCount) {
+        if (noticeCount > 0) {
+            delay(1200)
+            notice = null
+        }
+    }
+    fun toggleStopAtEnd() {
+        val enabled = !autoPause
+        session.setAutoPause(enabled)
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        notice = if (enabled) "Stop at end of line: on" else "Stop at end of line: off"
+        noticeCount++
+    }
+
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
         BoxWithConstraints(
             Modifier
@@ -456,6 +474,7 @@ private fun StudyPanel(
                         },
                         onLongPress = { onHold(true) },
                         onTap = { session.togglePause() },
+                        onDoubleTap = { toggleStopAtEnd() },
                     )
                 },
         ) {
@@ -499,6 +518,22 @@ private fun StudyPanel(
                         )
                     }
                 }
+            }
+
+            AnimatedVisibility(
+                visible = notice != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).zIndex(2f),
+            ) {
+                Text(
+                    notice.orEmpty(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .background(Color(0xE0303338), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
         }
     }
