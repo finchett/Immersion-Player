@@ -156,7 +156,9 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
         lookup = ActiveLookup(line, text, start)
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { app.lookup.lookup(text, start, maxLength) }.getOrNull()
+                runCatching { app.lookup.lookup(text, start, maxLength) }
+                    .onFailure { app.logError("lookup '$text' @$start", it) }
+                    .getOrNull()
             }
             if (generation == lookupGeneration) lookup = ActiveLookup(line, text, start, result)
         }
@@ -174,7 +176,9 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
         val found = withContext(Dispatchers.IO) {
             var fallback: ActiveLookup? = null
             for (position in positions.take(16)) {
-                val result = runCatching { app.lookup.lookup(text, position) }.getOrNull() ?: continue
+                val result = runCatching { app.lookup.lookup(text, position) }
+                    .onFailure { app.logError("auto lookup '$text' @$position", it) }
+                    .getOrNull() ?: continue
                 if (result.entries.isNotEmpty()) return@withContext ActiveLookup(lineIndex, text, position, result)
                 if (fallback == null) fallback = ActiveLookup(lineIndex, text, position, result)
             }

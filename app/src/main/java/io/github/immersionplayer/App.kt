@@ -19,6 +19,15 @@ class App : Application() {
     lateinit var subtitleLoader: SubtitleLoader
         private set
 
+    /** Appends a non-fatal error to files/errors.log (the system log isn't always available). */
+    fun logError(context: String, error: Throwable) {
+        runCatching {
+            val file = java.io.File(filesDir, "errors.log")
+            if (file.length() > 256 * 1024) file.delete()
+            file.appendText("${java.util.Date()} $context\n${error.stackTraceToString()}\n")
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         // keep the last crash on disk (the system log isn't always available)
