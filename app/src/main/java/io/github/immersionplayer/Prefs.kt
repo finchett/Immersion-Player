@@ -6,6 +6,7 @@ import androidx.core.content.edit
 class Prefs(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val positions = context.getSharedPreferences("positions", Context.MODE_PRIVATE)
+    private val perVideo = context.getSharedPreferences("per_video", Context.MODE_PRIVATE)
 
     var libraryTreeUri: String?
         get() = prefs.getString("library_tree_uri", null)
@@ -38,6 +39,18 @@ class Prefs(context: Context) {
     var subtitleSize: Float
         get() = prefs.getFloat("subtitle_size", 26f)
         set(value) = prefs.edit { putFloat("subtitle_size", value) }
+
+    /** Seconds to shift a video's subtitles (positive = subtitles appear later). */
+    fun subtitleOffset(uri: String): Double = perVideo.getFloat("offset:$uri", 0f).toDouble()
+
+    fun setSubtitleOffset(uri: String, seconds: Double) =
+        perVideo.edit { putFloat("offset:$uri", seconds.toFloat()) }
+
+    /** Name of the track picked for a video; "" means "none" (translation only), null means not chosen. */
+    fun trackChoice(uri: String, role: String): String? = perVideo.getString("$role:$uri", null)
+
+    fun setTrackChoice(uri: String, role: String, name: String) =
+        perVideo.edit { putString("$role:$uri", name) }
 
     fun position(uri: String): Double = positions.getFloat(uri, 0f).toDouble()
 

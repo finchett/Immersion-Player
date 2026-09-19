@@ -40,6 +40,13 @@ class PlayerSession(
     private val _secondary = MutableStateFlow<SubtitleTrack?>(null)
     val secondary: StateFlow<SubtitleTrack?> = _secondary.asStateFlow()
 
+    private val _tracks = MutableStateFlow<List<SubtitleTrack>>(emptyList())
+    val tracks: StateFlow<List<SubtitleTrack>> = _tracks.asStateFlow()
+
+    /** Subtitle shift in seconds; positive means subtitles appear later. */
+    private val _offset = MutableStateFlow(prefs.subtitleOffset(videoUri))
+    val offset: StateFlow<Double> = _offset.asStateFlow()
+
     /** Cue on screen now, or the last one that started (-1 before the first line). */
     private val _lineIndex = MutableStateFlow(-1)
     val lineIndex: StateFlow<Int> = _lineIndex.asStateFlow()
@@ -84,9 +91,35 @@ class PlayerSession(
         view = null
     }
 
-    fun setTracks(primary: SubtitleTrack?, secondary: SubtitleTrack?) {
-        _primary.value = primary
-        _secondary.value = secondary
+    /** Loads a video's tracks, restoring the user's earlier choices for this video if any. */
+    fun setTracks(all: List<SubtitleTrack>, defaultPrimary: SubtitleTrack?, defaultSecondary: SubtitleTrack?) {
+        _tracks.value = all
+        val savedPrimary = prefs.trackChoice(videoUri, "primary")
+        val savedSecondary = prefs.trackChoice(videoUri, "secondary")
+        _primary.value = all.firstOrNull { it.name == savedPrimary } ?: defaultPrimary
+        _secondary.value = when (savedSecondary) {
+            null -> defaultSecondary
+            "" -> null
+            else -> all.firstOrNull { it.name == savedSecondary } ?: defaultSecondary
+        }
+        updateLine(_position.value)
+    }
+
+    fun selectPrimary(track: SubtitleTrack) {
+        _primary.value = track
+        prefs.setTrackChoice(videoUri, "primary", track.name)
+        updateLine(_position.value)
+    }
+
+    fun selectSecondary(track: SubtitleTrack?) {
+        _secondary.value = track
+        prefs.setTrackChoice(videoUri, "secondary", track?.name ?: "")
+    }
+
+    fun setOffset(seconds: Double) {
+        val rounded = Math.round(seconds * 10) / 10.0
+        _offset.value = rounded
+        prefs.setSubtitleOffset(videoUri, rounded)
         updateLine(_position.value)
     }
 
@@ -126,7 +159,7 @@ class PlayerSession(
         val cues = _primary.value?.cues ?: return
         val cue = cues.getOrNull(index) ?: return
         autoPausedLine = -1
-        seekTo(cue.start)
+        seekTo((cue.start + _offset.value).coerceAtLeast(0.0))
         play()
     }
 
@@ -151,8 +184,10 @@ class PlayerSession(
         prefs.savePosition(videoUri, _position.value, _duration.value)
     }
 
-    private fun updateLine(time: Double) {
+    private fun updateLine(videoTime: Double) {
         val track = _primary.value ?: return
+        // subtitle clock: shifted subtitles show later (positive offset) or earlier
+        val time = videoTime - _offset.value
         val index = track.indexAt(time)
         val active = index >= 0 && time < track.cues[index].end
         _lineIndex.value = index
