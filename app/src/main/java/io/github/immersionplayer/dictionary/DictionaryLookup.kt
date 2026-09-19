@@ -34,9 +34,10 @@ data class LookupResult(
 
 class DictionaryLookup(private val database: DictionaryDatabase) {
 
-    fun lookup(text: String, start: Int): LookupResult? {
+    /** Longest dictionary match starting at [start], at most [maxLength] characters long. */
+    fun lookup(text: String, start: Int, maxLength: Int = MAX_LENGTH): LookupResult? {
         if (start !in text.indices) return null
-        val window = scanWindow(text, start)
+        val window = scanWindow(text, start, maxLength.coerceIn(1, MAX_LENGTH))
         if (window.isEmpty()) return null
 
         // candidates for every prefix length, longest first
@@ -112,8 +113,8 @@ class DictionaryLookup(private val database: DictionaryDatabase) {
         return LookupResult(text, start, entries.first().sourceLength, entries)
     }
 
-    private fun scanWindow(text: String, start: Int): String {
-        val end = minOf(text.length, start + MAX_LENGTH)
+    private fun scanWindow(text: String, start: Int, maxLength: Int): String {
+        val end = minOf(text.length, start + maxLength)
         val builder = StringBuilder()
         for (i in start until end) {
             val c = text[i]
@@ -160,6 +161,25 @@ class DictionaryLookup(private val database: DictionaryDatabase) {
     companion object {
         private const val MAX_LENGTH = 24
         private const val STOP_CHARACTERS = "。、！？!?「」『』（）()【】［］[]〈〉《》…‥・,.，．\"'“”‘’〜～♪"
+
+        fun isKanji(c: Char): Boolean = c in '\u4E00'..'\u9FFF' || c in '\u3400'..'\u4DBF' || c == '々'
+
+        /**
+         * Where to look up by default in a line: kanji first, then other text, skipping
+         * speaker names and readings in brackets, punctuation and spaces.
+         */
+        fun defaultLookupPositions(text: String): List<Int> {
+            val candidates = mutableListOf<Int>()
+            var depth = 0
+            for ((i, c) in text.withIndex()) {
+                when (c) {
+                    '（', '(', '［', '[', '【', '〔' -> depth++
+                    '）', ')', '］', ']', '】', '〕' -> depth = (depth - 1).coerceAtLeast(0)
+                    else -> if (depth == 0 && !c.isWhitespace() && c !in STOP_CHARACTERS) candidates.add(i)
+                }
+            }
+            return candidates.filter { isKanji(text[it]) } + candidates.filter { !isKanji(text[it]) }
+        }
 
         fun katakanaToHiragana(text: String): String =
             buildString(text.length) {
