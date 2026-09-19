@@ -17,6 +17,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("shoulder_triggers", true)
         set(value) = prefs.edit { putBoolean("shoulder_triggers", value) }
 
+    /** Show tap targets that game-mode trigger mappings (screen taps) can be placed on. */
+    var triggerTargets: Boolean
+        get() = prefs.getBoolean("trigger_targets", false)
+        set(value) = prefs.edit { putBoolean("trigger_targets", value) }
+
     /** Key codes the triggers send; defaults are what RedMagic's trigger sensors report. */
     var previousLineKey: Int
         get() = prefs.getInt("previous_line_key", android.view.KeyEvent.KEYCODE_F7)
