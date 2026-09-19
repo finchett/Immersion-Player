@@ -35,7 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
 import io.github.immersionplayer.App
+import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +58,8 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
         dictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries() }
         minedCount = withContext(Dispatchers.IO) { app.miningStore.all().size }
     }
-    LaunchedEffect(Unit) { refresh() }
+    val setupStatus by BundledDictionaries.status.collectAsState()
+    LaunchedEffect(setupStatus) { refresh() }
 
     val pickZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -125,6 +128,10 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                     TextButton(onClick = { confirmDelete = dict }) { Text("Remove") }
                 }
             }
+            setupStatus?.let {
+                Text(it, color = MaterialTheme.colorScheme.tertiary)
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
             val importStatus = importing
             if (importStatus != null) {
                 Text(importStatus)
@@ -167,6 +174,17 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
             Text(
                 "$minedCount saved. Each keeps the sentence, translation and timing for Anki export (coming later).",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            HorizontalDivider()
+            Text("About", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Bundled dictionary: JMdict, © Electronic Dictionary Research and Development Group, " +
+                    "used under the CC BY-SA 4.0 licence (edrdg.org/edrdg/licence.html). " +
+                    "Yomitan conversion by rikaitan-import (Ajatt-Tools). " +
+                    "Playback: libmpv via mpv-android.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
     }

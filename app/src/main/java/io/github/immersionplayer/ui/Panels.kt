@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.immersionplayer.dictionary.Definition
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.subs.SubtitleTrack
 
@@ -144,6 +145,7 @@ fun TranscriptPanel(
 fun DictionaryPanel(
     lookup: ActiveLookup,
     hasDictionaries: Boolean,
+    setupStatus: String?,
     onClose: () -> Unit,
     onMine: (TermEntry) -> Unit,
     isMined: (TermEntry) -> Boolean,
@@ -176,6 +178,7 @@ fun DictionaryPanel(
 
         val result = lookup.result
         when {
+            !hasDictionaries && setupStatus != null -> Message("$setupStatus\nThis only happens once.")
             !hasDictionaries -> Message("No dictionaries yet. Import a Yomitan dictionary (e.g. Jitendex) under Dictionaries & settings.")
             result == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             result.entries.isEmpty() -> Message("No match.")
@@ -231,27 +234,59 @@ private fun TermCard(
                 }
             }
         }
-        entry.definitions.forEach { definition ->
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Chip(definition.dictionaryTitle, MaterialTheme.colorScheme.primary)
-                    (definition.definitionTags.split(' ') + definition.termTags.split(' '))
-                        .filter { it.isNotBlank() }
-                        .distinct()
-                        .take(4)
-                        .forEach { Chip(it, MaterialTheme.colorScheme.secondary) }
+        // one heading per dictionary; some dictionaries (e.g. JMdict) store each sense as its own row
+        entry.definitions.groupBy { it.dictionaryTitle }.forEach { (title, definitions) ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // word-level tags (⭐, news, ichi…) repeat on every sense row, so show them once
+                val wordTags = definitions.flatMap { it.termTags.split(' ') }.filter { it.isNotBlank() }.distinct()
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Chip(title, MaterialTheme.colorScheme.primary)
+                    wordTags.forEach { Chip(it, MaterialTheme.colorScheme.tertiary) }
                 }
-                val rendered = remember(definition.glossaryJson, colors) { Glossary.render(definition.glossaryJson, colors) }
-                Text(
-                    rendered,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                val senses = definitions.filter { !it.isFormsList() }
+                val forms = definitions.filter { it.isFormsList() }
+                senses.forEachIndexed { index, definition ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (senses.size > 1) {
+                            Text(
+                                "${index + 1}",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.width(18.dp),
+                            )
+                        }
+                        Column(Modifier.weight(1f)) {
+                            val tags = definition.tagList()
+                            if (tags.isNotEmpty()) {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    tags.forEach { Chip(it, MaterialTheme.colorScheme.secondary) }
+                                }
+                            }
+                            val rendered = remember(definition.glossaryJson, colors) { Glossary.render(definition.glossaryJson, colors) }
+                            Text(rendered, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+                forms.forEach { definition ->
+                    val rendered = remember(definition.glossaryJson, colors) { Glossary.render(definition.glossaryJson, colors) }
+                    Text(
+                        "Other forms: " + rendered.text.lines().joinToString("、") { it.substringAfter(". ").trim() },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         Spacer(Modifier.padding(2.dp))
     }
 }
+
+/** Sense-level tags, without the sense numbers some dictionaries store as tags. */
+private fun Definition.tagList(): List<String> =
+    definitionTags.split(' ').filter { it.isNotBlank() && it.toIntOrNull() == null }.distinct()
+
+/** rikaitan-import JMdict adds a separate "forms" row listing alternative spellings. */
+private fun Definition.isFormsList(): Boolean = "forms" in definitionTags.split(' ')
 
 @Composable
 private fun Chip(text: String, color: Color) {
