@@ -66,6 +66,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.Switch
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -129,7 +140,7 @@ private val RESIZE_ZONE_WIDTH = 24.dp
 
 /** Invisible drag zone on the video/panel edge; a grip appears only while it's touched. */
 @Composable
-private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit, modifier: Modifier) {
+private fun ResizeHandle(onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: () -> Unit, modifier: Modifier) {
     var touched by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     Box(
@@ -146,7 +157,7 @@ private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit, modifie
             }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
-                    onDragStart = { dragging = true },
+                    onDragStart = { dragging = true; onDragStart() },
                     onDragEnd = { dragging = false; onDragEnd() },
                     onDragCancel = { dragging = false; onDragEnd() },
                     onHorizontalDrag = { change, dx ->
@@ -235,7 +246,7 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
         }
         tracks.onSuccess { list ->
             val primary = SubtitleLoader.pickPrimary(list)
-            session.setTracks(primary, SubtitleLoader.pickSecondary(list, primary))
+            session.setTracks(list, primary, SubtitleLoader.pickSecondary(list, primary))
             subtitleStatus = if (primary == null) "No text subtitles found for this video" else null
         }.onFailure {
             subtitleStatus = "Couldn't read subtitles: ${it.message}"
@@ -297,9 +308,11 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
     }
 
 
-    var panelFraction by remember {
+    // read only during layout/drawing so dragging the divider never recomposes the screen
+    val panelFraction = remember {
         mutableFloatStateOf(app.prefs.panelFraction.coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION))
     }
+    var resizing by remember { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -309,6 +322,7 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                 VideoArea(
                     session = session,
                     startPosition = app.prefs.position(session.videoUri),
+                    freezeSurface = resizing,
                     modifier = modifier,
                 )
             }
@@ -327,21 +341,40 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
             }
             if (landscape) {
                 val totalWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
-                val boundary = maxWidth * (1f - panelFraction)
+                val zonePx = with(LocalDensity.current) { RESIZE_ZONE_WIDTH.toPx() }
                 Box(Modifier.fillMaxSize()) {
-                    Row(Modifier.fillMaxSize()) {
-                        videoArea(Modifier.weight(1f - panelFraction).fillMaxHeight())
-                        sidePanel(Modifier.weight(panelFraction).fillMaxHeight())
+                    Layout(
+                        content = {
+                            videoArea(Modifier)
+                            sidePanel(Modifier)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    ) { measurables, constraints ->
+                        val width = constraints.maxWidth
+                        val height = constraints.maxHeight
+                        val panelWidth = (width * panelFraction.floatValue).roundToInt()
+                        val videoWidth = width - panelWidth
+                        val video = measurables[0].measure(Constraints.fixed(videoWidth, height))
+                        val panel = measurables[1].measure(Constraints.fixed(panelWidth, height))
+                        layout(width, height) {
+                            video.place(0, 0)
+                            panel.place(videoWidth, 0)
+                        }
                     }
                     // invisible grab zone straddling the edge, mid-height; takes no layout space
                     ResizeHandle(
+                        onDragStart = { resizing = true },
                         onDrag = { dx ->
-                            panelFraction = (panelFraction - dx / totalWidthPx).coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION)
+                            panelFraction.floatValue = (panelFraction.floatValue - dx / totalWidthPx)
+                                .coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION)
                         },
-                        onDragEnd = { app.prefs.panelFraction = panelFraction },
+                        onDragEnd = {
+                            resizing = false
+                            app.prefs.panelFraction = panelFraction.floatValue
+                        },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .offset(x = boundary - RESIZE_ZONE_WIDTH / 2)
+                            .offset { IntOffset((totalWidthPx * (1f - panelFraction.floatValue) - zonePx / 2).roundToInt(), 0) }
                             .width(RESIZE_ZONE_WIDTH)
                             .height(140.dp),
                     )
@@ -361,7 +394,13 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
  * A thin progress line sits on the bottom edge; time and a close button show while paused.
  */
 @Composable
-private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: Modifier) {
+private fun VideoArea(session: PlayerSession, startPosition: Double, freezeSurface: Boolean, modifier: Modifier) {
+    // While the divider is dragged the video surface keeps its size (centred, cropped or
+    // letterboxed) so mpv isn't reconfigured every frame; it resizes once on release.
+    val lastSurfaceSize = remember { intArrayOf(0, 0) }
+    val frozenSize = remember(freezeSurface) {
+        if (freezeSurface && lastSurfaceSize[0] > 0) IntSize(lastSurfaceSize[0], lastSurfaceSize[1]) else null
+    }
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
     val position by session.position.collectAsState()
@@ -371,6 +410,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
     var scrubOffset by remember { mutableStateOf(0.0) }
     var scrubSpeed by remember { mutableStateOf(1.0) }
     var flash by remember { mutableIntStateOf(0) }
+    var showOptions by remember { mutableStateOf(false) }
 
     // double-tap jumps on the video's edges
     val videoScope = rememberCoroutineScope()
@@ -426,11 +466,22 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
         }
     }
 
-    BoxWithConstraints(modifier.background(Color.Black)) {
+    BoxWithConstraints(modifier.clipToBounds().background(Color.Black)) {
         val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.layout { measurable, constraints ->
+                val width = frozenSize?.width ?: constraints.maxWidth
+                val height = frozenSize?.height ?: constraints.maxHeight
+                if (frozenSize == null) {
+                    lastSurfaceSize[0] = width
+                    lastSurfaceSize[1] = height
+                }
+                val placeable = measurable.measure(Constraints.fixed(width, height))
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeable.place((constraints.maxWidth - width) / 2, (constraints.maxHeight - height) / 2)
+                }
+            },
             factory = { ctx ->
                 MpvView(ctx).also { view ->
                     view.keepScreenOn = true
@@ -609,8 +660,20 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
                         .background(Color(0x88000000), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
+                Text(
+                    "⋯",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .background(Color(0x88000000), CircleShape)
+                        .clickable { showOptions = true }
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                )
             }
         }
+        if (showOptions) PlayerOptions(session, onDismiss = { showOptions = false })
 
         // seek bar: a thin line on the bottom edge, hidden while playing. While paused it can be
         // tapped or dragged (via an invisible touch strip); it fattens while held.
@@ -910,6 +973,97 @@ private fun CurrentLine(
         }
 
     }
+}
+
+/** Per-video options, opened from the ⋯ button while paused. */
+@Composable
+private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
+    val tracks by session.tracks.collectAsState()
+    val primary by session.primary.collectAsState()
+    val secondary by session.secondary.collectAsState()
+    val offset by session.offset.collectAsState()
+    val fill by session.fill.collectAsState()
+    val autoPause by session.autoPause.collectAsState()
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(0.8f),
+        ) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Options", style = MaterialTheme.typography.titleLarge)
+
+                if (tracks.isEmpty()) {
+                    Text("No text subtitle tracks in this video.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text("Subtitles to study", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tracks.forEach { track ->
+                            FilterChip(
+                                selected = track === primary,
+                                onClick = { session.selectPrimary(track) },
+                                label = { Text(trackLabel(track), maxLines = 1) },
+                            )
+                        }
+                    }
+                    Text("Translation (hold the panel to peek)", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = secondary == null,
+                            onClick = { session.selectSecondary(null) },
+                            label = { Text("None") },
+                        )
+                        tracks.filter { it !== primary }.forEach { track ->
+                            FilterChip(
+                                selected = track === secondary,
+                                onClick = { session.selectSecondary(track) },
+                                label = { Text(trackLabel(track), maxLines = 1) },
+                            )
+                        }
+                    }
+                }
+
+                Text("Subtitle timing", style = MaterialTheme.typography.titleSmall)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(-1.0 to "−1s", -0.1 to "−0.1s").forEach { (delta, label) ->
+                        FilledTonalButton(onClick = { session.setOffset(offset + delta) }) { Text(label) }
+                    }
+                    Text(
+                        when {
+                            offset == 0.0 -> "in sync"
+                            offset > 0 -> "+%.1fs later".format(offset)
+                            else -> "%.1fs earlier".format(-offset)
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(96.dp),
+                    )
+                    listOf(0.1 to "+0.1s", 1.0 to "+1s").forEach { (delta, label) ->
+                        FilledTonalButton(onClick = { session.setOffset(offset + delta) }) { Text(label) }
+                    }
+                    if (offset != 0.0) TextButton(onClick = { session.setOffset(0.0) }) { Text("Reset") }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Fill the video area (or pinch)", Modifier.weight(1f))
+                    Switch(checked = fill, onCheckedChange = session::setFill)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Stop at the end of each line (or double-tap the panel)", Modifier.weight(1f))
+                    Switch(checked = autoPause, onCheckedChange = session::setAutoPause)
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Done") }
+            }
+        }
+    }
+}
+
+private fun trackLabel(track: SubtitleTrack): String {
+    val language = track.language?.let { " · $it" }.orEmpty()
+    return "${track.name}$language · ${track.cues.size} lines"
 }
 
 /** English text overlapping a Japanese line's time range. */
