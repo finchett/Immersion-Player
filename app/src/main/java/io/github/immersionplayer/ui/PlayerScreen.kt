@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -482,7 +483,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
             }
         }
 
-        // progress line: only while paused or scrubbing
+        // seek bar: hidden while playing; while paused it can be tapped or dragged to an exact spot
         AnimatedVisibility(
             visible = paused || scrubTarget != null,
             enter = fadeIn(),
@@ -491,8 +492,59 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
         ) {
             val shown = scrubTarget ?: position
             val fraction = if (duration > 0) (shown / duration).toFloat().coerceIn(0f, 1f) else 0f
-            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0x33FFFFFF))) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(MaterialTheme.colorScheme.primary))
+            val thumbSize = 14.dp
+            fun timeAt(x: Float) = (x / widthPx).coerceIn(0f, 1f) * session.duration.value
+            BoxWithConstraints(
+                Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .pointerInput(widthPx) {
+                        detectTapGestures(onTap = { offset -> session.seekTo(timeAt(offset.x)) })
+                    }
+                    .pointerInput(widthPx) {
+                        var start = 0.0
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset ->
+                                start = session.position.value
+                                scrubSpeed = 1.0
+                                scrubTarget = timeAt(offset.x)
+                                scrubOffset = scrubTarget!! - start
+                            },
+                            onHorizontalDrag = { change, _ ->
+                                change.consume()
+                                scrubTarget = timeAt(change.position.x)
+                                scrubOffset = scrubTarget!! - start
+                            },
+                            onDragEnd = {
+                                scrubTarget?.let(session::seekTo)
+                                scrubTarget = null
+                            },
+                            onDragCancel = { scrubTarget = null },
+                        )
+                    },
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                val trackWidth = maxWidth
+                Box(
+                    Modifier
+                        .padding(bottom = 10.dp)
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .background(Color(0x44FFFFFF), RoundedCornerShape(3.dp)),
+                ) {
+                    Box(
+                        Modifier.fillMaxHeight().fillMaxWidth(fraction)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp)),
+                    )
+                }
+                Box(
+                    Modifier
+                        .padding(bottom = 10.dp - (thumbSize - 5.dp) / 2)
+                        .offset(x = (trackWidth * fraction - thumbSize / 2).coerceIn(0.dp, trackWidth - thumbSize))
+                        .width(thumbSize)
+                        .height(thumbSize)
+                        .background(Color.White, CircleShape),
+                )
             }
         }
     }
