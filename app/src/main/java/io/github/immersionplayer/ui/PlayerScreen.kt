@@ -270,7 +270,6 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                 VideoArea(
                     session = session,
                     startPosition = app.prefs.position(session.videoUri),
-                    onBack = onBack,
                     modifier = modifier,
                 )
             }
@@ -314,7 +313,7 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
  * A thin progress line sits on the bottom edge; time and a close button show while paused.
  */
 @Composable
-private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () -> Unit, modifier: Modifier) {
+private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: Modifier) {
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
     val position by session.position.collectAsState()
