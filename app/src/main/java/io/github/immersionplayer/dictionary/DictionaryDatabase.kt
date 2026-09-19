@@ -108,6 +108,30 @@ class DictionaryDatabase(context: Context) :
         )
     }
 
+    /** Moves a dictionary up (-1) or down (+1) in result order. */
+    fun move(id: Long, direction: Int) {
+        val ordered = dictionaries().map { it.id }.toMutableList()
+        val from = ordered.indexOf(id)
+        val to = from + direction
+        if (from < 0 || to !in ordered.indices) return
+        ordered.add(to, ordered.removeAt(from))
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            ordered.forEachIndexed { priority, dictId ->
+                db.update(
+                    "dictionaries",
+                    ContentValues().apply { put("priority", priority) },
+                    "id = ?",
+                    arrayOf(dictId.toString()),
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun delete(id: Long) {
         val db = writableDatabase
         db.beginTransaction()

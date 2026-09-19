@@ -91,14 +91,36 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
             Text("Dictionaries", style = MaterialTheme.typography.titleLarge)
             Text(
                 "Import Yomitan dictionary zips — the same files Rikaitan/Yomitan use (Jitendex, JMdict, frequency lists, pitch accent). " +
-                    "Earlier dictionaries are listed first in results.",
+                    "Dictionaries higher in this list come first in results; use ↑ ↓ to reorder.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (dictionaries.isEmpty()) {
                 Text("No dictionaries imported yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            dictionaries.forEach { dict ->
+            dictionaries.forEachIndexed { index, dict ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    if (dictionaries.size > 1) {
+                        Column {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) { app.dictionaryDatabase.move(dict.id, -1) }
+                                        refresh()
+                                    }
+                                },
+                                enabled = index > 0,
+                            ) { Text("↑") }
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) { app.dictionaryDatabase.move(dict.id, 1) }
+                                        refresh()
+                                    }
+                                },
+                                enabled = index < dictionaries.lastIndex,
+                            ) { Text("↓") }
+                        }
+                    }
                     Column(Modifier.weight(1f)) {
                         Text(dict.title, style = MaterialTheme.typography.titleMedium)
                         Text(

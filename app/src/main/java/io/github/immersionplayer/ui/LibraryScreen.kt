@@ -45,6 +45,9 @@ import kotlinx.coroutines.withContext
 
 private val VIDEO_EXTENSIONS = setOf("mkv", "mp4", "webm", "avi", "m4v", "mov", "ts", "m2ts", "wmv", "flv")
 
+fun DocumentFile.isVideo(): Boolean =
+    isFile && name?.substringAfterLast('.', "")?.lowercase() in VIDEO_EXTENSIONS
+
 private data class Listing(val folders: List<DocumentFile>, val videos: List<DocumentFile>, val all: List<DocumentFile>)
 
 @Composable
@@ -60,6 +63,30 @@ fun LibraryScreen(
             ?.takeIf { it.canRead() }
     }
     var path by remember(root) { mutableStateOf(listOfNotNull(root)) }
+    // reopen the folder you were last in (and don't save until that's done)
+    var restoring by remember(root) { mutableStateOf(true) }
+    LaunchedEffect(root) {
+        val names = app.prefs.libraryPath?.split('/')?.filter { it.isNotEmpty() }.orEmpty()
+        if (root == null || names.isEmpty()) {
+            restoring = false
+            return@LaunchedEffect
+        }
+        val start: DocumentFile = root
+        val restored = withContext(Dispatchers.IO) {
+            var current = start
+            val stack = mutableListOf(start)
+            for (name in names) {
+                current = current.findFile(name)?.takeIf { it.isDirectory } ?: break
+                stack.add(current)
+            }
+            stack
+        }
+        path = restored
+        restoring = false
+    }
+    LaunchedEffect(path, restoring) {
+        if (!restoring && path.isNotEmpty()) app.prefs.libraryPath = path.drop(1).joinToString("/") { it.name.orEmpty() }
+    }
     var listing by remember { mutableStateOf<Listing?>(null) }
 
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -158,7 +185,7 @@ fun LibraryScreen(
 private fun list(folder: DocumentFile): Listing {
     val all = folder.listFiles().toList()
     val folders = all.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
-    val videos = all.filter { it.isFile && it.name?.substringAfterLast('.', "")?.lowercase() in VIDEO_EXTENSIONS }
+    val videos = all.filter { it.isVideo() }
         .sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
     return Listing(folders, videos, all)
 }

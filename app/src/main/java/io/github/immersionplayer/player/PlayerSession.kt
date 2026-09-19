@@ -58,6 +58,10 @@ class PlayerSession(
     private val _autoPause = MutableStateFlow(prefs.autoPause)
     val autoPause: StateFlow<Boolean> = _autoPause.asStateFlow()
 
+    private val _ended = MutableStateFlow(false)
+    /** True once playback reaches the end of the file (cleared by seeking). */
+    val ended: StateFlow<Boolean> = _ended.asStateFlow()
+
     private val _fill = MutableStateFlow(prefs.videoFill)
     val fill: StateFlow<Boolean> = _fill.asStateFlow()
 
@@ -149,6 +153,7 @@ class PlayerSession(
     }
 
     fun seekTo(seconds: Double) {
+        _ended.value = false
         view?.seek(seconds)
         _position.value = seconds
         updateLine(seconds)
@@ -218,6 +223,11 @@ class PlayerSession(
     override fun onTimePos(seconds: Double) {
         _position.value = seconds
         updateLine(seconds)
+    }
+
+    override fun onEndReached() {
+        _ended.value = true
+        mainHandler.post { savePosition() }
     }
 
     override fun onDuration(seconds: Double) {
