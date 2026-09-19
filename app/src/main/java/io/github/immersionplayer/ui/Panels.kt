@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,8 +46,12 @@ import io.github.immersionplayer.dictionary.Definition
 import io.github.immersionplayer.dictionary.TermEntry
 
 private val HighlightBackground = Color(0xFF3B5BA5)
+private val SelectionBackground = Color(0xFF7A5BA5)
 
-/** Text where tapping a character reports its index. With [autoSize], shrinks to fit its bounds. */
+/**
+ * Text where tapping a character reports its index and dragging selects a range.
+ * A long press reports hold start/end instead. With [autoSize], shrinks to fit its bounds.
+ */
 @Composable
 fun TappableText(
     text: String,
@@ -56,13 +61,20 @@ fun TappableText(
     modifier: Modifier = Modifier,
     autoSize: TextAutoSize? = null,
     onHold: ((Boolean) -> Unit)? = null,
+    onSelect: ((start: Int, end: Int) -> Unit)? = null,
+    onTapOutside: (() -> Unit)? = null,
 ) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val annotated = remember(text, highlight) {
+    var selection by remember(text) { mutableStateOf<IntRange?>(null) }
+    var holding by remember { mutableStateOf(false) }
+    val shown = selection ?: highlight
+    val selecting = selection != null
+    val annotated = remember(text, shown, selecting) {
         buildAnnotatedString {
             append(text)
-            if (highlight != null && highlight.first >= 0 && highlight.last < text.length && !highlight.isEmpty()) {
-                addStyle(SpanStyle(background = HighlightBackground, color = Color.White), highlight.first, highlight.last + 1)
+            if (shown != null && shown.first >= 0 && shown.last < text.length && !shown.isEmpty()) {
+                val background = if (selecting) SelectionBackground else HighlightBackground
+                addStyle(SpanStyle(background = background, color = Color.White), shown.first, shown.last + 1)
             }
         }
     }
@@ -71,20 +83,46 @@ fun TappableText(
         style = style,
         onTextLayout = { layout = it },
         autoSize = autoSize,
-        modifier = modifier.pointerInput(text, onHold) {
-            detectTapGestures(
-                // a long press reports hold start/end instead of a tap
-                onPress = {
-                    tryAwaitRelease()
-                    onHold?.invoke(false)
-                },
-                onLongPress = onHold?.let { hold -> { hold(true) } },
-                onTap = { position ->
-                    val l = layout ?: return@detectTapGestures
-                    characterAt(l, position, text.length)?.let(onTap)
-                },
-            )
-        },
+        modifier = modifier
+            .pointerInput(text, onHold) {
+                detectTapGestures(
+                    onPress = {
+                        tryAwaitRelease()
+                        if (holding) {
+                            holding = false
+                            onHold?.invoke(false)
+                        }
+                    },
+                    onLongPress = onHold?.let { hold -> { holding = true; hold(true) } },
+                    onTap = { position ->
+                        val index = layout?.let { characterAt(it, position, text.length) }
+                        if (index != null) onTap(index) else onTapOutside?.invoke()
+                    },
+                )
+            }
+            .pointerInput(text, onSelect) {
+                if (onSelect == null) return@pointerInput
+                var anchor = -1
+                detectDragGestures(
+                    onDragStart = { position ->
+                        anchor = if (holding) -1 else layout?.let { characterAt(it, position, text.length) } ?: -1
+                        if (anchor >= 0) selection = anchor..anchor
+                    },
+                    onDrag = { change, _ ->
+                        val l = layout
+                        if (anchor >= 0 && l != null) {
+                            change.consume()
+                            val index = l.getOffsetForPosition(change.position).coerceIn(0, text.length - 1)
+                            selection = minOf(anchor, index)..maxOf(anchor, index)
+                        }
+                    },
+                    onDragEnd = {
+                        selection?.let { onSelect(it.first, it.last + 1) }
+                        selection = null
+                    },
+                    onDragCancel = { selection = null },
+                )
+            },
     )
 }
 
@@ -104,7 +142,6 @@ fun DictionaryPanel(
     lookup: ActiveLookup,
     hasDictionaries: Boolean,
     setupStatus: String?,
-    onClose: () -> Unit,
     onMine: (TermEntry) -> Unit,
     isMined: (TermEntry) -> Boolean,
 ) {
@@ -114,26 +151,6 @@ fun DictionaryPanel(
         link = MaterialTheme.colorScheme.primary,
     )
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            val matched = lookup.result?.matchLength ?: 0
-            Text(
-                buildAnnotatedString {
-                    val end = (lookup.start + maxOf(matched, 1)).coerceAtMost(lookup.text.length)
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
-                        append(lookup.text.substring(lookup.start, end))
-                    }
-                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                        append(lookup.text.substring(end).take(12))
-                    }
-                },
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-            )
-            TextButton(onClick = onClose) { Text("✕") }
-        }
-        HorizontalDivider()
-
         val result = lookup.result
         when {
             !hasDictionaries && setupStatus != null -> Message("$setupStatus\nThis only happens once.")

@@ -11,6 +11,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -76,6 +77,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
+import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.mining.MiningCard
@@ -97,8 +99,11 @@ data class ActiveLookup(
     val result: LookupResult? = null,
 )
 
-/** Seconds covered by dragging across the full width of the video. */
+/** Seconds covered by dragging across the full width of the video at normal speed. */
 private const val SCRUB_SECONDS_PER_WIDTH = 90.0
+
+/** Scrub speed multiplier when the finger has moved far up or down from where the drag began. */
+private const val SCRUB_MAX_SPEED = 10.0
 
 @Composable
 fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, onBack: () -> Unit) {
@@ -141,14 +146,41 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
         hasDictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries().any { it.enabled } }
     }
 
-    fun startLookup(line: Int, text: String, start: Int) {
+    // each lookup gets a generation so a slow automatic lookup can't overwrite a newer one
+    var lookupGeneration by remember { mutableIntStateOf(0) }
+
+    /** Lookup the user asked for: a tapped character, or a dragged selection (max [maxLength]). */
+    fun startLookup(line: Int, text: String, start: Int, maxLength: Int = Int.MAX_VALUE) {
         if (app.prefs.pauseOnLookup) session.pause()
-        val pending = ActiveLookup(line, text, start)
-        lookup = pending
+        val generation = ++lookupGeneration
+        lookup = ActiveLookup(line, text, start)
         scope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { app.lookup.lookup(text, start) }.getOrNull() }
-            if (lookup == pending) lookup = pending.copy(result = result)
+            val result = withContext(Dispatchers.IO) {
+                runCatching { app.lookup.lookup(text, start, maxLength) }.getOrNull()
+            }
+            if (generation == lookupGeneration) lookup = ActiveLookup(line, text, start, result)
         }
+    }
+
+    // every line always has a word defined: the first kanji (or next best) that has an entry
+    val lineIndex by session.lineIndex.collectAsState()
+    LaunchedEffect(lineIndex, primary, hasDictionaries) {
+        val cue = primary?.cues?.getOrNull(lineIndex) ?: return@LaunchedEffect
+        if (lookup?.lineIndex == lineIndex) return@LaunchedEffect
+        val generation = ++lookupGeneration
+        val text = cue.text
+        val positions = DictionaryLookup.defaultLookupPositions(text)
+        lookup = ActiveLookup(lineIndex, text, positions.firstOrNull() ?: 0)
+        val found = withContext(Dispatchers.IO) {
+            var fallback: ActiveLookup? = null
+            for (position in positions.take(16)) {
+                val result = runCatching { app.lookup.lookup(text, position) }.getOrNull() ?: continue
+                if (result.entries.isNotEmpty()) return@withContext ActiveLookup(lineIndex, text, position, result)
+                if (fallback == null) fallback = ActiveLookup(lineIndex, text, position, result)
+            }
+            fallback
+        }
+        if (generation == lookupGeneration && found != null) lookup = found
     }
 
     fun mine(entry: TermEntry, line: Int) {
@@ -188,8 +220,8 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                     lookup = lookup,
                     hasDictionaries = hasDictionaries,
                     dictionarySetup = dictionarySetup,
-                    onLookup = ::startLookup,
-                    onCloseLookup = { lookup = null },
+                    onLookup = { line, text, start -> startLookup(line, text, start) },
+                    onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
                     onMine = ::mine,
                     modifier = modifier,
                 )
@@ -223,6 +255,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
 
     var scrubTarget by remember { mutableStateOf<Double?>(null) }
     var scrubOffset by remember { mutableStateOf(0.0) }
+    var scrubSpeed by remember { mutableStateOf(1.0) }
     var flash by remember { mutableIntStateOf(0) }
     var showFlash by remember { mutableStateOf(false) }
     LaunchedEffect(flash) {
@@ -242,6 +275,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
 
     BoxWithConstraints(modifier.background(Color.Black)) {
         val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -265,21 +299,27 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
                         flash++
                     })
                 }
-                .pointerInput(widthPx) {
+                .pointerInput(widthPx, heightPx) {
+                    // horizontal movement scrubs; moving away vertically from where the drag
+                    // started speeds it up (applies to movement from then on, so you can slow back down)
                     var start = 0.0
-                    var dragged = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = {
+                    var target = 0.0
+                    var startY = 0f
+                    detectDragGestures(
+                        onDragStart = { offset ->
                             start = session.position.value
-                            dragged = 0f
+                            target = start
+                            startY = offset.y
                             scrubOffset = 0.0
+                            scrubSpeed = 1.0
                             scrubTarget = start
                         },
-                        onHorizontalDrag = { change, amount ->
+                        onDrag = { change, amount ->
                             change.consume()
-                            dragged += amount
+                            val distance = (abs(change.position.y - startY) / (heightPx * 0.45f)).coerceIn(0f, 1f)
+                            scrubSpeed = 1.0 + (SCRUB_MAX_SPEED - 1.0) * distance * distance
                             val maxTime = session.duration.value.takeIf { it > 0 } ?: Double.MAX_VALUE
-                            val target = (start + dragged / widthPx * SCRUB_SECONDS_PER_WIDTH).coerceIn(0.0, maxTime)
+                            target = (target + amount.x / widthPx * SCRUB_SECONDS_PER_WIDTH * scrubSpeed).coerceIn(0.0, maxTime)
                             scrubOffset = target - start
                             scrubTarget = target
                         },
@@ -305,8 +345,9 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
         // scrub bubble
         scrubTarget?.let { target ->
             val sign = if (scrubOffset >= 0) "+" else "−"
+            val speed = if (scrubSpeed >= 1.5) "   ×${scrubSpeed.toInt()}" else ""
             Text(
-                "${formatTime(target)}   $sign${formatTime(abs(scrubOffset))}",
+                "${formatTime(target)}   $sign${formatTime(abs(scrubOffset))}$speed",
                 color = Color.White,
                 fontSize = 22.sp,
                 modifier = Modifier
@@ -335,20 +376,26 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
             }
         }
 
-        // progress line
-        val shown = scrubTarget ?: position
-        val fraction = if (duration > 0) (shown / duration).toFloat().coerceIn(0f, 1f) else 0f
-        Box(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                .height(if (scrubTarget != null) 5.dp else 3.dp)
-                .background(Color(0x33FFFFFF)),
+        // progress line: only while paused or scrubbing
+        AnimatedVisibility(
+            visible = paused || scrubTarget != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomStart),
         ) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(MaterialTheme.colorScheme.primary))
+            val shown = scrubTarget ?: position
+            val fraction = if (duration > 0) (shown / duration).toFloat().coerceIn(0f, 1f) else 0f
+            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0x33FFFFFF))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(MaterialTheme.colorScheme.primary))
+            }
         }
     }
 }
 
-/** Current line (swipe for previous/next, hold for English), line controls, and dictionary results. */
+/**
+ * The study side: the current line at the top, definitions right below.
+ * Swipe anywhere for previous/next line, hold anywhere to peek at the English, tap to play/pause.
+ */
 @Composable
 private fun StudyPanel(
     app: App,
@@ -358,7 +405,7 @@ private fun StudyPanel(
     hasDictionaries: Boolean,
     dictionarySetup: String?,
     onLookup: (Int, String, Int) -> Unit,
-    onCloseLookup: () -> Unit,
+    onSelect: (Int, String, Int, Int) -> Unit,
     onMine: (TermEntry, Int) -> Unit,
     modifier: Modifier,
 ) {
@@ -366,11 +413,49 @@ private fun StudyPanel(
     val secondary by session.secondary.collectAsState()
     val lineIndex by session.lineIndex.collectAsState()
     val lineActive by session.lineActive.collectAsState()
-    val autoPause by session.autoPause.collectAsState()
+
+    val swipeThreshold = with(LocalDensity.current) { 56.dp.toPx() }
+    val haptics = LocalHapticFeedback.current
+    var peeking by remember { mutableStateOf(false) }
+    val onHold: (Boolean) -> Unit = remember(haptics) {
+        { hold ->
+            if (hold && !peeking) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            peeking = hold
+        }
+    }
+    LaunchedEffect(lineIndex) { peeking = false }
 
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val lineAreaHeight = maxHeight * 0.42f
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    var total = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { total = 0f },
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            total += amount
+                        },
+                        onDragEnd = {
+                            if (abs(total) > swipeThreshold) {
+                                if (total < 0) session.nextLine() else session.previousLine()
+                            }
+                        },
+                    )
+                }
+                .pointerInput(onHold) {
+                    detectTapGestures(
+                        onPress = {
+                            tryAwaitRelease()
+                            onHold(false)
+                        },
+                        onLongPress = { onHold(true) },
+                        onTap = { session.togglePause() },
+                    )
+                },
+        ) {
+            val maxLineHeight = maxHeight * 0.4f
             Column(Modifier.fillMaxSize()) {
                 CurrentLine(
                     track = primary,
@@ -380,59 +465,32 @@ private fun StudyPanel(
                     status = status,
                     lookup = lookup,
                     textSize = app.prefs.subtitleSize,
+                    peeking = peeking,
+                    onHold = onHold,
                     onCharTap = onLookup,
-                    onPrevious = session::previousLine,
-                    onNext = session::nextLine,
-                    // drawn above the rows below so the English peek can hang over them
-                    modifier = Modifier.fillMaxWidth().height(lineAreaHeight).zIndex(1f),
+                    onSelect = onSelect,
+                    onTapOutside = session::togglePause,
+                    // drawn above the definitions so the English peek can hang over them
+                    modifier = Modifier.fillMaxWidth().heightIn(max = maxLineHeight).zIndex(1f),
                 )
-
-                // line controls
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val total = primary?.cues?.size ?: 0
-                    Text(
-                        if (total > 0) "${(lineIndex + 1).coerceAtLeast(0)}/$total" else "",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.width(56.dp),
-                    )
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = session::previousLine) { Text("◁", fontSize = 20.sp) }
-                    TextButton(onClick = session::replayLine) { Text("↻", fontSize = 20.sp) }
-                    TextButton(onClick = session::nextLine) { Text("▷", fontSize = 20.sp) }
-                    Spacer(Modifier.weight(1f))
-                    FilterChip(
-                        selected = autoPause,
-                        onClick = { session.setAutoPause(!autoPause) },
-                        label = { Text("Stop at end", maxLines = 1, style = MaterialTheme.typography.labelSmall) },
-                    )
-                }
                 HorizontalDivider()
-
-                // dictionary
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (lookup != null) {
                         DictionaryPanel(
                             lookup = lookup,
                             hasDictionaries = hasDictionaries,
                             setupStatus = dictionarySetup,
-                            onClose = onCloseLookup,
                             onMine = { onMine(it, lookup.lineIndex) },
                             isMined = { entry ->
                                 val cue = primary?.cues?.getOrNull(lookup.lineIndex)
                                 cue != null && app.miningStore.contains(entry.expression, cue.text)
                             },
                         )
-                    } else {
+                    } else if (dictionarySetup != null) {
                         Text(
-                            dictionarySetup
-                                ?: "Tap a word to look it up.\nSwipe the line for previous/next · hold it for English.",
+                            dictionarySetup,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.align(Alignment.Center).padding(24.dp),
                         )
                     }
@@ -451,57 +509,22 @@ private fun CurrentLine(
     status: String?,
     lookup: ActiveLookup?,
     textSize: Float,
+    peeking: Boolean,
+    onHold: (Boolean) -> Unit,
     onCharTap: (Int, String, Int) -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
+    onSelect: (Int, String, Int, Int) -> Unit,
+    onTapOutside: () -> Unit,
     modifier: Modifier,
 ) {
-    val swipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
-    val haptics = LocalHapticFeedback.current
-    var peeking by remember { mutableStateOf(false) }
-    val onHold: (Boolean) -> Unit = remember(haptics) {
-        { hold ->
-            if (hold && !peeking) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            peeking = hold
-        }
-    }
-
-    Box(
-        modifier
-            .background(MaterialTheme.colorScheme.surface)
-            .pointerInput(Unit) {
-                var total = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { total = 0f },
-                    onHorizontalDrag = { change, amount ->
-                        change.consume()
-                        total += amount
-                    },
-                    onDragEnd = {
-                        if (abs(total) > swipeThreshold) {
-                            if (total < 0) onNext() else onPrevious()
-                        }
-                    },
-                )
-            }
-            .pointerInput(onHold) {
-                detectTapGestures(
-                    onPress = {
-                        tryAwaitRelease()
-                        onHold(false)
-                    },
-                    onLongPress = { onHold(true) },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(modifier.background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
         if (status != null || track == null) {
-            if (status == "Reading subtitles…") CircularProgressIndicator()
-            else Text(status ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                if (status == "Reading subtitles…") CircularProgressIndicator()
+                else Text(status ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            }
             return@Box
         }
 
-        var previousIndex by remember { mutableIntStateOf(lineIndex) }
         AnimatedContent(
             targetState = lineIndex,
             transitionSpec = {
@@ -510,39 +533,36 @@ private fun CurrentLine(
                     (slideOutHorizontally { if (forward) -it / 3 else it / 3 } + fadeOut())
             },
             label = "line",
-            modifier = Modifier.fillMaxSize(),
         ) { index ->
             val cue = track.cues.getOrNull(index)
-            Box(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
                 if (cue == null) {
                     Text("…", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     return@Box
                 }
-                val highlight = lookup?.takeIf { it.lineIndex == index && it.result != null }
+                val highlight = lookup?.takeIf { it.lineIndex == index && it.result != null && it.result.matchLength > 0 }
                     ?.let { it.start until it.start + it.result!!.matchLength }
-                // fixed-height area: long lines shrink instead of pushing anything around
+                // compact, but long lines shrink rather than grow past the panel's cap
                 TappableText(
                     text = cue.text,
                     highlight = highlight,
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontSize = textSize.sp,
-                        lineHeight = 1.4.em,
+                        lineHeight = 1.35.em,
                         textAlign = TextAlign.Center,
-                        color = if (lineActive || index != previousIndex) Color.White else Color(0xFFB0B4BA),
+                        color = if (lineActive) Color.White else Color(0xFFC4C7CC),
                     ),
                     autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = textSize.sp, stepSize = 1.sp),
                     onTap = { onCharTap(index, cue.text, it) },
                     onHold = onHold,
+                    onSelect = { start, end -> onSelect(index, cue.text, start, end) },
+                    onTapOutside = onTapOutside,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
-        LaunchedEffect(lineIndex) {
-            previousIndex = lineIndex
-            peeking = false
-        }
 
-        // English peek: hangs below the line area and slides down from under the Japanese
+        // English peek: hangs below the line and slides down from under the Japanese
         val cue = track.cues.getOrNull(lineIndex)
         val translation = if (cue != null && secondary != null) translationFor(secondary, cue.start, cue.end) else null
         Box(
@@ -566,7 +586,7 @@ private fun CurrentLine(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = 10.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                 )
