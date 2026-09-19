@@ -113,15 +113,26 @@ private const val SCRUB_SECONDS_PER_WIDTH = 90.0
 private const val MIN_PANEL_FRACTION = 0.28f
 private const val MAX_PANEL_FRACTION = 0.5f
 
-/** Drag handle between the video and the study panel. */
+/** Drag handle between the video and the study panel; the grip only shows while touched. */
 @Composable
 private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
+    var touched by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     Box(
         Modifier
             .fillMaxHeight()
-            .width(14.dp)
+            .width(12.dp)
             .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    touched = true
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                    } while (event.changes.any { it.pressed })
+                    touched = false
+                }
+            }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { dragging = true },
@@ -133,17 +144,25 @@ private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
                     },
                 )
             },
-        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .width(if (dragging) 5.dp else 4.dp)
-                .height(44.dp)
-                .background(
-                    if (dragging) MaterialTheme.colorScheme.primary else Color(0xFF4A4E55),
-                    RoundedCornerShape(3.dp),
-                ),
-        )
+        // hairline where the video meets the panel
+        Box(Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+        AnimatedVisibility(
+            visible = touched || dragging,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            Box(
+                Modifier
+                    .width(4.dp)
+                    .height(44.dp)
+                    .background(
+                        if (dragging) MaterialTheme.colorScheme.primary else Color(0xFF6A6E75),
+                        RoundedCornerShape(2.dp),
+                    ),
+            )
+        }
     }
 }
 
@@ -450,14 +469,9 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () 
             )
         }
 
-        // paused: close button and time
+        // paused: time (the back gesture closes the player)
         AnimatedVisibility(paused && scrubTarget == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
-                TextButton(
-                    onClick = onBack,
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                        .background(Color(0x88000000), CircleShape),
-                ) { Text("✕", color = Color.White) }
                 Text(
                     "${formatTime(position)} / ${formatTime(duration)}",
                     color = Color.White,
