@@ -12,6 +12,11 @@ class Prefs(context: Context) {
         get() = prefs.getString("library_tree_uri", null)
         set(value) = prefs.edit { putString("library_tree_uri", value) }
 
+    /** Folder names from the library root to the last opened folder, joined by "/". */
+    var libraryPath: String?
+        get() = prefs.getString("library_path", null)
+        set(value) = prefs.edit { putString("library_path", value) }
+
     /** Pause when the current line ends (mpvacious "play up to next"). */
     var autoPause: Boolean
         get() = prefs.getBoolean("auto_pause", false)

@@ -197,7 +197,14 @@ private const val PANEL_DOUBLE_TAP_MS = 180L
 private const val SCRUB_MAX_SPEED = 10.0
 
 @Composable
-fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, onBack: () -> Unit) {
+fun PlayerScreen(
+    app: App,
+    video: DocumentFile,
+    siblings: List<DocumentFile>,
+    nextEpisodeName: String?,
+    onNextEpisode: (() -> Unit)?,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember(video) {
@@ -323,6 +330,9 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
                     session = session,
                     startPosition = app.prefs.position(session.videoUri),
                     freezeSurface = resizing,
+                    nextEpisodeName = nextEpisodeName,
+                    onNextEpisode = onNextEpisode,
+                    onBack = onBack,
                     modifier = modifier,
                 )
             }
@@ -394,7 +404,16 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
  * A thin progress line sits on the bottom edge; time and a close button show while paused.
  */
 @Composable
-private fun VideoArea(session: PlayerSession, startPosition: Double, freezeSurface: Boolean, modifier: Modifier) {
+private fun VideoArea(
+    session: PlayerSession,
+    startPosition: Double,
+    freezeSurface: Boolean,
+    nextEpisodeName: String?,
+    onNextEpisode: (() -> Unit)?,
+    onBack: () -> Unit,
+    modifier: Modifier,
+) {
+    val ended by session.ended.collectAsState()
     // While the divider is dragged the video surface keeps its size (centred, cropped or
     // letterboxed) so mpv isn't reconfigured every frame; it resizes once on release.
     val lastSurfaceSize = remember { intArrayOf(0, 0) }
@@ -605,6 +624,29 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, freezeSurfa
             }
         }
 
+        // end of episode: offer the next one in the folder
+        AnimatedVisibility(
+            visible = ended && onNextEpisode != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            Column(
+                Modifier
+                    .background(Color(0xCC1E2126), RoundedCornerShape(16.dp))
+                    .clickable { onNextEpisode?.invoke() }
+                    .padding(horizontal = 28.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Next episode  ▶", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    nextEpisodeName.orEmpty(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+
         // ±seconds indicator on the tapped edge
         AnimatedVisibility(
             visible = jumpLabelVisible,
@@ -649,7 +691,7 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, freezeSurfa
             )
         }
 
-        // paused: time (the back gesture closes the player)
+        // paused: close, time and options
         AnimatedVisibility(paused && scrubTarget == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 Text(
@@ -659,6 +701,17 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, freezeSurfa
                     modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 16.dp)
                         .background(Color(0x88000000), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+                Text(
+                    "✕",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .background(Color(0x88000000), CircleShape)
+                        .clickable(onClick = onBack)
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                 )
                 Text(
                     "⋯",
