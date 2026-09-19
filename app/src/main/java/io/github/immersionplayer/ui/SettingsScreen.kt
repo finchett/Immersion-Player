@@ -4,7 +4,14 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -180,6 +187,17 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 initial = app.prefs.copyLines,
             ) { app.prefs.copyLines = it }
 
+            SettingSwitch(
+                title = "Shoulder triggers change lines",
+                description = "Left trigger: previous line, right trigger: next line. For phones whose triggers send F7/F8 keys (RedMagic).",
+                initial = app.prefs.shoulderTriggers,
+            ) { app.prefs.shoulderTriggers = it }
+            SettingSwitch(
+                title = "Swap shoulder triggers",
+                description = "Use this if the triggers go the wrong way.",
+                initial = app.prefs.swapShoulderTriggers,
+            ) { app.prefs.swapShoulderTriggers = it }
+
             var size by remember { mutableStateOf(app.prefs.subtitleSize) }
             Text("Subtitle size: ${size.toInt()}")
             Slider(
@@ -188,6 +206,31 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 onValueChange = { size = it },
                 onValueChangeFinished = { app.prefs.subtitleSize = size },
             )
+
+            HorizontalDivider()
+            Text("Appearance", style = MaterialTheme.typography.titleLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                AppTheme.entries.forEach { theme ->
+                    FilterChip(
+                        selected = app.appearance.theme == theme,
+                        onClick = { app.appearance.updateTheme(theme) },
+                        leadingIcon = {
+                            Box(
+                                Modifier
+                                    .size(16.dp)
+                                    .background(theme.scheme.background, CircleShape)
+                                    .border(3.dp, theme.scheme.primary, CircleShape),
+                            )
+                        },
+                        label = { Text(theme.label) },
+                    )
+                }
+            }
+            SettingSwitch(
+                title = "Rounded corners",
+                description = "Show the video and the study panel as rounded cards with a small gap.",
+                initial = app.appearance.roundedCorners,
+            ) { app.appearance.updateRoundedCorners(it) }
 
             HorizontalDivider()
             Text("About", style = MaterialTheme.typography.titleLarge)

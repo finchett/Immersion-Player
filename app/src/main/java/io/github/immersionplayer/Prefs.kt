@@ -12,6 +12,24 @@ class Prefs(context: Context) {
         get() = prefs.getString("library_tree_uri", null)
         set(value) = prefs.edit { putString("library_tree_uri", value) }
 
+    /** Phone shoulder triggers (F7/F8 keys, e.g. RedMagic) step through lines. */
+    var shoulderTriggers: Boolean
+        get() = prefs.getBoolean("shoulder_triggers", true)
+        set(value) = prefs.edit { putBoolean("shoulder_triggers", value) }
+
+    var swapShoulderTriggers: Boolean
+        get() = prefs.getBoolean("swap_shoulder_triggers", false)
+        set(value) = prefs.edit { putBoolean("swap_shoulder_triggers", value) }
+
+    var theme: String?
+        get() = prefs.getString("theme", null)
+        set(value) = prefs.edit { putString("theme", value) }
+
+    /** Show the video and panel as rounded cards. */
+    var roundedCorners: Boolean
+        get() = prefs.getBoolean("rounded_corners", false)
+        set(value) = prefs.edit { putBoolean("rounded_corners", value) }
+
     /** Folder names from the library root to the last opened folder, joined by "/". */
     var libraryPath: String?
         get() = prefs.getString("library_path", null)
