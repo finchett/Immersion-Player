@@ -3,6 +3,7 @@ package io.github.immersionplayer.ui
 import android.app.Activity
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.ui.graphics.graphicsLayer
@@ -476,14 +477,15 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
                     "${formatTime(position)} / ${formatTime(duration)}",
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 44.dp)
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 16.dp)
                         .background(Color(0x88000000), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
             }
         }
 
-        // seek bar: hidden while playing; while paused it can be tapped or dragged to an exact spot
+        // seek bar: a thin line on the bottom edge, hidden while playing. While paused it can be
+        // tapped or dragged (via an invisible touch strip); it fattens while held.
         AnimatedVisibility(
             visible = paused || scrubTarget != null,
             enter = fadeIn(),
@@ -492,12 +494,23 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
         ) {
             val shown = scrubTarget ?: position
             val fraction = if (duration > 0) (shown / duration).toFloat().coerceIn(0f, 1f) else 0f
-            val thumbSize = 14.dp
+            var held by remember { mutableStateOf(false) }
+            val barHeight by animateDpAsState(if (held) 10.dp else 4.dp, label = "seekBarHeight")
             fun timeAt(x: Float) = (x / widthPx).coerceIn(0f, 1f) * session.duration.value
-            BoxWithConstraints(
+            Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(32.dp)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            held = true
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (event.changes.any { it.pressed })
+                            held = false
+                        }
+                    }
                     .pointerInput(widthPx) {
                         detectTapGestures(onTap = { offset -> session.seekTo(timeAt(offset.x)) })
                     }
@@ -524,27 +537,9 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
                     },
                 contentAlignment = Alignment.BottomStart,
             ) {
-                val trackWidth = maxWidth
-                Box(
-                    Modifier
-                        .padding(bottom = 10.dp)
-                        .fillMaxWidth()
-                        .height(5.dp)
-                        .background(Color(0x44FFFFFF), RoundedCornerShape(3.dp)),
-                ) {
-                    Box(
-                        Modifier.fillMaxHeight().fillMaxWidth(fraction)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp)),
-                    )
+                Box(Modifier.fillMaxWidth().height(barHeight).background(Color(0x33FFFFFF))) {
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(MaterialTheme.colorScheme.primary))
                 }
-                Box(
-                    Modifier
-                        .padding(bottom = 10.dp - (thumbSize - 5.dp) / 2)
-                        .offset(x = (trackWidth * fraction - thumbSize / 2).coerceIn(0.dp, trackWidth - thumbSize))
-                        .width(thumbSize)
-                        .height(thumbSize)
-                        .background(Color.White, CircleShape),
-                )
             }
         }
     }
