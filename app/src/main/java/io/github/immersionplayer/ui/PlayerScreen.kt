@@ -2,10 +2,18 @@ package io.github.immersionplayer.ui
 
 import android.app.Activity
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,19 +23,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +44,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,7 +56,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
@@ -65,6 +84,7 @@ import io.github.immersionplayer.player.PlayerSession
 import io.github.immersionplayer.subs.SubtitleLoader
 import io.github.immersionplayer.subs.SubtitleTrack
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -76,6 +96,9 @@ data class ActiveLookup(
     val start: Int,
     val result: LookupResult? = null,
 )
+
+/** Seconds covered by dragging across the full width of the video. */
+private const val SCRUB_SECONDS_PER_WIDTH = 90.0
 
 @Composable
 fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, onBack: () -> Unit) {
@@ -110,14 +133,8 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
 
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
-    val lineIndex by session.lineIndex.collectAsState()
-    val lineActive by session.lineActive.collectAsState()
-    val paused by session.paused.collectAsState()
-    val autoPause by session.autoPause.collectAsState()
-    val mpvSubtitle by session.mpvSubtitle.collectAsState()
 
     var lookup by remember { mutableStateOf<ActiveLookup?>(null) }
-    var showTranslation by remember { mutableStateOf(app.prefs.showTranslation) }
     var hasDictionaries by remember { mutableStateOf(true) }
     val dictionarySetup by BundledDictionaries.status.collectAsState()
     LaunchedEffect(dictionarySetup) {
@@ -154,89 +171,67 @@ fun PlayerScreen(app: App, video: DocumentFile, siblings: List<DocumentFile>, on
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val landscape = maxWidth > maxHeight
-
-            val left: @Composable (Modifier) -> Unit = { modifier ->
-                Column(modifier) {
-                    VideoArea(
-                        session = session,
-                        videoUri = session.videoUri,
-                        startPosition = app.prefs.position(session.videoUri),
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
-                    CurrentLine(
-                        track = primary,
-                        secondary = secondary,
-                        lineIndex = lineIndex,
-                        lineActive = lineActive,
-                        status = subtitleStatus,
-                        showTranslation = showTranslation,
-                        lookup = lookup,
-                        textSize = app.prefs.subtitleSize,
-                        onCharTap = ::startLookup,
-                    )
-                    Controls(
-                        session = session,
-                        paused = paused,
-                        autoPause = autoPause,
-                        showTranslation = showTranslation,
-                        hasTranslation = secondary != null,
-                        mpvSubtitle = mpvSubtitle,
-                        onToggleTranslation = {
-                            showTranslation = !showTranslation
-                            app.prefs.showTranslation = showTranslation
-                        },
-                        onBack = onBack,
-                    )
-                }
+            val portraitVideoHeight = maxWidth * 9 / 16
+            val videoArea = @Composable { modifier: Modifier ->
+                VideoArea(
+                    session = session,
+                    startPosition = app.prefs.position(session.videoUri),
+                    onBack = onBack,
+                    modifier = modifier,
+                )
             }
-
-            val right: @Composable (Modifier) -> Unit = { modifier ->
-                Surface(modifier, color = MaterialTheme.colorScheme.surface) {
-                    val current = lookup
-                    if (current != null) {
-                        DictionaryPanel(
-                            lookup = current,
-                            hasDictionaries = hasDictionaries,
-                            setupStatus = dictionarySetup,
-                            onClose = { lookup = null },
-                            onMine = { mine(it, current.lineIndex) },
-                            isMined = { entry ->
-                                val cue = primary?.cues?.getOrNull(current.lineIndex)
-                                cue != null && app.miningStore.contains(entry.expression, cue.text)
-                            },
-                        )
-                    } else {
-                        TranscriptPanel(
-                            track = primary,
-                            lineIndex = lineIndex,
-                            status = subtitleStatus,
-                            onPlayLine = session::playLine,
-                            onCharTap = ::startLookup,
-                        )
-                    }
-                }
+            val sidePanel = @Composable { modifier: Modifier ->
+                StudyPanel(
+                    app = app,
+                    session = session,
+                    status = subtitleStatus,
+                    lookup = lookup,
+                    hasDictionaries = hasDictionaries,
+                    dictionarySetup = dictionarySetup,
+                    onLookup = ::startLookup,
+                    onCloseLookup = { lookup = null },
+                    onMine = ::mine,
+                    modifier = modifier,
+                )
             }
-
             if (landscape) {
                 Row(Modifier.fillMaxSize()) {
-                    left(Modifier.weight(0.62f).fillMaxHeight())
+                    videoArea(Modifier.weight(0.63f).fillMaxHeight())
                     VerticalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                    right(Modifier.weight(0.38f).fillMaxHeight())
+                    sidePanel(Modifier.weight(0.37f).fillMaxHeight())
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
-                    left(Modifier.weight(0.55f).fillMaxWidth())
-                    right(Modifier.weight(0.45f).fillMaxWidth())
+                    videoArea(Modifier.fillMaxWidth().height(portraitVideoHeight))
+                    sidePanel(Modifier.weight(1f).fillMaxWidth())
                 }
             }
         }
     }
 }
 
+/**
+ * Full-bleed video. Tap toggles play/pause; dragging sideways scrubs.
+ * A thin progress line sits on the bottom edge; time and a close button show while paused.
+ */
 @Composable
-private fun VideoArea(session: PlayerSession, videoUri: String, startPosition: Double, modifier: Modifier) {
-    val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
+private fun VideoArea(session: PlayerSession, startPosition: Double, onBack: () -> Unit, modifier: Modifier) {
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
+    val paused by session.paused.collectAsState()
+    val position by session.position.collectAsState()
+    val duration by session.duration.collectAsState()
+
+    var scrubTarget by remember { mutableStateOf<Double?>(null) }
+    var scrubOffset by remember { mutableStateOf(0.0) }
+    var flash by remember { mutableIntStateOf(0) }
+    var showFlash by remember { mutableStateOf(false) }
+    LaunchedEffect(flash) {
+        if (flash > 0) {
+            showFlash = true
+            delay(500)
+            showFlash = false
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -245,7 +240,8 @@ private fun VideoArea(session: PlayerSession, videoUri: String, startPosition: D
         }
     }
 
-    Box(modifier.background(Color.Black)) {
+    BoxWithConstraints(modifier.background(Color.Black)) {
+        val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -253,31 +249,196 @@ private fun VideoArea(session: PlayerSession, videoUri: String, startPosition: D
                     view.keepScreenOn = true
                     view.initialize(startPosition)
                     session.attach(view)
-                    view.playFile(videoUri)
+                    view.playFile(session.videoUri)
                     mpvView = view
                 }
             },
         )
-        // gesture layer above the video surface: tap = play/pause, swipe = previous/next line
+
+        // gesture layer above the video surface
         Box(
             Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = { session.togglePause() })
+                    detectTapGestures(onTap = {
+                        session.togglePause()
+                        flash++
+                    })
                 }
-                .pointerInput(Unit) {
-                    var total = 0f
+                .pointerInput(widthPx) {
+                    var start = 0.0
+                    var dragged = 0f
                     detectHorizontalDragGestures(
-                        onDragStart = { total = 0f },
-                        onHorizontalDrag = { _, amount -> total += amount },
-                        onDragEnd = {
-                            if (abs(total) > swipeThreshold) {
-                                if (total > 0) session.previousLine() else session.nextLine()
-                            }
+                        onDragStart = {
+                            start = session.position.value
+                            dragged = 0f
+                            scrubOffset = 0.0
+                            scrubTarget = start
                         },
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            dragged += amount
+                            val maxTime = session.duration.value.takeIf { it > 0 } ?: Double.MAX_VALUE
+                            val target = (start + dragged / widthPx * SCRUB_SECONDS_PER_WIDTH).coerceIn(0.0, maxTime)
+                            scrubOffset = target - start
+                            scrubTarget = target
+                        },
+                        onDragEnd = {
+                            scrubTarget?.let(session::seekTo)
+                            scrubTarget = null
+                        },
+                        onDragCancel = { scrubTarget = null },
                     )
                 },
         )
+
+        // play/pause flash in the middle
+        AnimatedVisibility(showFlash, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+            Box(
+                Modifier.background(Color(0x99000000), CircleShape).padding(22.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(if (paused) "❚❚" else "▶", color = Color.White, fontSize = 28.sp)
+            }
+        }
+
+        // scrub bubble
+        scrubTarget?.let { target ->
+            val sign = if (scrubOffset >= 0) "+" else "−"
+            Text(
+                "${formatTime(target)}   $sign${formatTime(abs(scrubOffset))}",
+                color = Color.White,
+                fontSize = 22.sp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(Color(0xAA000000), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            )
+        }
+
+        // paused: close button and time
+        AnimatedVisibility(paused && scrubTarget == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize()) {
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                        .background(Color(0x88000000), CircleShape),
+                ) { Text("✕", color = Color.White) }
+                Text(
+                    "${formatTime(position)} / ${formatTime(duration)}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 12.dp)
+                        .background(Color(0x88000000), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
+
+        // progress line
+        val shown = scrubTarget ?: position
+        val fraction = if (duration > 0) (shown / duration).toFloat().coerceIn(0f, 1f) else 0f
+        Box(
+            Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .height(if (scrubTarget != null) 5.dp else 3.dp)
+                .background(Color(0x33FFFFFF)),
+        ) {
+            Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(MaterialTheme.colorScheme.primary))
+        }
+    }
+}
+
+/** Current line (swipe for previous/next, hold for English), line controls, and dictionary results. */
+@Composable
+private fun StudyPanel(
+    app: App,
+    session: PlayerSession,
+    status: String?,
+    lookup: ActiveLookup?,
+    hasDictionaries: Boolean,
+    dictionarySetup: String?,
+    onLookup: (Int, String, Int) -> Unit,
+    onCloseLookup: () -> Unit,
+    onMine: (TermEntry, Int) -> Unit,
+    modifier: Modifier,
+) {
+    val primary by session.primary.collectAsState()
+    val secondary by session.secondary.collectAsState()
+    val lineIndex by session.lineIndex.collectAsState()
+    val lineActive by session.lineActive.collectAsState()
+    val autoPause by session.autoPause.collectAsState()
+
+    Surface(modifier, color = MaterialTheme.colorScheme.surface) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val lineAreaHeight = maxHeight * 0.42f
+            Column(Modifier.fillMaxSize()) {
+                CurrentLine(
+                    track = primary,
+                    secondary = secondary,
+                    lineIndex = lineIndex,
+                    lineActive = lineActive,
+                    status = status,
+                    lookup = lookup,
+                    textSize = app.prefs.subtitleSize,
+                    onCharTap = onLookup,
+                    onPrevious = session::previousLine,
+                    onNext = session::nextLine,
+                    // drawn above the rows below so the English peek can hang over them
+                    modifier = Modifier.fillMaxWidth().height(lineAreaHeight).zIndex(1f),
+                )
+
+                // line controls
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val total = primary?.cues?.size ?: 0
+                    Text(
+                        if (total > 0) "${(lineIndex + 1).coerceAtLeast(0)}/$total" else "",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.width(56.dp),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = session::previousLine) { Text("◁", fontSize = 20.sp) }
+                    TextButton(onClick = session::replayLine) { Text("↻", fontSize = 20.sp) }
+                    TextButton(onClick = session::nextLine) { Text("▷", fontSize = 20.sp) }
+                    Spacer(Modifier.weight(1f))
+                    FilterChip(
+                        selected = autoPause,
+                        onClick = { session.setAutoPause(!autoPause) },
+                        label = { Text("Stop at end", maxLines = 1, style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+                HorizontalDivider()
+
+                // dictionary
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (lookup != null) {
+                        DictionaryPanel(
+                            lookup = lookup,
+                            hasDictionaries = hasDictionaries,
+                            setupStatus = dictionarySetup,
+                            onClose = onCloseLookup,
+                            onMine = { onMine(it, lookup.lineIndex) },
+                            isMined = { entry ->
+                                val cue = primary?.cues?.getOrNull(lookup.lineIndex)
+                                cue != null && app.miningStore.contains(entry.expression, cue.text)
+                            },
+                        )
+                    } else {
+                        Text(
+                            dictionarySetup
+                                ?: "Tap a word to look it up.\nSwipe the line for previous/next · hold it for English.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -288,128 +449,128 @@ private fun CurrentLine(
     lineIndex: Int,
     lineActive: Boolean,
     status: String?,
-    showTranslation: Boolean,
     lookup: ActiveLookup?,
     textSize: Float,
     onCharTap: (Int, String, Int) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier,
 ) {
-    val cue = track?.cues?.getOrNull(lineIndex)
-    var revealed by remember(lineIndex) { mutableStateOf(false) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0B0C0E))
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .heightIn(min = 72.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+    val swipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
+    val haptics = LocalHapticFeedback.current
+    var peeking by remember { mutableStateOf(false) }
+    val onHold: (Boolean) -> Unit = remember(haptics) {
+        { hold ->
+            if (hold && !peeking) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            peeking = hold
+        }
+    }
+
+    Box(
+        modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { total = 0f },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        total += amount
+                    },
+                    onDragEnd = {
+                        if (abs(total) > swipeThreshold) {
+                            if (total < 0) onNext() else onPrevious()
+                        }
+                    },
+                )
+            }
+            .pointerInput(onHold) {
+                detectTapGestures(
+                    onPress = {
+                        tryAwaitRelease()
+                        onHold(false)
+                    },
+                    onLongPress = { onHold(true) },
+                )
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        when {
-            status != null -> Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            cue == null -> Text("…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> {
-                val highlight = lookup?.takeIf { it.lineIndex == lineIndex && it.result != null }
+        if (status != null || track == null) {
+            if (status == "Reading subtitles…") CircularProgressIndicator()
+            else Text(status ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            return@Box
+        }
+
+        var previousIndex by remember { mutableIntStateOf(lineIndex) }
+        AnimatedContent(
+            targetState = lineIndex,
+            transitionSpec = {
+                val forward = targetState >= initialState
+                (slideInHorizontally { if (forward) it / 3 else -it / 3 } + fadeIn()) togetherWith
+                    (slideOutHorizontally { if (forward) -it / 3 else it / 3 } + fadeOut())
+            },
+            label = "line",
+            modifier = Modifier.fillMaxSize(),
+        ) { index ->
+            val cue = track.cues.getOrNull(index)
+            Box(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                if (cue == null) {
+                    Text("…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    return@Box
+                }
+                val highlight = lookup?.takeIf { it.lineIndex == index && it.result != null }
                     ?.let { it.start until it.start + it.result!!.matchLength }
+                // fixed-height area: long lines shrink instead of pushing anything around
                 TappableText(
                     text = cue.text,
                     highlight = highlight,
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontSize = textSize.sp,
-                        lineHeight = (textSize * 1.35f).sp,
+                        lineHeight = 1.4.em,
                         textAlign = TextAlign.Center,
-                        color = if (lineActive) Color.White else Color(0xFFB0B4BA),
+                        color = if (lineActive || index != previousIndex) Color.White else Color(0xFFB0B4BA),
                     ),
-                    onTap = { onCharTap(lineIndex, cue.text, it) },
+                    autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = textSize.sp, stepSize = 1.sp),
+                    onTap = { onCharTap(index, cue.text, it) },
+                    onHold = onHold,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                val translation = secondary?.let { translationFor(it, cue.start, cue.end) }
-                if (translation != null) {
-                    if (showTranslation || revealed) {
-                        Text(
-                            translation,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.clickable { revealed = false },
-                        )
-                    } else {
-                        Text(
-                            "tap for translation",
-                            color = Color(0xFF5F6368),
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.clickable { revealed = true }.padding(4.dp),
-                        )
-                    }
-                }
             }
         }
-    }
-}
-
-@Composable
-private fun Controls(
-    session: PlayerSession,
-    paused: Boolean,
-    autoPause: Boolean,
-    showTranslation: Boolean,
-    hasTranslation: Boolean,
-    mpvSubtitle: String?,
-    onToggleTranslation: () -> Unit,
-    onBack: () -> Unit,
-) {
-    val position by session.position.collectAsState()
-    val duration by session.duration.collectAsState()
-    var dragging by remember { mutableStateOf<Float?>(null) }
-
-    Column(Modifier.fillMaxWidth().background(Color(0xFF0B0C0E)).padding(horizontal = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(formatTime(dragging?.toDouble() ?: position), color = Color.White, style = MaterialTheme.typography.labelMedium)
-            Slider(
-                value = (dragging ?: position.toFloat()).coerceIn(0f, duration.toFloat().coerceAtLeast(1f)),
-                valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
-                onValueChange = { dragging = it },
-                onValueChangeFinished = {
-                    dragging?.let { session.seekTo(it.toDouble()) }
-                    dragging = null
-                },
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-            Text(formatTime(duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
+        LaunchedEffect(lineIndex) {
+            previousIndex = lineIndex
+            peeking = false
         }
-        // scrolls sideways rather than wrapping when the panel is narrow
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+
+        // English peek: hangs below the line area and slides down from under the Japanese
+        val cue = track.cues.getOrNull(lineIndex)
+        val translation = if (cue != null && secondary != null) translationFor(secondary, cue.start, cue.end) else null
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                    layout(placeable.width, 0) { placeable.place(0, 0) }
+                },
         ) {
-            val compact = PaddingValues(horizontal = 14.dp)
-            TextButton(onClick = onBack, contentPadding = compact) { Text("✕") }
-            FilledTonalButton(onClick = session::previousLine, contentPadding = compact) { Text("◁ Prev") }
-            FilledTonalButton(onClick = session::replayLine, contentPadding = compact) { Text("↻") }
-            FilledTonalButton(onClick = session::togglePause, contentPadding = compact, modifier = Modifier.width(60.dp)) {
-                Text(if (paused) "▶" else "❚❚")
+            AnimatedVisibility(
+                visible = peeking,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            ) {
+                Text(
+                    translation ?: "No English line here.",
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                )
             }
-            FilledTonalButton(onClick = session::nextLine, contentPadding = compact) { Text("Next ▷") }
-            Spacer(Modifier.width(6.dp))
-            FilterChip(
-                selected = autoPause,
-                onClick = { session.setAutoPause(!autoPause) },
-                label = { Text("Stop at end", maxLines = 1) },
-            )
-            if (hasTranslation) {
-                FilterChip(selected = showTranslation, onClick = onToggleTranslation, label = { Text("EN", maxLines = 1) })
-            }
-            FilterChip(
-                selected = mpvSubtitle != null,
-                onClick = session::cycleMpvSubtitles,
-                label = {
-                    Text(
-                        if (mpvSubtitle == null) "mpv subs" else "mpv: $mpvSubtitle",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 160.dp),
-                    )
-                },
-            )
         }
     }
 }
@@ -418,9 +579,4 @@ private fun Controls(
 fun translationFor(track: SubtitleTrack, start: Double, end: Double): String? {
     val lines = track.cues.filter { it.start < end - 0.1 && it.end > start + 0.1 }
     return lines.joinToString("\n") { it.text }.ifEmpty { null }
-}
-
-@Composable
-fun LoadingBox(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 }

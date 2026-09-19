@@ -21,10 +21,6 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("copy_lines", false)
         set(value) = prefs.edit { putBoolean("copy_lines", value) }
 
-    var showTranslation: Boolean
-        get() = prefs.getBoolean("show_translation", false)
-        set(value) = prefs.edit { putBoolean("show_translation", value) }
-
     var pauseOnLookup: Boolean
         get() = prefs.getBoolean("pause_on_lookup", true)
         set(value) = prefs.edit { putBoolean("pause_on_lookup", value) }

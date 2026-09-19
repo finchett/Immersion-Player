@@ -1,6 +1,8 @@
 package io.github.immersionplayer.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -24,7 +25,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,14 +41,12 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.immersionplayer.dictionary.Definition
 import io.github.immersionplayer.dictionary.TermEntry
-import io.github.immersionplayer.subs.SubtitleTrack
 
 private val HighlightBackground = Color(0xFF3B5BA5)
 
-/** Text where tapping a character reports its index. */
+/** Text where tapping a character reports its index. With [autoSize], shrinks to fit its bounds. */
 @Composable
 fun TappableText(
     text: String,
@@ -56,6 +54,8 @@ fun TappableText(
     style: TextStyle,
     onTap: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    autoSize: TextAutoSize? = null,
+    onHold: ((Boolean) -> Unit)? = null,
 ) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val annotated = remember(text, highlight) {
@@ -66,15 +66,24 @@ fun TappableText(
             }
         }
     }
-    Text(
+    BasicText(
         text = annotated,
         style = style,
         onTextLayout = { layout = it },
-        modifier = modifier.pointerInput(text) {
-            detectTapGestures { position ->
-                val l = layout ?: return@detectTapGestures
-                characterAt(l, position, text.length)?.let(onTap)
-            }
+        autoSize = autoSize,
+        modifier = modifier.pointerInput(text, onHold) {
+            detectTapGestures(
+                // a long press reports hold start/end instead of a tap
+                onPress = {
+                    tryAwaitRelease()
+                    onHold?.invoke(false)
+                },
+                onLongPress = onHold?.let { hold -> { hold(true) } },
+                onTap = { position ->
+                    val l = layout ?: return@detectTapGestures
+                    characterAt(l, position, text.length)?.let(onTap)
+                },
+            )
         },
     )
 }
@@ -88,57 +97,6 @@ private fun characterAt(layout: TextLayoutResult, position: Offset, length: Int)
     if (offset > 0 && position.x < layout.getBoundingBox(offset).left) offset--
     if (offset < length - 1 && position.x > layout.getBoundingBox(offset).right) offset++
     return offset
-}
-
-@Composable
-fun TranscriptPanel(
-    track: SubtitleTrack?,
-    lineIndex: Int,
-    status: String?,
-    onPlayLine: (Int) -> Unit,
-    onCharTap: (Int, String, Int) -> Unit,
-) {
-    if (track == null) {
-        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-            if (status == "Reading subtitles…") CircularProgressIndicator()
-            else Text(status ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    val listState = rememberLazyListState()
-    LaunchedEffect(lineIndex) {
-        if (lineIndex >= 0 && !listState.isScrollInProgress) {
-            listState.animateScrollToItem((lineIndex - 2).coerceAtLeast(0))
-        }
-    }
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        itemsIndexed(track.cues) { index, cue ->
-            val current = index == lineIndex
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(if (current) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text(
-                    formatTime(cue.start),
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.width(52.dp).clickable { onPlayLine(index) }.padding(top = 4.dp),
-                )
-                TappableText(
-                    text = cue.text,
-                    highlight = null,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 18.sp,
-                        color = if (current) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                    onTap = { onCharTap(index, cue.text, it) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -172,7 +130,7 @@ fun DictionaryPanel(
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
             )
-            TextButton(onClick = onClose) { Text("Transcript ✕") }
+            TextButton(onClick = onClose) { Text("✕") }
         }
         HorizontalDivider()
 

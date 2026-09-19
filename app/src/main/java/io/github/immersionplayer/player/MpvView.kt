@@ -19,7 +19,6 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         fun onPause(paused: Boolean) {}
         fun onFileLoaded() {}
         fun onEndReached() {}
-        fun onMpvSubtitleChanged(title: String?) {}
     }
 
     var listener: Listener? = null
@@ -27,13 +26,9 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     private var initialized = false
 
     private val observer = object : MPVLib.EventObserver {
-        override fun eventProperty(property: String) {
-            if (property == "current-tracks/sub/title" || property == "sid") post { notifyMpvSubtitle() }
-        }
+        override fun eventProperty(property: String) {}
 
-        override fun eventProperty(property: String, value: Long) {
-            if (property == "sid") post { notifyMpvSubtitle() }
-        }
+        override fun eventProperty(property: String, value: Long) {}
 
         override fun eventProperty(property: String, value: Boolean) {
             when (property) {
@@ -42,9 +37,7 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
             }
         }
 
-        override fun eventProperty(property: String, value: String) {
-            if (property == "current-tracks/sub/title" || property == "sid") post { notifyMpvSubtitle() }
-        }
+        override fun eventProperty(property: String, value: String) {}
 
         override fun eventProperty(property: String, value: Double) {
             when (property) {
@@ -76,7 +69,7 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         MPVLib.setOptionString("gpu-shader-cache-dir", context.cacheDir.path)
         MPVLib.setOptionString("icc-cache-dir", context.cacheDir.path)
 
-        // Japanese audio; subtitles are drawn by the app so each character can be tapped
+        // Japanese audio; subtitles are never drawn on the video (the app shows them beside it)
         MPVLib.setOptionString("alang", "jpn,ja,jp")
         MPVLib.setOptionString("sid", "no")
         MPVLib.setOptionString("osd-level", "0")
@@ -95,7 +88,6 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         MPVLib.observeProperty("duration", MpvFormat.MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("pause", MpvFormat.MPV_FORMAT_FLAG)
         MPVLib.observeProperty("eof-reached", MpvFormat.MPV_FORMAT_FLAG)
-        MPVLib.observeProperty("sid", MpvFormat.MPV_FORMAT_STRING)
         initialized = true
     }
 
@@ -117,20 +109,6 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
 
     fun seek(seconds: Double) {
         MPVLib.command(arrayOf("seek", seconds.coerceAtLeast(0.0).toString(), "absolute+exact"))
-    }
-
-    /** Cycles mpv's own (styled) subtitle rendering through the file's tracks and off. */
-    fun cycleMpvSubtitles() {
-        MPVLib.command(arrayOf("cycle", "sub"))
-    }
-
-    private fun notifyMpvSubtitle() {
-        val sid = MPVLib.getPropertyString("sid")
-        val title = if (sid == null || sid == "no") null
-        else MPVLib.getPropertyString("current-tracks/sub/title")
-            ?: MPVLib.getPropertyString("current-tracks/sub/lang")
-            ?: "Track $sid"
-        listener?.onMpvSubtitleChanged(title)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
