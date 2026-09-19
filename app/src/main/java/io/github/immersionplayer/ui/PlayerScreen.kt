@@ -1,6 +1,7 @@
 package io.github.immersionplayer.ui
 
 import android.app.Activity
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
@@ -168,6 +169,14 @@ private fun ResizeHandle(onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
     }
 }
 
+/** Share of the video width on each side where double tap jumps. */
+private const val EDGE_ZONE = 0.3f
+private const val JUMP_SECONDS = 5
+/** Window for a second tap on a video edge to count as a double tap. */
+private const val VIDEO_DOUBLE_TAP_MS = 180L
+/** After a jump, further taps on the same edge within this window jump again. */
+private const val JUMP_CONTINUE_MS = 600L
+
 /** Window for a second tap on the study panel to count as a double tap. */
 private const val PANEL_DOUBLE_TAP_MS = 180L
 
@@ -325,6 +334,29 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
     var scrubOffset by remember { mutableStateOf(0.0) }
     var scrubSpeed by remember { mutableStateOf(1.0) }
     var flash by remember { mutableIntStateOf(0) }
+
+    // double-tap jumps on the video's edges
+    val videoScope = rememberCoroutineScope()
+    var pendingVideoTap by remember { mutableStateOf<Job?>(null) }
+    var pendingZone by remember { mutableIntStateOf(0) }
+    var jumpZone by remember { mutableIntStateOf(0) }
+    var lastJumpTap by remember { mutableStateOf(0L) }
+    var jumpTotal by remember { mutableIntStateOf(0) }
+    var jumpShown by remember { mutableIntStateOf(0) }
+    LaunchedEffect(jumpShown) {
+        if (jumpShown > 0) {
+            delay(JUMP_CONTINUE_MS)
+            jumpZone = 0
+            jumpTotal = 0
+        }
+    }
+    fun jump(direction: Int) {
+        jumpTotal += JUMP_SECONDS
+        val target = session.position.value + direction * JUMP_SECONDS
+        val maxTime = session.duration.value.takeIf { it > 0 } ?: Double.MAX_VALUE
+        session.seekTo(target.coerceIn(0.0, maxTime))
+        jumpShown++
+    }
     var flashFill by remember { mutableIntStateOf(0) }
     var fillNotice by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(flashFill) {
@@ -395,9 +427,43 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
                     }
                 }
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = {
-                        session.togglePause()
-                        flash++
+                    detectTapGestures(onTap = { offset ->
+                        // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
+                        // a single edge tap still plays/pauses after a short wait.
+                        val zone = when {
+                            offset.x < widthPx * EDGE_ZONE -> -1
+                            offset.x > widthPx * (1 - EDGE_ZONE) -> 1
+                            else -> 0
+                        }
+                        val now = SystemClock.uptimeMillis()
+                        val pending = pendingVideoTap
+                        when {
+                            zone == 0 -> {
+                                pending?.cancel()
+                                session.togglePause()
+                                flash++
+                            }
+                            zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
+                                lastJumpTap = now
+                                jump(zone)
+                            }
+                            pending != null && pending.isActive && pendingZone == zone -> {
+                                pending.cancel()
+                                jumpZone = zone
+                                lastJumpTap = now
+                                jumpTotal = 0
+                                jump(zone)
+                            }
+                            else -> {
+                                pending?.cancel()
+                                pendingZone = zone
+                                pendingVideoTap = videoScope.launch {
+                                    delay(VIDEO_DOUBLE_TAP_MS)
+                                    session.togglePause()
+                                    flash++
+                                }
+                            }
+                        }
                     })
                 }
                 .pointerInput(widthPx, heightPx) {
@@ -441,6 +507,23 @@ private fun VideoArea(session: PlayerSession, startPosition: Double, modifier: M
             ) {
                 Text(if (paused) "❚❚" else "▶", color = Color.White, fontSize = 28.sp)
             }
+        }
+
+        // ±seconds indicator on the tapped edge
+        AnimatedVisibility(
+            visible = jumpZone != 0 && jumpTotal > 0,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(if (jumpZone < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 28.dp),
+        ) {
+            Text(
+                if (jumpZone < 0) "« −${jumpTotal}s" else "+${jumpTotal}s »",
+                color = Color.White,
+                fontSize = 20.sp,
+                modifier = Modifier
+                    .background(Color(0x99000000), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
         }
 
         // fill/fit notice
