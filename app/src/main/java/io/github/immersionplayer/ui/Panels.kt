@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,7 +31,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
@@ -45,8 +48,8 @@ import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.dictionary.Definition
 import io.github.immersionplayer.dictionary.TermEntry
 
-private val HighlightBackground = Color(0xFF3B5BA5)
-private val SelectionBackground = Color(0xFF7A5BA5)
+private val HighlightBackground = Color(0x664F7BE0)
+private val SelectionBackground = Color(0x668E6BD6)
 
 /**
  * Text where tapping a character reports its index and dragging selects a range.
@@ -69,21 +72,24 @@ fun TappableText(
     var holding by remember { mutableStateOf(false) }
     val shown = selection ?: highlight
     val selecting = selection != null
-    val annotated = remember(text, shown, selecting) {
+    val validRange = shown?.takeIf { !it.isEmpty() && it.first >= 0 && it.last < text.length }
+    val annotated = remember(text, validRange) {
         buildAnnotatedString {
             append(text)
-            if (shown != null && shown.first >= 0 && shown.last < text.length && !shown.isEmpty()) {
-                val background = if (selecting) SelectionBackground else HighlightBackground
-                addStyle(SpanStyle(background = background, color = Color.White), shown.first, shown.last + 1)
-            }
+            if (validRange != null) addStyle(SpanStyle(color = Color.White), validRange.first, validRange.last + 1)
         }
     }
+    val pillColor = if (selecting) SelectionBackground else HighlightBackground
     BasicText(
         text = annotated,
         style = style,
         onTextLayout = { layout = it },
         autoSize = autoSize,
         modifier = modifier
+            .drawBehind {
+                val l = layout ?: return@drawBehind
+                if (validRange != null) drawHighlight(l, validRange, pillColor)
+            }
             .pointerInput(text, onHold) {
                 detectTapGestures(
                     onPress = {
@@ -126,6 +132,21 @@ fun TappableText(
     )
 }
 
+/** Rounded pill behind [range], one per visual line it spans. */
+private fun DrawScope.drawHighlight(layout: TextLayoutResult, range: IntRange, color: Color) {
+    val padX = 5.dp.toPx()
+    val padY = 1.dp.toPx()
+    val radius = CornerRadius(8.dp.toPx())
+    range.groupBy { layout.getLineForOffset(it) }.forEach { (line, offsets) ->
+        val boxes = offsets.map { layout.getBoundingBox(it) }
+        val left = boxes.minOf { it.left } - padX
+        val right = boxes.maxOf { it.right } + padX
+        val top = layout.getLineTop(line) + padY
+        val bottom = layout.getLineBottom(line) - padY
+        drawRoundRect(color, topLeft = Offset(left, top), size = Size(right - left, bottom - top), cornerRadius = radius)
+    }
+}
+
 private fun characterAt(layout: TextLayoutResult, position: Offset, length: Int): Int? {
     if (length == 0) return null
     val line = layout.getLineForVerticalPosition(position.y)
@@ -142,8 +163,6 @@ fun DictionaryPanel(
     lookup: ActiveLookup,
     hasDictionaries: Boolean,
     setupStatus: String?,
-    onMine: (TermEntry) -> Unit,
-    isMined: (TermEntry) -> Boolean,
 ) {
     val colors = GlossaryColors(
         tag = MaterialTheme.colorScheme.secondary,
@@ -159,7 +178,7 @@ fun DictionaryPanel(
             result.entries.isEmpty() -> Message("No match.")
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(result.entries) { _, entry ->
-                    TermCard(entry, colors, onMine, isMined)
+                    TermCard(entry, colors)
                     HorizontalDivider()
                 }
             }
@@ -175,13 +194,7 @@ private fun Message(text: String) {
 }
 
 @Composable
-private fun TermCard(
-    entry: TermEntry,
-    colors: GlossaryColors,
-    onMine: (TermEntry) -> Unit,
-    isMined: (TermEntry) -> Boolean,
-) {
-    var mined by remember(entry) { mutableStateOf(isMined(entry)) }
+private fun TermCard(entry: TermEntry, colors: GlossaryColors) {
     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
@@ -189,9 +202,6 @@ private fun TermCard(
                     Text(entry.reading, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 }
                 Text(entry.expression, style = MaterialTheme.typography.headlineMedium, color = Color.White)
-            }
-            OutlinedButton(onClick = { onMine(entry); mined = true }, enabled = !mined) {
-                Text(if (mined) "✓ Saved" else "+ Save")
             }
         }
         if (entry.reasons.isNotEmpty() || entry.frequencies.isNotEmpty() || entry.pitchPositions.isNotEmpty()) {
