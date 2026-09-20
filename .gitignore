@@ -6,3 +6,4 @@ local.properties
 .DS_Store
 # prebuilt libmpv binaries are extracted from the mpv-android release APK (see README)
 app/src/main/jniLibs/
+dist/

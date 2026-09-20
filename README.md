@@ -6,8 +6,6 @@
 ![Android 11+](https://img.shields.io/badge/Android-11%2B-3ddc84)
 ![arm64-v8a](https://img.shields.io/badge/abi-arm64--v8a-lightgrey)
 
-![The player: video on the left, the current line and its dictionary entry on the right](docs/player.png)
-
 On a desktop you can do this already: mpv on one side, a clipboard bridge, Yomitan or Rikaitan
 open on the other, and every line of dialogue one keypress away. On a phone you get a player
 that hides the subtitles behind a menu and a dictionary app you have to paste into.
@@ -40,14 +38,11 @@ once, on first run.
 | Divider | drag | resize the video and the panel |
 | Shoulder triggers | press | previous / next line (RedMagic, see below) |
 
-Hold anywhere on the panel and the Japanese is replaced, in place, by the translation:
+Turn the phone and the same layout stacks instead of splitting: the video keeps the share of the
+height you gave it, the panel takes the rest. Holding anywhere on the panel replaces the Japanese,
+in place, with the translation — on the right below.
 
-![Holding the panel swaps the Japanese line for the English one](docs/english-peek.png)
-
-Turn the phone and the same layout stacks instead of splitting. The video keeps a share of the
-height you chose; the panel takes the rest.
-
-<img src="docs/portrait.png" width="320" alt="Portrait mode: video above, line and dictionary below">
+![Portrait mode, with the same line shown as Japanese and then held to reveal the English](docs/portrait.png)
 
 ## Always a word defined
 
