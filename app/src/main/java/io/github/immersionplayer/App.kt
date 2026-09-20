@@ -7,6 +7,7 @@ import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.mining.MiningStore
 import io.github.immersionplayer.subs.SubtitleLoader
 import io.github.immersionplayer.ui.Appearance
+import io.github.immersionplayer.ui.ThumbnailStore
 
 class App : Application() {
     lateinit var prefs: Prefs
@@ -20,6 +21,8 @@ class App : Application() {
     lateinit var subtitleLoader: SubtitleLoader
         private set
     lateinit var appearance: Appearance
+        private set
+    lateinit var thumbnails: ThumbnailStore
         private set
 
     /** Appends a non-fatal error to files/errors.log (the system log isn't always available). */
@@ -45,6 +48,7 @@ class App : Application() {
         miningStore = MiningStore(this)
         subtitleLoader = SubtitleLoader(this)
         appearance = Appearance(prefs)
+        thumbnails = ThumbnailStore(this)
         Thread {
             dictionaryDatabase.deleteIncomplete()
             BundledDictionaries.installMissing(this, dictionaryDatabase)
