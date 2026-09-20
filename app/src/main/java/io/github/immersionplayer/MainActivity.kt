@@ -3,6 +3,8 @@ package io.github.immersionplayer
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.MotionEvent
+import io.github.immersionplayer.triggers.ShoulderTriggers
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -69,6 +71,27 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /**
+     * While the shoulder triggers are on, Nubia's game service also injects screen taps at the
+     * points it has mapped for games. Those come from a virtual device rather than the
+     * touchscreen, so they can be dropped; the trigger reader already handles the presses.
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (ShoulderTriggers.running.value && event.isInjected()) {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                (application as App).logError(
+                    "ignored injected tap at (${event.x.toInt()}, ${event.y.toInt()}) device=${event.deviceId}",
+                    Throwable("trace"),
+                )
+            }
+            return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun MotionEvent.isInjected(): Boolean =
+        deviceId <= 0 || device == null || device.isVirtual
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

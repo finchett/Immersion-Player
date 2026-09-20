@@ -265,11 +265,23 @@ fun PlayerScreen(
         }
     }
 
-    // shoulder triggers: on while a video is open, off when it isn't
+    // shoulder triggers: only while the player is actually on screen, so presses (and the
+    // taps the phone's game service injects alongside them) can't reach other apps
     if (app.prefs.shoulderTriggers) {
-        DisposableEffect(Unit) {
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_START -> ShoulderTriggers.start(context)
+                    Lifecycle.Event.ON_STOP -> ShoulderTriggers.stop()
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
             ShoulderTriggers.start(context)
-            onDispose { ShoulderTriggers.stop() }
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                ShoulderTriggers.stop()
+            }
         }
     }
 
