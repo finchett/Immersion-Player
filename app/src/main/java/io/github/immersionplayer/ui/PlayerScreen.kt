@@ -89,6 +89,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.LocalView
+import android.view.RoundedCorner
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -150,8 +153,24 @@ private const val SCRUB_SECONDS_PER_WIDTH = 90.0
 
 /** Rounded-corners appearance: gap between the cards and their corner radius. */
 private val CARD_GAP = 6.dp
-private val CARD_RADIUS = 16.dp
+private val FALLBACK_CARD_RADIUS = 16.dp
 private val LocalRoundedCorners = compositionLocalOf { false }
+private val LocalCardRadius = compositionLocalOf { FALLBACK_CARD_RADIUS }
+
+/**
+ * The phone's own display corner radius, minus the card gap so the curves stay concentric
+ * with the screen's corners. Falls back to a plain rounded corner if the device doesn't say.
+ */
+@Composable
+private fun deviceCardRadius(): Dp {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    return remember(view, density) {
+        val corner = view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)
+        val radius = corner?.radius?.takeIf { it > 0 }?.let { with(density) { it.toDp() } }
+        radius?.minus(CARD_GAP)?.coerceAtLeast(4.dp) ?: FALLBACK_CARD_RADIUS
+    }
+}
 
 private const val MIN_VIDEO_FRACTION = 0.25f
 private const val MAX_VIDEO_FRACTION = 0.6f
@@ -330,10 +349,17 @@ fun PlayerScreen(
 
     val rounded = app.appearance.roundedCorners
     val gap = if (rounded) CARD_GAP else 0.dp
-    val panelShape = if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape
+    val cardRadius = deviceCardRadius()
+    val panelShape = if (rounded) RoundedCornerShape(cardRadius) else RectangleShape
+
+    // first time in a video: show what all the gestures are
+    var showGuide by remember { mutableStateOf(!app.prefs.gestureGuideSeen) }
+    LaunchedEffect(showGuide) {
+        if (showGuide) session.pause()
+    }
 
     Surface(Modifier.fillMaxSize(), color = if (rounded) MaterialTheme.colorScheme.background else Color.Black) {
-      CompositionLocalProvider(LocalRoundedCorners provides rounded) {
+      CompositionLocalProvider(LocalRoundedCorners provides rounded, LocalCardRadius provides cardRadius) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val landscape = maxWidth > maxHeight
             val portraitVideoHeight = maxWidth * 9 / 16
@@ -436,6 +462,15 @@ fun PlayerScreen(
                 }
             }
         }
+        if (showGuide) {
+            Box(Modifier.fillMaxSize().zIndex(10f)) {
+                GestureGuide(onDismiss = {
+                    showGuide = false
+                    app.prefs.gestureGuideSeen = true
+                    session.play()
+                })
+            }
+        }
       }
     }
 }
@@ -521,10 +556,11 @@ private fun VideoArea(
     }
 
     val rounded = LocalRoundedCorners.current
+    val cardRadius = LocalCardRadius.current
     val maskColor = MaterialTheme.colorScheme.background
     BoxWithConstraints(
         modifier
-            .clip(if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape)
+            .clip(if (rounded) RoundedCornerShape(cardRadius) else RectangleShape)
             .background(Color.Black),
     ) {
         val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
@@ -544,7 +580,7 @@ private fun VideoArea(
         if (rounded) {
             // SurfaceView ignores Compose clipping, so paint the corners over it instead
             Canvas(Modifier.fillMaxSize()) {
-                val radius = CARD_RADIUS.toPx()
+                val radius = cardRadius.toPx()
                 val corners = Path().apply {
                     fillType = PathFillType.EvenOdd
                     addRect(Rect(0f, 0f, size.width, size.height))

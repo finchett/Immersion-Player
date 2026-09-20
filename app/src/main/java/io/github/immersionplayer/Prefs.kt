@@ -50,6 +50,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("video_fill", false)
         set(value) = prefs.edit { putBoolean("video_fill", value) }
 
+    /** Whether the first-run gesture guide has been dismissed. */
+    var gestureGuideSeen: Boolean
+        get() = prefs.getBoolean("gesture_guide_seen", false)
+        set(value) = prefs.edit { putBoolean("gesture_guide_seen", value) }
+
     /** Share of the screen height used by the video in portrait. */
     var portraitVideoFraction: Float
         get() = prefs.getFloat("portrait_video_fraction", 0.34f)
