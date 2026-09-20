@@ -41,7 +41,6 @@ private val videoGestures = listOf(
 private val lineGestures = listOf(
     Gesture("◉", "Tap a word", "look it up"),
     Gesture("↔", "Drag across the text", "look up exactly what you select"),
-    Gesture("↑", "Swipe up", "replay this line"),
     Gesture("⊙", "Hold", "show the English translation"),
 )
 
