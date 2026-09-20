@@ -92,6 +92,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalView
 import android.view.RoundedCorner
 import androidx.compose.ui.unit.Dp
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -298,9 +300,10 @@ fun PlayerScreen(
         }
     }
 
-    // shoulder triggers: only while the player is actually on screen, so presses (and the
-    // taps the phone's game service injects alongside them) can't reach other apps
-    if (app.prefs.shoulderTriggers) {
+    // shoulder triggers: only while the player is on screen and held in landscape, so presses
+    // (and the taps the phone's game service injects alongside them) can't reach other apps
+    val landscapeNow = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    if (app.prefs.shoulderTriggers && landscapeNow) {
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
