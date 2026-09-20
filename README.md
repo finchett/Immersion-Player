@@ -32,9 +32,6 @@ Every action is a gesture. The app lists them once, on first run.
 | Divider | drag | resize the video and the panel |
 | Shoulder triggers | press | previous / next line (RedMagic, see below) |
 
-In portrait the layout stacks instead of splitting. Holding the panel swaps the Japanese for the
-translation, in place — right-hand shot below.
-
 ![Portrait mode, with the same line shown as Japanese and then held to reveal the English](docs/portrait.png)
 
 ## Dictionaries
