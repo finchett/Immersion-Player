@@ -117,10 +117,6 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         MPVLib.setPropertyDouble("panscan", if (fill) 1.0 else 0.0)
     }
 
-    /** Current frame, for the library's thumbnails (mpv decodes formats Android can't). */
-    fun grabFrame(size: Int): android.graphics.Bitmap? =
-        runCatching { MPVLib.grabThumbnail(size) }.getOrNull()
-
     fun seek(seconds: Double) {
         MPVLib.command(arrayOf("seek", seconds.coerceAtLeast(0.0).toString(), "absolute+exact"))
     }

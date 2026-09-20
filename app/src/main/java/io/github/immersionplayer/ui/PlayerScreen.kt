@@ -316,8 +316,6 @@ fun PlayerScreen(
             val videoArea = @Composable { modifier: Modifier ->
                 VideoArea(
                     session = session,
-                    thumbnails = app.thumbnails,
-                    onThumbnailProblem = { app.logError("thumbnail: $it", Throwable("trace")) },
                     startPosition = app.prefs.position(session.videoUri),
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
@@ -393,8 +391,6 @@ fun PlayerScreen(
 @Composable
 private fun VideoArea(
     session: PlayerSession,
-    thumbnails: ThumbnailStore,
-    onThumbnailProblem: (String) -> Unit,
     startPosition: Double,
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
@@ -461,22 +457,8 @@ private fun VideoArea(
         }
     }
 
-    // the frame you're paused on becomes this video's library thumbnail (mpv must still be alive,
-    // so this happens on pause rather than while the player is being torn down)
-    val pausedForThumbnail by session.paused.collectAsState()
-    LaunchedEffect(pausedForThumbnail) {
-        if (!pausedForThumbnail) return@LaunchedEffect
-        delay(300)
-        val captured = withContext(Dispatchers.IO) {
-            runCatching { session.captureThumbnail(thumbnails) }
-        }
-        captured.onSuccess { if (!it) onThumbnailProblem("mpv returned no frame") }
-            .onFailure { onThumbnailProblem(it.toString()) }
-    }
-
     DisposableEffect(Unit) {
         onDispose {
-            runCatching { session.captureThumbnail(thumbnails) }
             session.detach()
             mpvView?.destroy()
         }

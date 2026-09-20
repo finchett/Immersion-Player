@@ -22,7 +22,8 @@ object ThumbnailGenerator {
         abort = true
     }
 
-    fun generate(context: Context, videoUri: String, store: ThumbnailStore): Boolean {
+    /** [start] is an mpv position: "20%" for an unwatched video, or seconds for where you left off. */
+    fun generate(context: Context, videoUri: String, store: ThumbnailStore, start: String = "20%"): Boolean {
         val outputDir = File(context.cacheDir, "thumbgen").apply {
             deleteRecursively()
             mkdirs()
@@ -40,7 +41,7 @@ object ThumbnailGenerator {
             MPVLib.setOptionString("audio", "no")
             MPVLib.setOptionString("sub", "no")
             MPVLib.setOptionString("hwdec", "no")
-            MPVLib.setOptionString("start", "20%")
+            MPVLib.setOptionString("start", start)
             MPVLib.setOptionString("frames", "1")
             MPVLib.setOptionString("keep-open", "no")
             MPVLib.init()

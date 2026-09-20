@@ -59,6 +59,12 @@ class Prefs(context: Context) {
         get() = prefs.getFloat("subtitle_size", 26f)
         set(value) = prefs.edit { putFloat("subtitle_size", value) }
 
+    /** Position a video's library thumbnail was taken at, to know when to refresh it. */
+    fun thumbnailPosition(uri: String): Double = perVideo.getFloat("thumbpos:$uri", -1f).toDouble()
+
+    fun setThumbnailPosition(uri: String, seconds: Double) =
+        perVideo.edit { putFloat("thumbpos:$uri", seconds.toFloat()) }
+
     /** Seconds to shift a video's subtitles (positive = subtitles appear later). */
     fun subtitleOffset(uri: String): Double = perVideo.getFloat("offset:$uri", 0f).toDouble()
 

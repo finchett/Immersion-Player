@@ -160,10 +160,18 @@ fun LibraryScreen(
         withContext(Dispatchers.IO) {
             for (video in videos) {
                 val uri = video.uri.toString()
-                if (app.thumbnails.exists(uri)) continue
+                val watched = app.prefs.position(uri)
+                val takenAt = app.prefs.thumbnailPosition(uri)
+                val wanted = if (watched > 0) watched else 0.0
+                // make one if it's missing, or refresh it when you've watched further on
+                val needed = !app.thumbnails.exists(uri) || kotlin.math.abs(takenAt - wanted) > 30.0
+                if (!needed) continue
                 if (!MpvOwner.tryAcquire("thumbnails")) return@withContext
                 try {
-                    ThumbnailGenerator.generate(context, uri, app.thumbnails)
+                    val start = if (watched > 0) watched.toInt().toString() else "20%"
+                    if (ThumbnailGenerator.generate(context, uri, app.thumbnails, start)) {
+                        app.prefs.setThumbnailPosition(uri, wanted)
+                    }
                 } finally {
                     MpvOwner.release("thumbnails")
                 }
