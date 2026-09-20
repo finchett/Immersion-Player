@@ -52,6 +52,9 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     }
 
     fun initialize(startPosition: Double, fill: Boolean) {
+        // libmpv is a per-process singleton shared with the thumbnail generator
+        ThumbnailGenerator.requestAbort()
+        MpvOwner.acquire(OWNER)
         MPVLib.create(context.applicationContext)
 
         MPVLib.setOptionString("config", "no")
@@ -102,6 +105,7 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         MPVLib.removeObserver(observer)
         holder.removeCallback(this)
         MPVLib.destroy()
+        MpvOwner.release(OWNER)
     }
 
     var paused: Boolean
@@ -147,5 +151,6 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
 
     companion object {
         private const val TAG = "ImmersionMpv"
+        private const val OWNER = "player"
     }
 }

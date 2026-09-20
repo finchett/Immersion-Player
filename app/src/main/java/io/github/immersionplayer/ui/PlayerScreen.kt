@@ -230,70 +230,6 @@ fun PlayerScreen(
         PlayerSession(context.applicationContext, app.prefs, video.uri.toString(), video.name ?: "video")
     }
 
-    // fullscreen while playing
-    DisposableEffect(Unit) {
-        val window = (context as Activity).window
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
-    }
-
-    // pause when the app is backgrounded or the screen turns off, and when headphones disconnect
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> session.savePosition()
-                Lifecycle.Event.ON_STOP -> session.pause()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        val noisyReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) = session.pause()
-        }
-        ContextCompat.registerReceiver(
-            context,
-            noisyReceiver,
-            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            context.unregisterReceiver(noisyReceiver)
-        }
-    }
-
-    // shoulder triggers: only while the player is actually on screen, so presses (and the
-    // taps the phone's game service injects alongside them) can't reach other apps
-    if (app.prefs.shoulderTriggers) {
-        DisposableEffect(lifecycleOwner) {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_START -> ShoulderTriggers.start(context)
-                    Lifecycle.Event.ON_STOP -> ShoulderTriggers.stop()
-                    else -> Unit
-                }
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            ShoulderTriggers.start(context)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-                ShoulderTriggers.stop()
-            }
-        }
-    }
-
-    LaunchedEffect(session) {
-        PlayerCommands.events.collect { command ->
-            when (command) {
-                PlayerCommand.PreviousLine -> session.previousLine()
-                PlayerCommand.NextLine -> session.nextLine()
-            }
-        }
-    }
-
     var subtitleStatus by remember { mutableStateOf<String?>("Reading subtitles…") }
     LaunchedEffect(video) {
         val tracks = withContext(Dispatchers.IO) {
@@ -381,6 +317,7 @@ fun PlayerScreen(
                 VideoArea(
                     session = session,
                     thumbnails = app.thumbnails,
+                    onThumbnailProblem = { app.logError("thumbnail: $it", Throwable("trace")) },
                     startPosition = app.prefs.position(session.videoUri),
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
@@ -457,6 +394,7 @@ fun PlayerScreen(
 private fun VideoArea(
     session: PlayerSession,
     thumbnails: ThumbnailStore,
+    onThumbnailProblem: (String) -> Unit,
     startPosition: Double,
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
@@ -523,9 +461,21 @@ private fun VideoArea(
         }
     }
 
+    // the frame you're paused on becomes this video's library thumbnail (mpv must still be alive,
+    // so this happens on pause rather than while the player is being torn down)
+    val pausedForThumbnail by session.paused.collectAsState()
+    LaunchedEffect(pausedForThumbnail) {
+        if (!pausedForThumbnail) return@LaunchedEffect
+        delay(300)
+        val captured = withContext(Dispatchers.IO) {
+            runCatching { session.captureThumbnail(thumbnails) }
+        }
+        captured.onSuccess { if (!it) onThumbnailProblem("mpv returned no frame") }
+            .onFailure { onThumbnailProblem(it.toString()) }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
-            // the frame you left off on becomes this video's library thumbnail
             runCatching { session.captureThumbnail(thumbnails) }
             session.detach()
             mpvView?.destroy()
