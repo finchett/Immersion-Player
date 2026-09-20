@@ -3,11 +3,6 @@ package io.github.immersionplayer
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.KeyEvent
-import android.view.MotionEvent
-import io.github.immersionplayer.player.TriggerSetup
-import io.github.immersionplayer.player.PlayerCommand
-import io.github.immersionplayer.player.PlayerCommands
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -25,8 +20,6 @@ import io.github.immersionplayer.ui.SettingsScreen
 import io.github.immersionplayer.ui.isVideo
 import kotlinx.coroutines.android.awaitFrame
 import java.io.File
-
-private const val TRIGGER_DEBOUNCE_MS = 150L
 
 sealed interface Screen {
     data object Library : Screen
@@ -75,48 +68,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    private val triggerHeld = mutableSetOf<Int>()
-    private val triggerReleasedAt = mutableMapOf<Int, Long>()
-
-    /**
-     * Shoulder triggers (RedMagic and similar) arrive as F7/F8 key presses. They're capacitive
-     * and can flicker while a finger rests on them, so a press only counts after a real release.
-     */
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val app = application as App
-        if (TriggerSetup.active && event.keyCode != KeyEvent.KEYCODE_BACK) {
-            TriggerSetup.onKey(event)
-            return true
-        }
-        val previousKey = app.prefs.previousLineKey
-        val nextKey = app.prefs.nextLineKey
-        val isTrigger = event.keyCode == previousKey || event.keyCode == nextKey
-        if (!isTrigger || screen !is Screen.Player || !app.prefs.shoulderTriggers) {
-            return super.dispatchKeyEvent(event)
-        }
-        val key = event.keyCode
-        val now = event.eventTime
-        when (event.action) {
-            KeyEvent.ACTION_DOWN -> {
-                val recentlyReleased = now - (triggerReleasedAt[key] ?: 0L) < TRIGGER_DEBOUNCE_MS
-                if (event.repeatCount == 0 && key !in triggerHeld && !recentlyReleased) {
-                    PlayerCommands.send(if (key == previousKey) PlayerCommand.PreviousLine else PlayerCommand.NextLine)
-                }
-                triggerHeld.add(key)
-            }
-            KeyEvent.ACTION_UP -> {
-                triggerHeld.remove(key)
-                triggerReleasedAt[key] = now
-            }
-        }
-        return true
-    }
-
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (TriggerSetup.active) TriggerSetup.onTouch(event)
-        return super.dispatchTouchEvent(event)
     }
 
     override fun onNewIntent(intent: Intent) {

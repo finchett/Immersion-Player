@@ -38,6 +38,19 @@ Built for landscape phones (developed on a RedMagic 10 Pro).
 | Right panel | hold | show the English line in place of the Japanese |
 | Right panel | tap / double tap | play-pause / toggle stop-at-end-of-line |
 | Divider | drag its middle | resize the panel (28–50 % of the width) |
+| Shoulder triggers | press left / right | previous / next line (RedMagic, needs Shizuku — see below) |
+
+## Shoulder triggers (RedMagic)
+
+RedMagic's capacitive shoulder triggers report `KEY_F7`/`KEY_F8`, but the phone only powers them
+while Nubia's game settings are on, and Nubia's game service swallows the key events before any
+app sees them. With [Shizuku](https://shizuku.rikka.app/) running, the app starts a small user
+service (shell privileges) while a video is open that switches the sensors on, keeps them on when
+Nubia resets them, and reads the two device nodes with `getevent`. The triggers are switched off
+again when you leave the player. Turn it on under Dictionaries & settings, where the same section
+shows what Shizuku still needs and can test the triggers live.
+
+Approach discovered by [RedTrigger](https://github.com/zampierilucas/RedTrigger) (MIT).
 
 ## Building
 

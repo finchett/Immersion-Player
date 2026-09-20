@@ -32,7 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.DisposableEffect
-import io.github.immersionplayer.player.TriggerSetup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +50,8 @@ import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
+import io.github.immersionplayer.triggers.ShoulderTriggers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,7 +64,6 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
     var importing by remember { mutableStateOf<String?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<DictionaryInfo?>(null) }
-    var showTriggerSetup by remember { mutableStateOf(false) }
 
     suspend fun refresh() {
         dictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries() }
@@ -192,23 +192,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 initial = app.prefs.copyLines,
             ) { app.prefs.copyLines = it }
 
-            SettingSwitch(
-                title = "Shoulder triggers change lines",
-                description = "Step through lines with the phone's shoulder triggers (RedMagic and similar). Use the setup below to teach it your triggers.",
-                initial = app.prefs.shoulderTriggers,
-            ) { app.prefs.shoulderTriggers = it }
-            SettingSwitch(
-                title = "Trigger tap targets",
-                description = "For Game Space, which maps triggers to screen taps: shows small ◁ ▷ targets in the " +
-                    "top corners of the study panel. Open a video, then in Game Space drag the left trigger's " +
-                    "marker onto ◁ and the right one onto ▷.",
-                initial = app.prefs.triggerTargets,
-            ) { app.prefs.triggerTargets = it }
-            if (showTriggerSetup) {
-                TriggerSetupCard(app, onDone = { showTriggerSetup = false })
-            } else {
-                OutlinedButton(onClick = { showTriggerSetup = true }) { Text("Set up shoulder triggers…") }
-            }
+            ShoulderTriggerSettings(app)
 
             var size by remember { mutableStateOf(app.prefs.subtitleSize) }
             Text("Subtitle size: ${size.toInt()}")
@@ -296,77 +280,92 @@ private fun SettingSwitch(title: String, description: String, initial: Boolean, 
     }
 }
 
-/**
- * Learns which keys the phone's shoulder triggers send (and reports taps if it sends those instead).
- * Inline rather than a dialog: key presses only reach the activity when no dialog window has focus.
- */
-@Composable
-private fun TriggerSetupCard(app: App, onDone: () -> Unit) {
-    DisposableEffect(Unit) {
-        TriggerSetup.start()
-        onDispose { TriggerSetup.stop() }
-    }
-    val lastKey by TriggerSetup.lastKey.collectAsState()
-    val lastTouch by TriggerSetup.lastTouch.collectAsState()
-    var step by remember { mutableIntStateOf(0) } // 0 = previous, 1 = next, 2 = done
-    var previousKey by remember { mutableStateOf<TriggerSetup.Seen?>(null) }
-    var nextKey by remember { mutableStateOf<TriggerSetup.Seen?>(null) }
 
-    LaunchedEffect(lastKey) {
-        val key = lastKey ?: return@LaunchedEffect
-        when (step) {
-            0 -> { previousKey = key; step = 1 }
-            1 -> if (key.keyCode != previousKey?.keyCode) { nextKey = key; step = 2 }
+/** Shoulder triggers need Shizuku, so this shows what's still missing and can test them live. */
+@Composable
+private fun ShoulderTriggerSettings(app: App) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(app.prefs.shoulderTriggers) }
+    var status by remember { mutableStateOf(ShoulderTriggers.status(context)) }
+    var testing by remember { mutableStateOf(false) }
+    val lastPress by ShoulderTriggers.lastPress.collectAsState()
+    val running by ShoulderTriggers.running.collectAsState()
+
+    // status changes when Shizuku is started or permission granted, both outside this screen
+    LaunchedEffect(Unit) {
+        while (true) {
+            status = ShoulderTriggers.status(context)
+            delay(1000)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (testing) {
+                ShoulderTriggers.testMode = false
+                ShoulderTriggers.stop()
+            }
         }
     }
 
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Set up shoulder triggers", style = MaterialTheme.typography.titleMedium)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Shoulder triggers change lines", style = MaterialTheme.typography.titleMedium)
             Text(
-                "On RedMagic phones the triggers only work while the app runs in Game Space, " +
-                    "so add Immersion Player to Game Space first.",
+                "RedMagic's triggers: left for the previous line, right for the next one. " +
+                    "The phone only powers them in Game Space, so the app switches them on itself " +
+                    "through Shizuku while a video is open.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
             )
+        }
+        Switch(checked = enabled, onCheckedChange = { enabled = it; app.prefs.shoulderTriggers = it })
+    }
+
+    if (!enabled) return
+
+    when (status) {
+        ShoulderTriggers.Status.NotInstalled -> {
+            Text("Shizuku isn't installed.", color = MaterialTheme.colorScheme.secondary)
             Text(
-                when (step) {
-                    0 -> "Press the trigger for PREVIOUS line."
-                    1 -> "Now press the trigger for NEXT line."
-                    else -> "Done. Save to use these."
-                },
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
+                "Shizuku gives apps the access that adb has. Install it, start it (it walks you " +
+                    "through wireless debugging), then come back here.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
             )
-            previousKey?.let { Text("Previous line: ${it.description}") }
-            nextKey?.let { Text("Next line: ${it.description}") }
-            lastTouch?.let {
-                Text(
-                    "Also received a screen $it. If that appeared when you pressed a trigger, " +
-                        "Game Space is sending taps instead of keys.",
-                    color = MaterialTheme.colorScheme.secondary,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        val previous = previousKey?.keyCode
-                        val next = nextKey?.keyCode
-                        if (previous != null && next != null) {
-                            app.prefs.previousLineKey = previous
-                            app.prefs.nextLineKey = next
-                            app.prefs.shoulderTriggers = true
-                        }
-                        onDone()
-                    },
-                    enabled = step == 2,
-                ) { Text("Save") }
-                TextButton(onClick = {
-                    step = 0
-                    previousKey = null
-                    nextKey = null
-                }) { Text("Start over") }
-                TextButton(onClick = onDone) { Text("Cancel") }
+        }
+        ShoulderTriggers.Status.NotRunning -> {
+            Text("Shizuku is installed but not running.", color = MaterialTheme.colorScheme.secondary)
+            OutlinedButton(onClick = {
+                context.packageManager.getLaunchIntentForPackage(ShoulderTriggers.SHIZUKU_PACKAGE)
+                    ?.let(context::startActivity)
+            }) { Text("Open Shizuku") }
+        }
+        ShoulderTriggers.Status.NeedsPermission -> {
+            Text("Shizuku is running; allow this app to use it.", color = MaterialTheme.colorScheme.secondary)
+            OutlinedButton(onClick = {
+                ShoulderTriggers.requestPermission { granted ->
+                    if (granted) status = ShoulderTriggers.Status.Ready
+                }
+            }) { Text("Grant access") }
+        }
+        ShoulderTriggers.Status.Ready -> {
+            Text("Ready. The triggers work while a video is open.", color = MaterialTheme.colorScheme.tertiary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = {
+                    testing = !testing
+                    ShoulderTriggers.testMode = testing
+                    if (testing) ShoulderTriggers.start(context) else ShoulderTriggers.stop()
+                }) { Text(if (testing) "Stop test" else "Test triggers") }
+                if (testing) {
+                    Text(
+                        when {
+                            lastPress != null -> "Pressed: $lastPress"
+                            running -> "Press a trigger…"
+                            else -> "Starting…"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
