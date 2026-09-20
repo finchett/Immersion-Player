@@ -1120,8 +1120,7 @@ private fun CurrentLine(
     ) {
         if (status != null || track == null) {
             Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                if (status == "Reading subtitles…") CircularProgressIndicator()
-                else Text(status ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                Text(status ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             }
             return@Box
         }
