@@ -1,7 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Release signing. Point `immersionKeystore` (in ~/.gradle/gradle.properties or -P) at a
+// properties file holding storeFile/storePassword/keyAlias/keyPassword. Without it, release
+// builds fall back to the debug key so the project still builds for everyone else.
+fun loadKeystoreProps(): Properties? {
+    val path = project.findProperty("immersionKeystore") as String? ?: return null
+    val propsFile = file(path)
+    if (!propsFile.isFile) return null
+    val loaded = Properties()
+    propsFile.inputStream().use { stream -> loaded.load(stream) }
+    return loaded
+}
+
+val keystoreProps: Properties? = loadKeystoreProps()
 
 android {
     namespace = "io.github.immersionplayer"
@@ -18,10 +34,21 @@ android {
         }
     }
 
+    signingConfigs {
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
