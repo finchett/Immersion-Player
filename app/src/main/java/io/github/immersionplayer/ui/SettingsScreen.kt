@@ -228,6 +228,10 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                         }
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingRow("Gesture guide", "The short guide shown the first time you open a video.") {
+                        OutlinedButton(onClick = { app.prefs.gestureGuideSeen = false }) { Text("Show again") }
+                    }
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     SettingSwitchRow(
                         title = "Rounded corners",
                         description = "Show the video and study panel as rounded cards.",
