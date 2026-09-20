@@ -6,21 +6,15 @@
 ![Android 11+](https://img.shields.io/badge/Android-11%2B-3ddc84)
 ![arm64-v8a](https://img.shields.io/badge/abi-arm64--v8a-lightgrey)
 
-On a desktop you can do this already: mpv on one side, a clipboard bridge, Yomitan or Rikaitan
-open on the other, and every line of dialogue one keypress away. On a phone you get a player
-that hides the subtitles behind a menu and a dictionary app you have to paste into.
-
-This is the desktop loop, rebuilt for a touchscreen. The video plays on the left. The current
-line sits on the right with a word already looked up. Tap another word, drag across a phrase,
-hold to see the English, swipe to step back a line and hear it again.
+An Android player for sentence mining. The video plays on one side; the current line sits on the
+other with a word already looked up. Tap another word, drag across a phrase, hold for the English,
+swipe to step back a line and hear it again.
 
 ![Stepping through lines while the video plays](docs/loop.gif)
 
 ## No buttons
 
-There is no transport bar, no menu strip, no overlay that appears when you touch the screen and
-covers the thing you were reading. Every action is a gesture, and the app tells you all of them
-once, on first run.
+Every action is a gesture. The app lists them once, on first run.
 
 | Where | Gesture | Does |
 |---|---|---|
@@ -46,8 +40,7 @@ in place, with the translation — on the right below.
 
 ## Always a word defined
 
-An empty dictionary pane is a wasted pane. Every time the line changes the app looks something
-up by itself — the first kanji it can find, skipping speaker names and the readings in brackets
+Every time the line changes the app looks something up by itself — the first kanji it can find, skipping speaker names and the readings in brackets
 that subtitle files are full of, falling through to the next candidate until a lookup hits.
 
 Lookups take the longest match at the position you touched and undo conjugation to get there, so
@@ -61,10 +54,9 @@ content renders rather than being flattened to a string.
 ## Plays the files you actually have
 
 Playback is libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt
-binaries. This is not a preference. A large share of Japanese releases are 10-bit H.264, which
-Android's hardware decoders do not support and its software decoder declines; a stock
-`MediaCodec` player shows you a black rectangle. mpv decodes them, and — because it is already
-there — also generates the library thumbnails, headless, straight to a bitmap.
+binaries, because a lot of Japanese releases are 10-bit H.264: Android's hardware decoders do not
+support it and its software decoder declines it, so a stock `MediaCodec` player shows a black
+rectangle. mpv also generates the library thumbnails, headless, straight to a bitmap.
 
 Subtitles come out of the container rather than through the player: the app walks the Matroska
 EBML itself, handles zlib-compressed tracks, and parses SRT, ASS/SSA and WebVTT. Sidecar files
@@ -73,9 +65,9 @@ you pay for it once.
 
 ![The library, with thumbnails and resume positions](docs/library.png)
 
-The library groups a folder of shows, orders episodes the way a human would rather than the way
-`strcmp` would, remembers where you stopped, and offers the next episode when one ends. It will
-also open a video handed to it by another app.
+The library groups a folder of shows, sorts episodes in natural order, remembers where you
+stopped, and offers the next episode when one ends. It also opens videos handed to it by other
+apps.
 
 ## Shoulder triggers, the hard way
 
