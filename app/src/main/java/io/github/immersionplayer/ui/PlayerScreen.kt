@@ -1045,7 +1045,6 @@ private fun StudyPanel(
                     onCharTap = onLookup,
                     onSelect = onSelect,
                     onTapOutside = session::togglePause,
-                    onReplay = session::replayLine,
                     modifier = Modifier.fillMaxWidth().heightIn(max = maxLineHeight),
                 )
                 HorizontalDivider()
@@ -1100,25 +1099,10 @@ private fun CurrentLine(
     onCharTap: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
     onTapOutside: () -> Unit,
-    onReplay: () -> Unit,
     modifier: Modifier,
 ) {
-    val replayThreshold = with(LocalDensity.current) { 40.dp.toPx() }
     Box(
-        modifier
-            .background(MaterialTheme.colorScheme.surface)
-            .pointerInput(Unit) {
-                // swipe up on the line to hear it again
-                var total = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { total = 0f },
-                    onVerticalDrag = { change, amount ->
-                        change.consume()
-                        total += amount
-                    },
-                    onDragEnd = { if (total < -replayThreshold) onReplay() },
-                )
-            },
+        modifier.background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center,
     ) {
         if (status != null || track == null) {
