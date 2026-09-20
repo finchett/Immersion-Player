@@ -50,6 +50,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("video_fill", false)
         set(value) = prefs.edit { putBoolean("video_fill", value) }
 
+    /** Share of the screen height used by the video in portrait. */
+    var portraitVideoFraction: Float
+        get() = prefs.getFloat("portrait_video_fraction", 0.34f)
+        set(value) = prefs.edit { putFloat("portrait_video_fraction", value) }
+
     /** Share of the screen width used by the study panel in landscape. */
     var panelFraction: Float
         get() = prefs.getFloat("panel_fraction", 0.37f)

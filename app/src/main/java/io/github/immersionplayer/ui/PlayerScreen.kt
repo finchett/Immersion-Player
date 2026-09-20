@@ -28,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -152,6 +153,8 @@ private val CARD_GAP = 6.dp
 private val CARD_RADIUS = 16.dp
 private val LocalRoundedCorners = compositionLocalOf { false }
 
+private const val MIN_VIDEO_FRACTION = 0.25f
+private const val MAX_VIDEO_FRACTION = 0.6f
 private const val MIN_PANEL_FRACTION = 0.28f
 private const val MAX_PANEL_FRACTION = 0.5f
 
@@ -159,7 +162,13 @@ private val RESIZE_ZONE_WIDTH = 24.dp
 
 /** Invisible drag zone on the video/panel edge; a grip appears only while it's touched. */
 @Composable
-private fun ResizeHandle(onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: () -> Unit, modifier: Modifier) {
+private fun ResizeHandle(
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    modifier: Modifier,
+    vertical: Boolean = false,
+) {
     var touched by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     Box(
@@ -174,24 +183,36 @@ private fun ResizeHandle(onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDra
                     touched = false
                 }
             }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { dragging = true; onDragStart() },
-                    onDragEnd = { dragging = false; onDragEnd() },
-                    onDragCancel = { dragging = false; onDragEnd() },
-                    onHorizontalDrag = { change, dx ->
-                        change.consume()
-                        onDrag(dx)
-                    },
-                )
+            .pointerInput(vertical) {
+                if (vertical) {
+                    detectVerticalDragGestures(
+                        onDragStart = { dragging = true; onDragStart() },
+                        onDragEnd = { dragging = false; onDragEnd() },
+                        onDragCancel = { dragging = false; onDragEnd() },
+                        onVerticalDrag = { change, dy ->
+                            change.consume()
+                            onDrag(dy)
+                        },
+                    )
+                } else {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragging = true; onDragStart() },
+                        onDragEnd = { dragging = false; onDragEnd() },
+                        onDragCancel = { dragging = false; onDragEnd() },
+                        onHorizontalDrag = { change, dx ->
+                            change.consume()
+                            onDrag(dx)
+                        },
+                    )
+                }
             },
         contentAlignment = Alignment.Center,
     ) {
         AnimatedVisibility(visible = touched || dragging, enter = fadeIn(), exit = fadeOut()) {
             Box(
                 Modifier
-                    .width(5.dp)
-                    .height(48.dp)
+                    .width(if (vertical) 48.dp else 5.dp)
+                    .height(if (vertical) 5.dp else 48.dp)
                     .background(
                         if (dragging) MaterialTheme.colorScheme.primary else Color(0xFF8A8E95),
                         RoundedCornerShape(3.dp),
@@ -300,6 +321,9 @@ fun PlayerScreen(
 
 
     // read only during layout/drawing so dragging the divider never recomposes the screen
+    val videoFraction = remember {
+        mutableFloatStateOf(app.prefs.portraitVideoFraction.coerceIn(MIN_VIDEO_FRACTION, MAX_VIDEO_FRACTION))
+    }
     val panelFraction = remember {
         mutableFloatStateOf(app.prefs.panelFraction.coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION))
     }
@@ -374,9 +398,41 @@ fun PlayerScreen(
                     )
                 }
             } else {
-                Column(Modifier.fillMaxSize()) {
-                    videoArea(Modifier.fillMaxWidth().height(portraitVideoHeight).padding(start = gap, top = gap, end = gap, bottom = gap / 2))
-                    sidePanel(Modifier.weight(1f).fillMaxWidth().padding(start = gap, top = gap / 2, end = gap, bottom = gap).clip(panelShape))
+                val totalHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
+                val zonePx = with(LocalDensity.current) { RESIZE_ZONE_WIDTH.toPx() }
+                Box(Modifier.fillMaxSize()) {
+                    Layout(
+                        content = {
+                            videoArea(Modifier.padding(start = gap, top = gap, end = gap, bottom = gap / 2))
+                            sidePanel(Modifier.padding(start = gap, top = gap / 2, end = gap, bottom = gap).clip(panelShape))
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    ) { measurables, constraints ->
+                        val width = constraints.maxWidth
+                        val height = constraints.maxHeight
+                        val videoHeight = (height * videoFraction.floatValue).roundToInt()
+                        val video = measurables[0].measure(Constraints.fixed(width, videoHeight))
+                        val panel = measurables[1].measure(Constraints.fixed(width, height - videoHeight))
+                        layout(width, height) {
+                            video.place(0, 0)
+                            panel.place(0, videoHeight)
+                        }
+                    }
+                    // grab zone on the boundary, in the middle of the width
+                    ResizeHandle(
+                        vertical = true,
+                        onDragStart = {},
+                        onDrag = { dy ->
+                            videoFraction.floatValue = (videoFraction.floatValue + dy / totalHeightPx)
+                                .coerceIn(MIN_VIDEO_FRACTION, MAX_VIDEO_FRACTION)
+                        },
+                        onDragEnd = { app.prefs.portraitVideoFraction = videoFraction.floatValue },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset { IntOffset(0, (totalHeightPx * videoFraction.floatValue - zonePx / 2).roundToInt()) }
+                            .height(RESIZE_ZONE_WIDTH)
+                            .width(160.dp),
+                    )
                 }
             }
         }
@@ -892,6 +948,7 @@ private fun StudyPanel(
                     onCharTap = onLookup,
                     onSelect = onSelect,
                     onTapOutside = session::togglePause,
+                    onReplay = session::replayLine,
                     modifier = Modifier.fillMaxWidth().heightIn(max = maxLineHeight),
                 )
                 HorizontalDivider()
@@ -946,9 +1003,27 @@ private fun CurrentLine(
     onCharTap: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
     onTapOutside: () -> Unit,
+    onReplay: () -> Unit,
     modifier: Modifier,
 ) {
-    Box(modifier.background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+    val replayThreshold = with(LocalDensity.current) { 40.dp.toPx() }
+    Box(
+        modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                // swipe up on the line to hear it again
+                var total = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { total = 0f },
+                    onVerticalDrag = { change, amount ->
+                        change.consume()
+                        total += amount
+                    },
+                    onDragEnd = { if (total < -replayThreshold) onReplay() },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
         if (status != null || track == null) {
             Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
                 if (status == "Reading subtitles…") CircularProgressIndicator()
