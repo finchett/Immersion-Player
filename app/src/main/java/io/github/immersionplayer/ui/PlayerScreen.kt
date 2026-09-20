@@ -154,7 +154,7 @@ private const val SCRUB_SECONDS_PER_WIDTH = 90.0
 /** Rounded-corners appearance: gap between the cards and their corner radius. */
 private val CARD_GAP = 6.dp
 private val FALLBACK_CARD_RADIUS = 16.dp
-private val MIN_CARD_RADIUS = 14.dp
+private val MIN_CARD_RADIUS = 10.dp
 private val LocalRoundedCorners = compositionLocalOf { false }
 private val LocalCardRadius = compositionLocalOf { FALLBACK_CARD_RADIUS }
 
