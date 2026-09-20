@@ -6,9 +6,9 @@
 ![Android 11+](https://img.shields.io/badge/Android-11%2B-3ddc84)
 ![arm64-v8a](https://img.shields.io/badge/abi-arm64--v8a-lightgrey)
 
-An Android player for sentence mining. The video plays on one side; the current line sits on the
-other with a word already looked up. Tap another word, drag across a phrase, hold for the English,
-swipe to step back a line and hear it again.
+An Android video player with a Japanese dictionary built in. The video plays on one side; the
+current line sits on the other with a word already looked up. Tap another word, drag across a
+phrase, hold for the English, swipe to step back a line and hear it again.
 
 ![Stepping through lines while the video plays](docs/loop.gif)
 
