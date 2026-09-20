@@ -272,6 +272,62 @@ fun PlayerScreen(
         PlayerSession(context.applicationContext, app.prefs, video.uri.toString(), video.name ?: "video")
     }
 
+    // pause when the app is backgrounded or the screen turns off, and when headphones disconnect
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> session.savePosition()
+                Lifecycle.Event.ON_STOP -> session.pause()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        val noisyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) = session.pause()
+        }
+        ContextCompat.registerReceiver(
+            context,
+            noisyReceiver,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            context.unregisterReceiver(noisyReceiver)
+        }
+    }
+
+    // shoulder triggers: only while the player is actually on screen, so presses (and the
+    // taps the phone's game service injects alongside them) can't reach other apps
+    if (app.prefs.shoulderTriggers) {
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_START -> ShoulderTriggers.start(context)
+                    Lifecycle.Event.ON_STOP -> ShoulderTriggers.stop()
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            ShoulderTriggers.start(context)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                ShoulderTriggers.stop()
+            }
+        }
+    }
+
+    // hardware keys and triggers arrive as commands from outside the UI
+    LaunchedEffect(session) {
+        PlayerCommands.events.collect { command ->
+            when (command) {
+                PlayerCommand.PreviousLine -> session.previousLine()
+                PlayerCommand.NextLine -> session.nextLine()
+            }
+        }
+    }
+
     var subtitleStatus by remember { mutableStateOf<String?>("Reading subtitles…") }
     LaunchedEffect(video) {
         val tracks = withContext(Dispatchers.IO) {
