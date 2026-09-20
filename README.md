@@ -32,36 +32,29 @@ Every action is a gesture. The app lists them once, on first run.
 | Divider | drag | resize the video and the panel |
 | Shoulder triggers | press | previous / next line (RedMagic, see below) |
 
-Turn the phone and the same layout stacks instead of splitting: the video keeps the share of the
-height you gave it, the panel takes the rest. Holding anywhere on the panel replaces the Japanese,
-in place, with the translation — on the right below.
+In portrait the layout stacks instead of splitting. Holding the panel swaps the Japanese for the
+translation, in place — right-hand shot below.
 
 ![Portrait mode, with the same line shown as Japanese and then held to reveal the English](docs/portrait.png)
 
-## Always a word defined
+## Dictionaries
 
-Every time the line changes the app looks something up by itself — the first kanji it can find, skipping speaker names and the readings in brackets
-that subtitle files are full of, falling through to the next candidate until a lookup hits.
+- Imports Yomitan/Rikaitan zips: term banks, frequency lists, pitch accent. Structured content is
+  rendered, not flattened.
+- JMdict is bundled and installs on first launch. Stored in SQLite, searched on device.
+- Lookup takes the longest match at the point you touched and deinflects:
+  食べさせられなかった → 食べる, with the chain shown in the entry.
+- Every new line is looked up automatically — first kanji found, skipping speaker names and
+  bracketed readings, falling through candidates until one hits.
 
-Lookups take the longest match at the position you touched and undo conjugation to get there, so
-食べさせられなかった finds 食べる, and the entry shows you the chain it followed.
+## Playback
 
-Dictionaries are Yomitan's: the same zips Yomitan and Rikaitan take, including term banks,
-frequency lists and pitch accent, imported into SQLite and searched locally. JMdict is bundled
-and installs itself the first time you open the app, so there is nothing to set up. Structured
-content renders rather than being flattened to a string.
-
-## Plays the files you actually have
-
-Playback is libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt
-binaries, because a lot of Japanese releases are 10-bit H.264: Android's hardware decoders do not
-support it and its software decoder declines it, so a stock `MediaCodec` player shows a black
-rectangle. mpv also generates the library thumbnails, headless, straight to a bitmap.
-
-Subtitles come out of the container rather than through the player: the app walks the Matroska
-EBML itself, handles zlib-compressed tracks, and parses SRT, ASS/SSA and WebVTT. Sidecar files
-next to the video win over embedded tracks when they exist. Extraction is cached per file, so
-you pay for it once.
+- libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt binaries.
+  Needed because much of what you'll play is 10-bit H.264, which Android's hardware decoders
+  don't support and its software decoder refuses — a `MediaCodec` player shows a black rectangle.
+- Library thumbnails come from a second, headless mpv rather than a separate decoder.
+- Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
+  tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.
 
 ![The library, with thumbnails and resume positions](docs/library.png)
 
@@ -69,26 +62,19 @@ The library groups a folder of shows, sorts episodes in natural order, remembers
 stopped, and offers the next episode when one ends. It also opens videos handed to it by other
 apps.
 
-## Shoulder triggers, the hard way
+## Shoulder triggers (RedMagic)
 
-The RedMagic 10 Pro has two capacitive shoulder triggers. They report `KEY_F7` and `KEY_F8`,
-which sounds like the end of the story, except:
+Maps the two capacitive triggers to previous/next line. Off by default, needs
+[Shizuku](https://shizuku.rikka.app/), advanced settings.
 
-1. The sensors are unpowered unless Nubia's game settings are on.
-2. Nubia's game service consumes both key events before any app sees them. Watching the raw
-   input devices during a press produced hundreds of events and not one of them reached us.
+They report `KEY_F7`/`KEY_F8` but the events never reach an app: the sensors are unpowered unless
+Nubia's game settings are on, and Nubia's game service consumes the keys first. The app therefore
+bypasses the input stack. While a video is open, a Shizuku user service (shell privilege) enables
+the sensors, re-applies the setting every second because Nubia resets it, and reads the device
+nodes with `getevent`. Settings are restored on exit.
 
-So the app skips the input stack entirely. With [Shizuku](https://shizuku.rikka.app/) running it
-starts a small user service at shell privilege for as long as a video is open: it turns the
-sensors on, re-applies the setting every second because Nubia keeps turning it back off, and
-reads the two device nodes with `getevent` directly. Leave the player and the settings are put
-back the way they were.
-
-It is off by default and lives in the advanced section, where the same panel tells you what
-Shizuku still needs and lets you test both triggers live. Shizuku stops on every reboot and has
-to be started again; the app's permission survives. Nothing else in the app needs it.
-
-The approach was worked out first by [RedTrigger](https://github.com/zampierilucas/RedTrigger).
+Shizuku has to be started again after every reboot; the app's permission persists. Nothing else
+in the app uses it. Approach from [RedTrigger](https://github.com/zampierilucas/RedTrigger).
 
 ## Install
 
@@ -145,11 +131,12 @@ app/src/main/java/io/github/immersionplayer/
   ui/          library, player, dictionary panel, settings
 ```
 
-## Not there yet
+## Limitations
 
-Anki export has a card model and a store behind it but no UI, so nothing leaves the app today.
-Sidecar subtitle files can't be found for videos opened from another app, because a content URI
-doesn't tell you what's next to it. Builds are arm64 only. The layout assumes a phone.
+- Anki export: card model and store exist, no UI. Nothing leaves the app yet.
+- Sidecar subtitles can't be found for videos opened from another app (a content URI doesn't say
+  what's next to it).
+- arm64 only. Phone layouts only.
 
 ## Licence
 
