@@ -12,6 +12,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +63,29 @@ class MainActivity : ComponentActivity() {
                     screen = next
                     pendingScreen = null
                 }
-                when (val s = screen) {
+                AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        val toPlayer = targetState is Screen.Player
+                        val fromPlayer = initialState is Screen.Player
+                        val toSettings = targetState is Screen.Settings
+                        when {
+                            // opening a video: settle into it
+                            toPlayer -> (fadeIn(tween(220)) + scaleIn(tween(260), initialScale = 0.93f)) togetherWith
+                                (fadeOut(tween(160)) + scaleOut(tween(260), targetScale = 1.04f))
+                            // leaving a video: pull back out to the grid
+                            fromPlayer -> (fadeIn(tween(220)) + scaleIn(tween(260), initialScale = 1.05f)) togetherWith
+                                (fadeOut(tween(160)) + scaleOut(tween(260), targetScale = 0.95f))
+                            // settings slides in from the right, and back out the same way
+                            toSettings -> (slideInHorizontally(tween(260)) { it / 3 } + fadeIn(tween(200))) togetherWith
+                                (slideOutHorizontally(tween(260)) { -it / 6 } + fadeOut(tween(200)))
+                            else -> (slideInHorizontally(tween(260)) { -it / 6 } + fadeIn(tween(200))) togetherWith
+                                (slideOutHorizontally(tween(260)) { it / 3 } + fadeOut(tween(200)))
+                        } using SizeTransform(clip = false)
+                    },
+                    label = "screen",
+                ) { animatedScreen ->
+                when (val s = animatedScreen) {
                     Screen.Library -> LibraryScreen(
                         app = app,
                         onOpenVideo = { video, siblings -> screen = Screen.Player(video, siblings) },
@@ -71,6 +103,7 @@ class MainActivity : ComponentActivity() {
                             onNextEpisode = next?.let { { switchTo(Screen.Player(it, s.siblings)) } },
                         )
                     }
+                }
                 }
             }
         }
