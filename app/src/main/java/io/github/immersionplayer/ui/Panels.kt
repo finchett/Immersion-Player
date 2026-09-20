@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -110,13 +110,14 @@ fun TappableText(
             }
             .pointerInput(text, onSelect) {
                 if (onSelect == null) return@pointerInput
+                // horizontal only: vertical drags belong to the panel (swipe up replays the line)
                 var anchor = -1
-                detectDragGestures(
+                detectHorizontalDragGestures(
                     onDragStart = { position ->
                         anchor = if (holding) -1 else layout?.let { characterAt(it, position, text.length) } ?: -1
                         if (anchor >= 0) selection = anchor..anchor
                     },
-                    onDrag = { change, _ ->
+                    onHorizontalDrag = { change, _ ->
                         val l = layout
                         if (anchor >= 0 && l != null) {
                             change.consume()
