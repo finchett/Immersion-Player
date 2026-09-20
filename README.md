@@ -107,12 +107,19 @@ app/src/main/java/io/github/immersionplayer/
   ui/          library, player, dictionary panel, settings
 ```
 
-## Licences
+## Licence
+
+Immersion Player is free software under the **GNU General Public License v3.0 or later**
+(see [LICENSE](LICENSE)). That follows from the mpv and FFmpeg binaries it bundles, which are
+GPL-licensed. You may use, modify, sell and redistribute it, provided recipients get the same
+freedoms and access to the source.
+
+### Third-party components
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, used under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
   [rikaitan-import](https://github.com/Ajatt-Tools/rikaitan-import).
 - **mpv-android** (`MPVLib.kt`, JNI glue): MIT.
-- **libmpv and FFmpeg** (prebuilt binaries): GPL-2.0+/LGPL-2.1+ as built by mpv-android.
-  Distributing APKs that include them means following those licences (including offering
-  the corresponding source). No licence has been chosen for this app's own code yet.
+- **libmpv and FFmpeg** (prebuilt binaries, fetched by `scripts/fetch-libmpv.sh`):
+  GPL-2.0+/LGPL-2.1+ as built by mpv-android. These are why this app is GPL.
+- **Shizuku API** (optional, for shoulder triggers): Apache-2.0.
