@@ -92,8 +92,8 @@ The approach was worked out first by [RedTrigger](https://github.com/zampieriluc
 
 ## Install
 
-No build is published yet — APKs will land on the
-[releases page](https://github.com/finchett/Immersion-Player/releases). Until then:
+Grab the APK from [releases](https://github.com/finchett/Immersion-Player/releases/latest), or
+build it:
 
 ```sh
 ./scripts/fetch-libmpv.sh          # pinned mpv-android release, extracts its native libs
