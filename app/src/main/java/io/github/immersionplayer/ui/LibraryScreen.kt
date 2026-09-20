@@ -53,6 +53,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.widthIn
 import io.github.immersionplayer.player.MpvOwner
 import io.github.immersionplayer.player.ThumbnailGenerator
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -145,6 +146,14 @@ fun LibraryScreen(
         if (current != null) listing = withContext(Dispatchers.IO) { list(current) }
     }
 
+    // warm the cache so scrolling never waits on a decode
+    LaunchedEffect(listing) {
+        val videos = listing?.videos ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            videos.forEach { app.thumbnails.load(it.uri.toString()) }
+        }
+    }
+
     // fill in missing thumbnails while the library is open (libmpv is free then)
     LaunchedEffect(listing) {
         val videos = listing?.videos ?: return@LaunchedEffect
@@ -169,14 +178,14 @@ fun LibraryScreen(
     // controls hide as you scroll into the grid and come back when you scroll up
     var lastIndex by remember { mutableIntStateOf(0) }
     var lastOffset by remember { mutableIntStateOf(0) }
-    var controlsVisible by remember { mutableStateOf(true) }
+    val controlsVisible = remember { mutableStateOf(true) }
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
                 val scrollingDown = index > lastIndex || (index == lastIndex && offset > lastOffset + 8)
                 val scrollingUp = index < lastIndex || (index == lastIndex && offset < lastOffset - 8)
-                if (scrollingDown && index > 0) controlsVisible = false
-                if (scrollingUp) controlsVisible = true
+                if (scrollingDown && index > 0) controlsVisible.value = false
+                if (scrollingUp) controlsVisible.value = true
                 lastIndex = index
                 lastOffset = offset
             }
@@ -229,67 +238,20 @@ fun LibraryScreen(
                 }
             }
 
-            // floating controls over the grid: where you are (tap to go up), and a menu
-            AnimatedVisibility(
+            FolderChip(
                 visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                inFolder = path.size > 1,
+                name = if (path.size > 1) path.last().name.orEmpty() else "Immersion Player",
+                onUp = { path = path.dropLast(1) },
                 modifier = Modifier.align(Alignment.TopStart),
-            ) {
-                val inFolder = path.size > 1
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier
-                        .safeDrawingPadding()
-                        .padding(start = 14.dp, top = 8.dp)
-                        .clickable(enabled = inFolder) { path = path.dropLast(1) },
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (inFolder) {
-                            Text("‹  ", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-                        }
-                        Text(
-                            if (inFolder) path.last().name.orEmpty() else "Immersion Player",
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 320.dp),
-                        )
-                    }
-                }
-            }
-
-            AnimatedVisibility(
+            )
+            LibraryMenu(
                 visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                hasFolder = root != null,
+                onPickFolder = { pickFolder.launch(null) },
+                onOpenSettings = onOpenSettings,
                 modifier = Modifier.align(Alignment.TopEnd),
-            ) {
-                Box(Modifier.safeDrawingPadding().padding(end = 10.dp, top = 8.dp)) {
-                    var menuOpen by remember { mutableStateOf(false) }
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                        shape = CircleShape,
-                        modifier = Modifier.clickable { menuOpen = true },
-                    ) {
-                        Text("⋯", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(if (root == null) "Choose folder" else "Change folder") },
-                            onClick = { menuOpen = false; pickFolder.launch(null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Dictionaries & settings") },
-                            onClick = { menuOpen = false; onOpenSettings() },
-                        )
-                    }
-                }
-            }
+            )
 
             val setupStatus by BundledDictionaries.status.collectAsState()
             setupStatus?.let {
@@ -305,6 +267,76 @@ fun LibraryScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Current folder, floating over the grid; tapping it goes up. */
+@Composable
+private fun FolderChip(
+    visible: State<Boolean>,
+    inFolder: Boolean,
+    name: String,
+    onUp: () -> Unit,
+    modifier: Modifier,
+) {
+    AnimatedVisibility(visible = visible.value, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .safeDrawingPadding()
+                .padding(start = 14.dp, top = 8.dp)
+                .clickable(enabled = inFolder, onClick = onUp),
+        ) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (inFolder) {
+                    Text("‹  ", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                }
+                Text(
+                    name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 320.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryMenu(
+    visible: State<Boolean>,
+    hasFolder: Boolean,
+    onPickFolder: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier,
+) {
+    AnimatedVisibility(visible = visible.value, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        Box(Modifier.safeDrawingPadding().padding(end = 10.dp, top = 8.dp)) {
+            var menuOpen by remember { mutableStateOf(false) }
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                shape = CircleShape,
+                modifier = Modifier.clickable { menuOpen = true },
+            ) {
+                Text(
+                    "⋯",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (hasFolder) "Change folder" else "Choose folder") },
+                    onClick = { menuOpen = false; onPickFolder() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Dictionaries & settings") },
+                    onClick = { menuOpen = false; onOpenSettings() },
+                )
             }
         }
     }
