@@ -176,7 +176,8 @@ fun DictionaryPanel(
         when {
             !hasDictionaries && setupStatus != null -> Message("$setupStatus\nThis only happens once.")
             !hasDictionaries -> Message("No dictionaries yet. Import a Yomitan dictionary (e.g. Jitendex) under Dictionaries & settings.")
-            result == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            // nothing while a lookup runs: it finishes in milliseconds and a spinner just flickers
+            result == null -> Unit
             result.entries.isEmpty() -> Message("Nothing to look up here. Tap or drag across a word to try another spot.")
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(result.entries) { _, entry ->
