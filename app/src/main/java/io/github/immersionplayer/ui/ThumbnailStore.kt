@@ -4,9 +4,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.Snapshot
 import java.io.File
 import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
 
 /** Library thumbnails: a frame from each video, decoded by mpv. */
 class ThumbnailStore(context: Context) {
@@ -17,14 +18,17 @@ class ThumbnailStore(context: Context) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
-    /** Bumped when a thumbnail changes, so cards know to reload. Kept in memory: no disk I/O in layout. */
-    private val versions = ConcurrentHashMap<String, Long>()
+    /**
+     * Bumped when a thumbnail changes. Snapshot state, so only the card for that video
+     * recomposes — and no disk I/O happens during layout.
+     */
+    val versions = mutableStateMapOf<String, Long>()
 
     fun save(videoUri: String, bitmap: Bitmap) {
         runCatching {
             file(videoUri).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 80, it) }
             cache.put(videoUri, bitmap)
-            versions[videoUri] = System.currentTimeMillis()
+            Snapshot.withMutableSnapshot { versions[videoUri] = System.currentTimeMillis() }
         }
     }
 
@@ -35,12 +39,14 @@ class ThumbnailStore(context: Context) {
         cache.get(videoUri)?.let { return it }
         val file = file(videoUri)
         if (!file.exists()) return null
-        val bitmap = runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull() ?: return null
+        // hardware bitmaps live on the GPU: no per-frame upload while scrolling
+        val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.HARDWARE }
+        val bitmap = runCatching { BitmapFactory.decodeFile(file.path, options) }.getOrNull()
+            ?: runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull()
+            ?: return null
         cache.put(videoUri, bitmap)
         return bitmap
     }
-
-    fun version(videoUri: String): Long = versions[videoUri] ?: 0L
 
     /** Whether a thumbnail exists, for deciding what still needs generating (off the main thread). */
     fun exists(videoUri: String): Boolean = cache.get(videoUri) != null || file(videoUri).exists()
