@@ -185,6 +185,12 @@ class PlayerSession(
         playLine((_lineIndex.value + 1).coerceAtMost(cues.lastIndex))
     }
 
+    /** Saves the current frame as this video's library thumbnail. */
+    fun captureThumbnail(store: io.github.immersionplayer.ui.ThumbnailStore) {
+        val bitmap = view?.grabFrame(480) ?: return
+        store.save(videoUri, bitmap)
+    }
+
     fun savePosition() {
         prefs.savePosition(videoUri, _position.value, _duration.value)
     }

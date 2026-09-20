@@ -380,6 +380,7 @@ fun PlayerScreen(
             val videoArea = @Composable { modifier: Modifier ->
                 VideoArea(
                     session = session,
+                    thumbnails = app.thumbnails,
                     startPosition = app.prefs.position(session.videoUri),
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
@@ -455,6 +456,7 @@ fun PlayerScreen(
 @Composable
 private fun VideoArea(
     session: PlayerSession,
+    thumbnails: ThumbnailStore,
     startPosition: Double,
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
@@ -523,6 +525,8 @@ private fun VideoArea(
 
     DisposableEffect(Unit) {
         onDispose {
+            // the frame you left off on becomes this video's library thumbnail
+            runCatching { session.captureThumbnail(thumbnails) }
             session.detach()
             mpvView?.destroy()
         }

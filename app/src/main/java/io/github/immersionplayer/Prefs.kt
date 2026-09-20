@@ -73,7 +73,11 @@ class Prefs(context: Context) {
 
     fun position(uri: String): Double = positions.getFloat(uri, 0f).toDouble()
 
+    /** Length of a video, once it has been opened at least once (0 if unknown). */
+    fun duration(uri: String): Double = perVideo.getFloat("duration:$uri", 0f).toDouble()
+
     fun savePosition(uri: String, seconds: Double, duration: Double) {
+        if (duration > 0) perVideo.edit { putFloat("duration:$uri", duration.toFloat()) }
         positions.edit {
             // finished episodes restart from the beginning
             if (duration > 0 && seconds > duration - 30) remove(uri) else putFloat(uri, seconds.toFloat())

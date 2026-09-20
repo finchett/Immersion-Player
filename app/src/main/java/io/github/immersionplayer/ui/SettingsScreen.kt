@@ -5,6 +5,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
     var importing by remember { mutableStateOf<String?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<DictionaryInfo?>(null) }
+    var showAdvanced by remember { mutableStateOf(false) }
 
     suspend fun refresh() {
         dictionaries = withContext(Dispatchers.IO) { app.dictionaryDatabase.dictionaries() }
@@ -192,7 +194,15 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                 initial = app.prefs.copyLines,
             ) { app.prefs.copyLines = it }
 
-            ShoulderTriggerSettings(app)
+            HorizontalDivider()
+            Row(
+                Modifier.fillMaxWidth().clickable { showAdvanced = !showAdvanced },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Advanced", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text(if (showAdvanced) "▲" else "▼", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (showAdvanced) ShoulderTriggerSettings(app)
 
             var size by remember { mutableStateOf(app.prefs.subtitleSize) }
             Text("Subtitle size: ${size.toInt()}")
