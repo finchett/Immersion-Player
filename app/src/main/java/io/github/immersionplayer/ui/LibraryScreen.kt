@@ -44,8 +44,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.snapshotFlow
@@ -54,6 +52,15 @@ import androidx.compose.foundation.layout.widthIn
 import io.github.immersionplayer.player.MpvOwner
 import io.github.immersionplayer.player.ThumbnailGenerator
 import androidx.compose.runtime.State
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -280,6 +287,18 @@ fun LibraryScreen(
     }
 }
 
+@Composable
+private fun MenuRow(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 13.dp),
+    )
+}
+
 /** Current folder, floating over the grid; tapping it goes up. */
 @Composable
 private fun FolderChip(
@@ -324,11 +343,11 @@ private fun LibraryMenu(
 ) {
     AnimatedVisibility(visible = visible.value, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         Box(Modifier.safeDrawingPadding().padding(end = 10.dp, top = 8.dp)) {
-            var menuOpen by remember { mutableStateOf(false) }
+            val menuState = remember { MutableTransitionState(false) }
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
                 shape = CircleShape,
-                modifier = Modifier.clickable { menuOpen = true },
+                modifier = Modifier.clickable { menuState.targetState = true },
             ) {
                 Text(
                     "⋯",
@@ -336,20 +355,44 @@ private fun LibraryMenu(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 )
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text(if (hasFolder) "Change folder" else "Choose folder") },
-                    onClick = { menuOpen = false; onPickFolder() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Dictionaries & settings") },
-                    onClick = { menuOpen = false; onOpenSettings() },
-                )
+            // kept mounted until the close animation finishes
+            if (menuState.currentState || menuState.targetState) {
+                val density = LocalDensity.current
+                Popup(
+                    alignment = Alignment.TopEnd,
+                    offset = IntOffset(0, with(density) { 42.dp.roundToPx() }),
+                    onDismissRequest = { menuState.targetState = false },
+                    properties = PopupProperties(focusable = true),
+                ) {
+                    AnimatedVisibility(
+                        visibleState = menuState,
+                        enter = fadeIn(tween(120)) + scaleIn(tween(160), initialScale = 0.88f, transformOrigin = TransformOrigin(1f, 0f)),
+                        exit = fadeOut(tween(90)) + scaleOut(tween(120), targetScale = 0.9f, transformOrigin = TransformOrigin(1f, 0f)),
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(16.dp),
+                            shadowElevation = 12.dp,
+                        ) {
+                            Column(Modifier.width(260.dp).padding(vertical = 6.dp)) {
+                                MenuRow(if (hasFolder) "Change folder" else "Choose folder") {
+                                    menuState.targetState = false
+                                    onPickFolder()
+                                }
+                                MenuRow("Dictionaries & settings") {
+                                    menuState.targetState = false
+                                    onOpenSettings()
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+/** Current folder, floating over the grid; tapping it goes up. */
 @Composable
 private fun FolderCard(folder: Entry.Folder, onClick: () -> Unit) {
     Surface(
