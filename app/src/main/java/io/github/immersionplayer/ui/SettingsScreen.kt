@@ -327,14 +327,22 @@ private fun ShoulderTriggerSettings(app: App) {
         ShoulderTriggers.Status.NotInstalled -> {
             Text("Shizuku isn't installed.", color = MaterialTheme.colorScheme.secondary)
             Text(
-                "Shizuku gives apps the access that adb has. Install it, start it (it walks you " +
-                    "through wireless debugging), then come back here.",
+                "The phone only powers its triggers inside Game Space, so this app switches them " +
+                    "on itself — which needs Shizuku, a free app that grants adb-level access. " +
+                    "Install it, open it and follow its wireless-debugging steps, then come back here.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
         ShoulderTriggers.Status.NotRunning -> {
-            Text("Shizuku is installed but not running.", color = MaterialTheme.colorScheme.secondary)
+            Text("Shizuku isn't running.", color = MaterialTheme.colorScheme.secondary)
+            Text(
+                "Shizuku stops every time the phone restarts, so start it again after a reboot. " +
+                    "This app's permission is remembered, so there's nothing else to redo. " +
+                    "Everything apart from the triggers works without it.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
             OutlinedButton(onClick = {
                 context.packageManager.getLaunchIntentForPackage(ShoulderTriggers.SHIZUKU_PACKAGE)
                     ?.let(context::startActivity)
@@ -342,6 +350,11 @@ private fun ShoulderTriggerSettings(app: App) {
         }
         ShoulderTriggers.Status.NeedsPermission -> {
             Text("Shizuku is running; allow this app to use it.", color = MaterialTheme.colorScheme.secondary)
+            Text(
+                "Asked once — after a reboot you only need to start Shizuku again.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
             OutlinedButton(onClick = {
                 ShoulderTriggers.requestPermission { granted ->
                     if (granted) status = ShoulderTriggers.Status.Ready
@@ -349,7 +362,10 @@ private fun ShoulderTriggerSettings(app: App) {
             }) { Text("Grant access") }
         }
         ShoulderTriggers.Status.Ready -> {
-            Text("Ready. The triggers work while a video is open.", color = MaterialTheme.colorScheme.tertiary)
+            Text(
+                "Ready. The triggers work while a video is open, and switch off when you leave it.",
+                color = MaterialTheme.colorScheme.tertiary,
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = {
                     testing = !testing

@@ -50,6 +50,10 @@ Nubia resets them, and reads the two device nodes with `getevent`. The triggers 
 again when you leave the player. Turn it on under Dictionaries & settings, where the same section
 shows what Shizuku still needs and can test the triggers live.
 
+Setup: install Shizuku, start it (wireless debugging, or `adb shell <its start command>` with a
+cable), then grant this app access in Dictionaries & settings. Shizuku stops on every reboot and
+has to be started again; the app's permission is remembered. Nothing else in the app needs Shizuku.
+
 Approach discovered by [RedTrigger](https://github.com/zampierilucas/RedTrigger) (MIT).
 
 ## Building
