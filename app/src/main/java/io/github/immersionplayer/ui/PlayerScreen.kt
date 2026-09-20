@@ -154,6 +154,7 @@ private const val SCRUB_SECONDS_PER_WIDTH = 90.0
 /** Rounded-corners appearance: gap between the cards and their corner radius. */
 private val CARD_GAP = 6.dp
 private val FALLBACK_CARD_RADIUS = 16.dp
+private val MIN_CARD_RADIUS = 14.dp
 private val LocalRoundedCorners = compositionLocalOf { false }
 private val LocalCardRadius = compositionLocalOf { FALLBACK_CARD_RADIUS }
 
@@ -168,7 +169,8 @@ private fun deviceCardRadius(): Dp {
     return remember(view, density) {
         val corner = view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)
         val radius = corner?.radius?.takeIf { it > 0 }?.let { with(density) { it.toDp() } }
-        radius?.minus(CARD_GAP)?.coerceAtLeast(4.dp) ?: FALLBACK_CARD_RADIUS
+        // some phones report a much smaller radius than they actually look, so keep a floor
+        radius?.coerceAtLeast(MIN_CARD_RADIUS) ?: FALLBACK_CARD_RADIUS
     }
 }
 
