@@ -32,6 +32,8 @@ android {
 
     buildFeatures {
         compose = true
+        aidl = true
+        buildConfig = true
     }
 
     packaging {
@@ -50,6 +52,10 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.12.0-alpha03")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.12.0-alpha03")
+
+    // shoulder triggers: shell-level access to the trigger sensors via Shizuku
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")

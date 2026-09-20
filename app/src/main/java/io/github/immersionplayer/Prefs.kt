@@ -12,24 +12,10 @@ class Prefs(context: Context) {
         get() = prefs.getString("library_tree_uri", null)
         set(value) = prefs.edit { putString("library_tree_uri", value) }
 
-    /** Phone shoulder triggers (F7/F8 keys, e.g. RedMagic) step through lines. */
+    /** Use the phone's shoulder triggers (via Shizuku) to step through lines. */
     var shoulderTriggers: Boolean
         get() = prefs.getBoolean("shoulder_triggers", true)
         set(value) = prefs.edit { putBoolean("shoulder_triggers", value) }
-
-    /** Show tap targets that game-mode trigger mappings (screen taps) can be placed on. */
-    var triggerTargets: Boolean
-        get() = prefs.getBoolean("trigger_targets", false)
-        set(value) = prefs.edit { putBoolean("trigger_targets", value) }
-
-    /** Key codes the triggers send; defaults are what RedMagic's trigger sensors report. */
-    var previousLineKey: Int
-        get() = prefs.getInt("previous_line_key", android.view.KeyEvent.KEYCODE_F7)
-        set(value) = prefs.edit { putInt("previous_line_key", value) }
-
-    var nextLineKey: Int
-        get() = prefs.getInt("next_line_key", android.view.KeyEvent.KEYCODE_F8)
-        set(value) = prefs.edit { putInt("next_line_key", value) }
 
     var theme: String?
         get() = prefs.getString("theme", null)

@@ -124,6 +124,7 @@ import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.player.MpvView
 import io.github.immersionplayer.player.PlayerCommand
+import io.github.immersionplayer.triggers.ShoulderTriggers
 import io.github.immersionplayer.player.PlayerCommands
 import io.github.immersionplayer.player.PlayerSession
 import io.github.immersionplayer.subs.SubtitleLoader
@@ -264,7 +265,14 @@ fun PlayerScreen(
         }
     }
 
-    // hardware keys (shoulder triggers) forwarded by the activity
+    // shoulder triggers: on while a video is open, off when it isn't
+    if (app.prefs.shoulderTriggers) {
+        DisposableEffect(Unit) {
+            ShoulderTriggers.start(context)
+            onDispose { ShoulderTriggers.stop() }
+        }
+    }
+
     LaunchedEffect(session) {
         PlayerCommands.events.collect { command ->
             when (command) {
@@ -957,12 +965,6 @@ private fun StudyPanel(
                 }
             }
 
-            // targets for phone game modes that map shoulder triggers to screen taps (RedMagic Game Space)
-            if (app.prefs.triggerTargets) {
-                TriggerTarget("◁", session::previousLine, Modifier.align(Alignment.TopStart).zIndex(2f))
-                TriggerTarget("▷", session::nextLine, Modifier.align(Alignment.TopEnd).zIndex(2f))
-            }
-
             AnimatedVisibility(
                 visible = notice != null,
                 enter = fadeIn(),
@@ -1069,27 +1071,6 @@ private fun CurrentLine(
             }
         }
 
-    }
-}
-
-/** Small tap target a shoulder trigger's screen mapping can be dropped onto. Consumes the tap. */
-@Composable
-private fun TriggerTarget(label: String, onTrigger: () -> Unit, modifier: Modifier) {
-    Box(
-        modifier
-            .padding(4.dp)
-            .size(40.dp)
-            .pointerInput(onTrigger) { detectTapGestures(onTap = { onTrigger() }) },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .size(28.dp)
-                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 12.sp)
-        }
     }
 }
 
