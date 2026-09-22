@@ -38,21 +38,46 @@ val isMac = System.getProperty("os.name").lowercase().contains("mac")
 /** Whether the macOS traffic lights are drawn over the content (not in full screen). */
 val LocalTrafficLights = staticCompositionLocalOf { isMac }
 
+/**
+ * Corner geometry, all concentric with the window corner (radius R): each layer steps in by the
+ * same amount, from the window edge to the video card, the pill, and the traffic lights.
+ * On macOS R is the real window radius; elsewhere there are no lights, so plain values.
+ */
+class Corners(windowRadius: Double) {
+    /** One step in, shared by every layer: three steps span the window corner to a light's edge. */
+    val step: Dp = if (isMac) ((windowRadius - MacTrafficLights.LIGHT_RADIUS) / 3).dp else 6.dp
+    val cardGap: Dp = step
+    val cardRadius: Dp = if (isMac) windowRadius.dp - step else 12.dp
+    /** Centre of the corner curve, where the first light sits. */
+    val lightCenter: Dp = windowRadius.dp
+    val pillRadius: Dp = MacTrafficLights.LIGHT_RADIUS.dp + step
+}
+
+val LocalCorners = staticCompositionLocalOf { Corners(16.0) }
+
 /** Where a header on the title-bar line starts: clear of the traffic lights when they're shown. */
 val HeaderStart: Dp
-    @Composable get() = if (LocalTrafficLights.current) (76 + MacTrafficLights.INSET).dp else 12.dp
+    @Composable get() {
+        if (!LocalTrafficLights.current) return 12.dp
+        val c = LocalCorners.current
+        return c.lightCenter + (MacTrafficLights.LIGHT_SPACING * 2).dp + c.pillRadius + 12.dp
+    }
 
-/** A translucent pill behind the traffic lights, so they read over video; fades with them. */
+/** Height of a header row whose middle lines up with the traffic lights. */
+val HeaderHeight: Dp
+    @Composable get() = if (LocalTrafficLights.current) LocalCorners.current.lightCenter * 2 else 40.dp
+
+/** A translucent pill behind the traffic lights, concentric with the window corner; fades with them. */
 @Composable
 fun TrafficLightsPill(visible: Boolean, modifier: Modifier = Modifier) {
     if (!LocalTrafficLights.current) return
+    val c = LocalCorners.current
     val alpha by animateFloatAsState(if (visible) 1f else 0f, label = "pill")
-    val inset = MacTrafficLights.INSET.dp
     Box(
-        modifier.padding(start = 5.dp + inset, top = 4.dp + inset)
-            .size(width = 62.dp, height = 20.dp)
+        modifier.padding(start = c.lightCenter - c.pillRadius, top = c.lightCenter - c.pillRadius)
+            .size(width = (MacTrafficLights.LIGHT_SPACING * 2).dp + c.pillRadius * 2, height = c.pillRadius * 2)
             .graphicsLayer { this.alpha = alpha }
-            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(c.pillRadius)),
     )
 }
 

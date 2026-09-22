@@ -37,7 +37,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
@@ -176,8 +179,9 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         dark -> Color.Black
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
-    val shape = if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape
-    val gap = if (rounded) CARD_GAP else 0.dp
+    val corners = LocalCorners.current
+    val shape = if (rounded) RoundedCornerShape(corners.cardRadius) else RectangleShape
+    val gap = if (rounded) corners.cardGap else 0.dp
 
     // the pill is placed against the window, where the traffic lights are, not the (inset) video card
     Box(Modifier.fillMaxSize()) {
@@ -199,23 +203,28 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                             event.changes.forEach { it.consume() }
                         },
                 )
-                // the divider: a hairline (or the gap between cards), with a wider strip to grab
                 val density = LocalDensity.current
+                // the divider: a hairline, or the gap between cards. The grab area is wider than
+                // what's drawn and sits above both sides, so a thin gap is still easy to catch.
                 Box(
-                    Modifier.width(if (rounded) CARD_GAP.coerceAtLeast(9.dp) else 9.dp).fillMaxHeight()
-                        .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
-                        .pointerInput(Unit) {
-                            detectHorizontalDragGestures(
-                                onDragEnd = { settings.updatePanelFraction(panelFraction) },
-                            ) { change, amount ->
-                                change.consume()
-                                val widthPx = with(density) { totalWidth.toPx() }
-                                panelFraction = (panelFraction - amount / widthPx).coerceIn(0.2f, 0.6f)
-                            }
-                        },
+                    Modifier.width(if (rounded) gap else 1.dp).fillMaxHeight().zIndex(1f)
+                        .wrapContentWidth(unbounded = true),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (!rounded) Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+                    Box(
+                        Modifier.requiredWidth(11.dp).fillMaxHeight()
+                            .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragEnd = { settings.updatePanelFraction(panelFraction) },
+                                ) { change, amount ->
+                                    change.consume()
+                                    val widthPx = with(density) { totalWidth.toPx() }
+                                    panelFraction = (panelFraction - amount / widthPx).coerceIn(0.2f, 0.6f)
+                                }
+                            },
+                    )
                 }
                 run {
                     StudyPanel(
@@ -237,9 +246,6 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         TrafficLightsPill(keys.chromeVisible, Modifier.align(Alignment.TopStart))
     }
 }
-
-private val CARD_GAP = 8.dp
-private val CARD_RADIUS = 14.dp
 
 /** How long the controls stay after the mouse stops moving over the video. */
 private const val CONTROLS_TIMEOUT_MS = 2000L
