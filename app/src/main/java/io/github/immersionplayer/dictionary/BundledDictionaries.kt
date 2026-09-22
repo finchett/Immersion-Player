@@ -26,7 +26,7 @@ object BundledDictionaries {
             val label = asset.removeSuffix(".zip").replace('_', ' ')
             try {
                 _status.value = "Setting up $label…"
-                YomitanImporter(context, database).import(asset, { progress ->
+                YomitanImporter(database).import(asset, { progress ->
                     _status.value = "Setting up $label… ${progress.terms} terms"
                 }) {
                     context.assets.open("$ASSET_DIR/$asset")

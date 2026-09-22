@@ -85,8 +85,11 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    YomitanImporter(context, app.dictionaryDatabase).import(uri, name) { progress ->
+                    YomitanImporter(app.dictionaryDatabase).import(name, { progress ->
                         importing = "Importing $name… ${progress.terms} terms"
+                    }) {
+                        context.contentResolver.openInputStream(uri)
+                            ?: throw YomitanImporter.ImportException("Could not open $name")
                     }
                 }
             }

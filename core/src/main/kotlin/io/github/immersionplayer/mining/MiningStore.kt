@@ -1,6 +1,5 @@
 package io.github.immersionplayer.mining
 
-import android.content.Context
 import org.json.JSONObject
 import java.io.File
 
@@ -54,8 +53,7 @@ interface CardExporter {
 }
 
 /** Saves mined cards to a local JSON-lines file so nothing is lost before Anki export exists. */
-class MiningStore(context: Context) : CardExporter {
-    private val file = File(context.filesDir, "mined_cards.jsonl")
+class MiningStore(private val file: File) : CardExporter {
 
     override fun export(card: MiningCard) {
         synchronized(this) {

@@ -69,6 +69,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
+
     val composeBom = platform("androidx.compose:compose-bom:2026.04.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
@@ -84,6 +86,4 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20250517")
 }

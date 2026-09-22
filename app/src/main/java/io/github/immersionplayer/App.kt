@@ -1,6 +1,7 @@
 package io.github.immersionplayer
 
 import android.app.Application
+import io.github.immersionplayer.dictionary.AndroidSql
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryDatabase
 import io.github.immersionplayer.dictionary.DictionaryLookup
@@ -43,9 +44,9 @@ class App : Application() {
             defaultHandler?.uncaughtException(thread, error)
         }
         prefs = Prefs(this)
-        dictionaryDatabase = DictionaryDatabase(this)
+        dictionaryDatabase = DictionaryDatabase { AndroidSql(this, "dictionaries.db") }
         lookup = DictionaryLookup(dictionaryDatabase)
-        miningStore = MiningStore(this)
+        miningStore = MiningStore(java.io.File(filesDir, "mined_cards.jsonl"))
         subtitleLoader = SubtitleLoader(this)
         appearance = Appearance(prefs)
         thumbnails = ThumbnailStore(this)
