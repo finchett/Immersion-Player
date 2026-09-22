@@ -14,7 +14,14 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -154,25 +161,33 @@ fun main(args: Array<String>) {
                     // the native window too, so a resize never flashes white before Compose repaints
                     val background = MaterialTheme.colorScheme.background
                     LaunchedEffect(background) { window.background = java.awt.Color(background.toArgb()) }
-                    // the theme background behind the screens, so a crossfade never shows the window's white
+                    // the theme background behind the screens, so a crossfade never shows the window's white.
+                    // Library and settings share one key: moving between them doesn't animate here, only
+                    // their bodies do, under a header bar that stays put.
                     AnimatedContent(
                         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                         targetState = screen,
-                        transitionSpec = { screenTransition(initialState, targetState) },
-                        label = "screen",
+                        contentKey = { if (it is Screen.Player) it else Screen.Library::class },
+                        transitionSpec = {
+                            if (targetState is Screen.Player) {
+                                (fadeIn(fade) + scaleIn(fade, initialScale = 0.97f)) togetherWith fadeOut(fade)
+                            } else {
+                                fadeIn(fade) togetherWith (fadeOut(fade) + scaleOut(fade, targetScale = 0.97f))
+                            }
+                        },
+                        label = "player",
                     ) { s ->
-                        when (s) {
-                            is Screen.Library -> LibraryScreen(
+                        if (s is Screen.Player) {
+                            sessions[s]?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
+                            DisposableEffect(s) { onDispose { if (screen != s) sessions.remove(s) } }
+                        } else {
+                            Browse(
                                 app = app,
-                                folder = s.folder,
-                                onOpenFolder = { screen = Screen.Library(it) },
-                                onOpenVideo = { openVideo(it, s.folder ?: it.parentFile) },
-                                onOpenSettings = { screen = Screen.Settings(s) },
+                                screen = s,
+                                navigate = { screen = it },
+                                onOpenVideo = { video, from -> openVideo(video, from) },
                             )
-                            is Screen.Player -> sessions[s]?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
-                            is Screen.Settings -> SettingsScreen(app, onBack = { screen = s.from })
                         }
-                        DisposableEffect(s) { onDispose { if (s is Screen.Player && screen != s) sessions.remove(s) } }
                     }
                 }
             }
@@ -201,26 +216,65 @@ private fun bench(path: String, width: Int) {
     exitProcess(0)
 }
 
+private val fade = tween<Float>(220, easing = FastOutSlowInEasing)
+private val slide = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+
 /**
- * Deeper folders slide in from the right and back out to the right; videos open with a slight
- * zoom; settings slide over the library. Only transforms and fades, so the video's size (which
- * mpv renders at) never changes mid-animation.
+ * Library and settings: a header bar that stays put (its content crossfades between library and
+ * settings, and changes in place between folders) over a body that slides. Deeper folders and
+ * settings come in from the right.
  */
-private fun screenTransition(from: Screen, to: Screen): ContentTransform {
-    val spec = tween<Float>(220, easing = FastOutSlowInEasing)
-    val slide = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+@Composable
+private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, onOpenVideo: (File, File?) -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(start = HeaderStart, end = 12.dp)) {
+            AnimatedContent(
+                targetState = screen,
+                contentKey = { it::class },
+                transitionSpec = { fadeIn(fade) togetherWith fadeOut(fade) },
+                label = "header",
+            ) { s ->
+                when (s) {
+                    is Screen.Library -> LibraryHeader(
+                        app, s.folder,
+                        onOpenFolder = { navigate(Screen.Library(it)) },
+                        onOpenSettings = { navigate(Screen.Settings(s)) },
+                    )
+                    is Screen.Settings -> SettingsHeader(onBack = { navigate(s.from) })
+                    is Screen.Player -> Unit
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        AnimatedContent(
+            modifier = Modifier.fillMaxSize(),
+            targetState = screen,
+            transitionSpec = { bodyTransition(initialState, targetState) },
+            label = "body",
+        ) { s ->
+            when (s) {
+                is Screen.Library -> LibraryBody(
+                    app, s.folder,
+                    onOpenFolder = { navigate(Screen.Library(it)) },
+                    onOpenVideo = { onOpenVideo(it, s.folder ?: it.parentFile) },
+                )
+                is Screen.Settings -> SettingsBody(app)
+                is Screen.Player -> Unit
+            }
+        }
+    }
+}
+
+private fun bodyTransition(from: Screen, to: Screen): ContentTransform {
     fun horizontal(forward: Boolean) =
-        (slideInHorizontally(slide) { if (forward) it / 6 else -it / 6 } + fadeIn(spec)) togetherWith
-            (slideOutHorizontally(slide) { if (forward) -it / 6 else it / 6 } + fadeOut(spec))
+        (slideInHorizontally(slide) { if (forward) it / 6 else -it / 6 } + fadeIn(fade)) togetherWith
+            (slideOutHorizontally(slide) { if (forward) -it / 6 else it / 6 } + fadeOut(fade))
     return when {
         from is Screen.Library && to is Screen.Library -> {
             val deeper = to.folder != null && (from.folder == null || to.folder.path.startsWith(from.folder.path + File.separator))
             horizontal(forward = deeper)
         }
-        to is Screen.Player -> (fadeIn(spec) + scaleIn(spec, initialScale = 0.97f)) togetherWith fadeOut(spec)
-        from is Screen.Player -> fadeIn(spec) togetherWith (fadeOut(spec) + scaleOut(spec, targetScale = 0.97f))
         to is Screen.Settings -> horizontal(forward = true)
-        from is Screen.Settings -> horizontal(forward = false)
-        else -> fadeIn(spec) togetherWith fadeOut(spec)
+        else -> horizontal(forward = false)
     }
 }

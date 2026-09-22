@@ -24,10 +24,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,65 +63,61 @@ private fun list(folder: File): Listing {
     return Listing(folders, videosIn(folder))
 }
 
-@Composable
-fun LibraryScreen(
-    app: DesktopApp,
-    folder: File?,
-    onOpenFolder: (File) -> Unit,
-    onOpenVideo: (File) -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    val settings = app.settings
-    val root = settings.libraryRoot?.let(::File)?.takeIf { it.isDirectory }
+/** The library root, and the folder being shown (the root unless [folder] is inside it). */
+private fun locate(app: DesktopApp, folder: File?): Pair<File?, File?> {
+    val root = app.settings.libraryRoot?.let(::File)?.takeIf { it.isDirectory }
     val current = folder?.takeIf { root != null && it.isDirectory && it.path.startsWith(root.path) } ?: root
+    return root to current
+}
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier.fillMaxWidth().height(HeaderHeight).padding(start = HeaderStart, end = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // the path from the library root, each part a way back up
-                val crumbs = generateSequence(current) { it.parentFile?.takeIf { _ -> it != root } }
-                    .toList().reversed().takeIf { current != null } ?: emptyList()
-                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    if (crumbs.isEmpty()) {
-                        Text("Library", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 8.dp))
-                    }
-                    crumbs.forEachIndexed { i, dir ->
-                        if (i > 0) Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (i == crumbs.lastIndex) {
-                            Text(
-                                dir.name,
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 8.dp),
-                            )
-                        } else {
-                            TextAction(dir.name, onClick = { onOpenFolder(dir) }, style = MaterialTheme.typography.titleLarge)
-                        }
-                    }
-                }
-                TextAction("Settings", onClick = onOpenSettings)
+/** Header content: the path from the library root, each part a way back up, and Settings. */
+@Composable
+fun LibraryHeader(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, onOpenSettings: () -> Unit) {
+    val (root, current) = locate(app, folder)
+    val crumbs = generateSequence(current) { it.parentFile?.takeIf { _ -> it != root } }
+        .toList().reversed().takeIf { current != null } ?: emptyList()
+    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            if (crumbs.isEmpty()) {
+                Text("Library", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 8.dp))
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            if (current == null) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Pick the folder that holds your videos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = {
-                            chooseFolder(null)?.let {
-                                settings.updateLibraryRoot(it.path)
-                                onOpenFolder(it)
-                            }
-                        }) { Text("Choose folder") }
-                    }
+            crumbs.forEachIndexed { i, dir ->
+                if (i > 0) Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (i == crumbs.lastIndex) {
+                    Text(
+                        dir.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                } else {
+                    TextAction(dir.name, onClick = { onOpenFolder(dir) }, style = MaterialTheme.typography.titleLarge)
                 }
-            } else {
-                FolderContents(app, current, onOpenFolder, onOpenVideo)
             }
         }
+        TextAction("Settings", onClick = onOpenSettings)
+    }
+}
+
+/** Everything below the header: the folder's contents, or a way to choose the library folder. */
+@Composable
+fun LibraryBody(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, onOpenVideo: (File) -> Unit) {
+    val (_, current) = locate(app, folder)
+    if (current == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Pick the folder that holds your videos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = {
+                    chooseFolder(null)?.let {
+                        app.settings.updateLibraryRoot(it.path)
+                        onOpenFolder(it)
+                    }
+                }) { Text("Choose folder") }
+            }
+        }
+    } else {
+        FolderContents(app, current, onOpenFolder, onOpenVideo)
     }
 }
 
