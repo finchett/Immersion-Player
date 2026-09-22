@@ -1,7 +1,24 @@
+@file:OptIn(ExperimentalComposeUiApi::class)
+
 package io.github.immersionplayer.desktop
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
+import kotlinx.coroutines.delay
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -25,11 +42,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -148,24 +162,11 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         val totalWidth = maxWidth
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
         Row(Modifier.fillMaxSize()) {
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                VideoSurface(
-                    session.player,
-                    Modifier.weight(1f).fillMaxWidth().background(Color.Black)
-                        .pointerInput(session) {
-                            detectTapGestures(
-                                onTap = { session.togglePause() },
-                                onDoubleTap = { keys.onToggleFullscreen() },
-                            )
-                        },
-                )
-                SeekBar(session, onBack)
-            }
-            // drag to resize the panel
+            VideoArea(session, keys, Modifier.weight(1f).fillMaxHeight())
+            // a hairline, with a wider invisible strip to grab
             val density = LocalDensity.current
             Box(
-                Modifier.width(6.dp).fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                Modifier.width(9.dp).fillMaxHeight()
                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
@@ -176,7 +177,10 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                             panelFraction = (panelFraction - amount / widthPx).coerceIn(0.2f, 0.6f)
                         }
                     },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+            }
             StudyPanel(
                 app = app,
                 session = session,
@@ -185,11 +189,135 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                 lookup = lookup,
                 hasDictionaries = hasDictionaries,
                 setupStatus = setupStatus,
+                onBack = onBack,
                 onLookup = { line, text, start -> startLookup(line, text, start) },
                 onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
                 modifier = Modifier.width(totalWidth * panelFraction).fillMaxHeight(),
             )
         }
+    }
+}
+
+/** How long the controls stay after the mouse stops moving over the video. */
+private const val CONTROLS_TIMEOUT_MS = 2000L
+
+/** The video, with controls that show on mouse movement or while paused and otherwise get out of the way. */
+@Composable
+private fun VideoArea(session: PlayerSession, keys: PlayerKeys, modifier: Modifier) {
+    val paused by session.paused.collectAsState()
+    var lastMove by remember { mutableLongStateOf(0L) }
+    var overControls by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf(false) }
+    LaunchedEffect(lastMove) {
+        moving = lastMove > 0
+        delay(CONTROLS_TIMEOUT_MS)
+        moving = false
+    }
+    val visible = paused || moving || overControls
+    Box(
+        modifier.background(Color.Black)
+            .onPointerEvent(PointerEventType.Move) { lastMove = System.nanoTime() }
+            .onPointerEvent(PointerEventType.Exit) { moving = false }
+            .pointerHoverIcon(if (visible) PointerIcon.Default else HiddenCursor)
+            .pointerInput(session) {
+                detectTapGestures(
+                    onTap = { session.togglePause() },
+                    onDoubleTap = { keys.onToggleFullscreen() },
+                )
+            },
+    ) {
+        VideoSurface(session.player, Modifier.fillMaxSize())
+        AnimatedVisibility(
+            visible,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(400)),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .onPointerEvent(PointerEventType.Enter) { overControls = true }
+                .onPointerEvent(PointerEventType.Exit) { overControls = false },
+        ) {
+            Controls(session)
+        }
+    }
+}
+
+private val HiddenCursor = PointerIcon(
+    java.awt.Toolkit.getDefaultToolkit().createCustomCursor(
+        java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB),
+        java.awt.Point(0, 0),
+        "hidden",
+    )
+)
+
+@Composable
+private fun Controls(session: PlayerSession) {
+    val position by session.position.collectAsState()
+    val duration by session.duration.collectAsState()
+    val paused by session.paused.collectAsState()
+    var scrubbing by remember { mutableStateOf<Double?>(null) }
+    val white = Color.White
+    Column(
+        Modifier.fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xA6000000))))
+            .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Scrubber(
+            position = scrubbing ?: position,
+            duration = duration,
+            onScrub = { scrubbing = it },
+            onScrubEnd = {
+                scrubbing?.let(session::seekTo)
+                scrubbing = null
+            },
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextAction(
+                if (paused) "▶" else "❚❚",
+                onClick = session::togglePause,
+                color = white,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                "${formatTime(scrubbing ?: position)} / ${formatTime(duration)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = white.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
+/** A thin seek bar that thickens under the pointer. */
+@Composable
+private fun Scrubber(position: Double, duration: Double, onScrub: (Double) -> Unit, onScrubEnd: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val thickness by animateDpAsState(if (hovered) 6.dp else 3.dp, label = "scrubber")
+    val played = MaterialTheme.colorScheme.primary
+    fun at(x: Float, width: Int) = (x / width).coerceIn(0f, 1f) * duration
+    Canvas(
+        Modifier.fillMaxWidth().height(14.dp)
+            .hoverable(interaction)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .pointerInput(duration) {
+                detectTapGestures { onScrub(at(it.x, size.width)); onScrubEnd() }
+            }
+            .pointerInput(duration) {
+                detectHorizontalDragGestures(
+                    onDragStart = { onScrub(at(it.x, size.width)) },
+                    onDragEnd = onScrubEnd,
+                    onDragCancel = onScrubEnd,
+                ) { change, _ ->
+                    change.consume()
+                    onScrub(at(change.position.x, size.width))
+                }
+            },
+    ) {
+        val h = thickness.toPx()
+        val y = (size.height - h) / 2
+        val radius = CornerRadius(h / 2)
+        val fraction = if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
+        drawRoundRect(Color.White.copy(alpha = 0.28f), Offset(0f, y), Size(size.width, h), radius)
+        drawRoundRect(played, Offset(0f, y), Size(size.width * fraction, h), radius)
     }
 }
 
@@ -214,47 +342,6 @@ fun VideoSurface(player: MpvPlayer, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SeekBar(session: PlayerSession, onBack: () -> Unit) {
-    val position by session.position.collectAsState()
-    val duration by session.duration.collectAsState()
-    val paused by session.paused.collectAsState()
-    var dragging by remember { mutableStateOf<Float?>(null) }
-    Surface(color = MaterialTheme.colorScheme.surface) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            TextButton(onClick = onBack) { Text("‹ Library") }
-            TextButton(onClick = session::togglePause, modifier = Modifier.width(56.dp)) {
-                Text(if (paused) "▶" else "❚❚")
-            }
-            Text(
-                formatTime(dragging?.toDouble() ?: position),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Slider(
-                value = (dragging ?: position.toFloat()).coerceIn(0f, duration.toFloat().coerceAtLeast(0.01f)),
-                onValueChange = { dragging = it },
-                onValueChangeFinished = {
-                    dragging?.let { session.seekTo(it.toDouble()) }
-                    dragging = null
-                },
-                valueRange = 0f..duration.toFloat().coerceAtLeast(0.01f),
-                colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                formatTime(duration),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
 private fun StudyPanel(
     app: DesktopApp,
     session: PlayerSession,
@@ -263,6 +350,7 @@ private fun StudyPanel(
     lookup: ActiveLookup?,
     hasDictionaries: Boolean,
     setupStatus: String?,
+    onBack: () -> Unit,
     onLookup: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
     modifier: Modifier,
@@ -274,10 +362,10 @@ private fun StudyPanel(
     var mouseHold by remember { mutableStateOf(false) }
 
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(top = TitleBarInset)) {
             val maxLineHeight = maxHeight * 0.4f
             Column(Modifier.fillMaxSize()) {
-                PanelHeader(app, session)
+                PanelHeader(app, session, onBack)
                 CurrentLine(
                     track = primary,
                     secondary = secondary,
@@ -292,7 +380,7 @@ private fun StudyPanel(
                     onSelect = onSelect,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = maxLineHeight),
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (lookup != null) {
                         DictionaryPanel(
@@ -316,36 +404,35 @@ private fun StudyPanel(
     }
 }
 
-/** Track choice, subtitle offset and stop-at-end, above the line. */
+/** Back to the library, track choice, subtitle offset and stop-at-end, above the line. */
 @Composable
-private fun PanelHeader(app: DesktopApp, session: PlayerSession) {
+private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> Unit) {
     val tracks by session.tracks.collectAsState()
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
     val offset by session.offset.collectAsState()
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TrackMenu("日本語", primary, tracks, allowNone = false) { it?.let(session::selectPrimary) }
-        TrackMenu("English", secondary, tracks, allowNone = true, onSelect = session::selectSecondary)
+        TextAction("‹ Library", onClick = onBack)
         Box(Modifier.weight(1f))
         if (offset != 0.0) {
             Text(
-                "%+.1fs".format(offset),
+                "%+.1f s".format(offset),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
+        TrackMenu("Japanese", primary, tracks, allowNone = false) { it?.let(session::selectPrimary) }
+        TrackMenu("English", secondary, tracks, allowNone = true, onSelect = session::selectSecondary)
         val autoPause = app.settings.autoPause
-        TextButton(onClick = { session.setAutoPause(!autoPause) }) {
-            Text(
-                if (autoPause) "Stop at end ✓" else "Stop at end",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (autoPause) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        TextAction(
+            "Stop at end",
+            onClick = { session.setAutoPause(!autoPause) },
+            color = if (autoPause) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -359,13 +446,11 @@ private fun TrackMenu(
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { open = true }, enabled = tracks.isNotEmpty()) {
-            Text(
-                if (selected == null) "$label: off" else "$label ▾",
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-            )
-        }
+        TextAction(
+            if (selected == null) "$label off ▾" else "$label ▾",
+            onClick = { open = true },
+            enabled = tracks.isNotEmpty(),
+        )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (allowNone) DropdownMenuItem(text = { Text("None") }, onClick = { onSelect(null); open = false })
             tracks.forEach { track ->

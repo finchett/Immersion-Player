@@ -1,6 +1,5 @@
 package io.github.immersionplayer.desktop
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
@@ -94,7 +93,7 @@ class PlayerScreenTest {
         try {
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
-                    MaterialTheme(colorScheme = AppTheme.Midnight.scheme) {
+                    DesktopTheme(AppTheme.Midnight) {
                         PlayerScreen(app, session, keys, onBack = {})
                     }
                 }

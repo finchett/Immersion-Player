@@ -41,7 +41,8 @@ class Settings(node: String = "io/github/immersionplayer") {
     private val prefs = Preferences.userRoot().node(node)
     private val videos = prefs.node("videos")
 
-    var theme by mutableStateOf(AppTheme.entries.firstOrNull { it.name == prefs.get("theme", null) } ?: AppTheme.Midnight)
+    /** A fixed theme, or null to follow the system's light/dark appearance. */
+    var theme by mutableStateOf(AppTheme.entries.firstOrNull { it.name == prefs.get("theme", null) })
         private set
     var subtitleSize by mutableStateOf(prefs.getFloat("subtitle_size", 30f))
         private set
@@ -56,7 +57,10 @@ class Settings(node: String = "io/github/immersionplayer") {
     var libraryRoot by mutableStateOf(prefs.get("library_root", null))
         private set
 
-    fun updateTheme(value: AppTheme) { theme = value; prefs.put("theme", value.name) }
+    fun updateTheme(value: AppTheme?) {
+        theme = value
+        if (value == null) prefs.remove("theme") else prefs.put("theme", value.name)
+    }
     fun updateSubtitleSize(value: Float) { subtitleSize = value; prefs.putFloat("subtitle_size", value) }
     fun updatePanelFraction(value: Float) { panelFraction = value; prefs.putFloat("panel_fraction", value) }
     fun updateAutoPause(value: Boolean) { autoPause = value; prefs.putBoolean("auto_pause", value) }

@@ -50,6 +50,8 @@ class PlayerSession(
     val lineActive: StateFlow<Boolean> = _lineActive.asStateFlow()
 
     private var autoPausedLine = -1
+    /** A line to stop at the end of once, whatever the stop-at-end setting says (-1 for none). */
+    private var stopAfterLine = -1
     private var lastCopiedLine = -1
 
     init {
@@ -115,29 +117,33 @@ class PlayerSession(
 
     fun seekBy(seconds: Double) = seekTo(player.position.value + seconds)
 
-    /** Jump to a line and play it (it will stop at its end when auto-pause is on). */
-    fun playLine(index: Int) {
+    /**
+     * Jump to a line and play it. With [stopAtEnd] it pauses when the line finishes; otherwise
+     * it stops there only if stop-at-end is on in settings.
+     */
+    fun playLine(index: Int, stopAtEnd: Boolean = false) {
         val cue = _primary.value?.cues?.getOrNull(index) ?: return
         autoPausedLine = -1
+        stopAfterLine = if (stopAtEnd) index else -1
         seekTo(cue.start + _offset.value)
         play()
     }
 
-    fun replayLine() {
+    fun replayLine(stopAtEnd: Boolean = false) {
         val index = _lineIndex.value
-        playLine(if (index >= 0) index else 0)
+        playLine(if (index >= 0) index else 0, stopAtEnd)
     }
 
-    fun previousLine() {
+    fun previousLine(stopAtEnd: Boolean = false) {
         val index = _lineIndex.value
         // between lines, "previous" means the line that just finished
         val target = if (_lineActive.value || index < 0) index - 1 else index
-        playLine(target.coerceAtLeast(0))
+        playLine(target.coerceAtLeast(0), stopAtEnd)
     }
 
-    fun nextLine() {
+    fun nextLine(stopAtEnd: Boolean = false) {
         val cues = _primary.value?.cues ?: return
-        playLine((_lineIndex.value + 1).coerceAtMost(cues.lastIndex))
+        playLine((_lineIndex.value + 1).coerceAtMost(cues.lastIndex), stopAtEnd)
     }
 
     fun savePosition() {
@@ -160,10 +166,12 @@ class PlayerSession(
             }
         }
 
-        if (settings.autoPause && index >= 0 && index != autoPausedLine && !player.paused.value) {
+        val stopHere = settings.autoPause || index == stopAfterLine
+        if (stopHere && index >= 0 && index != autoPausedLine && !player.paused.value) {
             val cue = track.cues[index]
             if (time >= cue.end - END_MARGIN && time < cue.end + 1.0) {
                 autoPausedLine = index
+                stopAfterLine = -1
                 pause()
             }
         }

@@ -1,6 +1,6 @@
 package io.github.immersionplayer.desktop
 
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,20 +68,26 @@ fun main(args: Array<String>) {
 
         fun onKey(event: KeyEvent): Boolean {
             val current = session.takeIf { screen is Screen.Player } ?: return false
-            if (event.key == Key.E) {
+            if (event.key == Key.I) {
                 keys.peeking = event.type == KeyEventType.KeyDown
                 return true
             }
             if (event.type != KeyEventType.KeyDown) return false
             when (event.key) {
                 Key.Spacebar -> current.togglePause()
+                Key.J -> current.previousLine()
+                Key.K -> current.nextLine()
+                Key.H -> current.previousLine(stopAtEnd = true)
+                Key.L -> current.nextLine(stopAtEnd = true)
+                Key.Semicolon, Key.DirectionDown -> current.replayLine(stopAtEnd = true)
+                Key.Y -> current.seekBy(-5.0)
+                Key.O -> current.seekBy(5.0)
+                Key.N -> current.shiftOffset(-0.1)
+                Key.M -> current.shiftOffset(0.1)
+                Key.U -> current.setAutoPause(!app.settings.autoPause)
+                Key.F -> toggleFullscreen()
                 Key.DirectionLeft -> if (event.isShiftPressed) current.seekBy(-5.0) else current.previousLine()
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
-                Key.DirectionDown, Key.R -> current.replayLine()
-                Key.S -> current.setAutoPause(!app.settings.autoPause)
-                Key.LeftBracket -> current.shiftOffset(-0.1)
-                Key.RightBracket -> current.shiftOffset(0.1)
-                Key.F -> toggleFullscreen()
                 Key.Escape -> if (windowState.placement == WindowPlacement.Fullscreen) toggleFullscreen() else closeVideo()
                 else -> return false
             }
@@ -98,7 +104,15 @@ fun main(args: Array<String>) {
             title = (screen as? Screen.Player)?.video?.nameWithoutExtension ?: "Immersion Player",
             onPreviewKeyEvent = ::onKey,
         ) {
-            MaterialTheme(colorScheme = app.settings.theme.scheme) {
+            if (isMac) {
+                // content runs under a transparent title bar, as native Mac apps do
+                LaunchedEffect(Unit) {
+                    window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
+                    window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
+                    window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+                }
+            }
+            DesktopTheme(app.settings.theme) {
                 when (val s = screen) {
                     is Screen.Library -> LibraryScreen(
                         app = app,

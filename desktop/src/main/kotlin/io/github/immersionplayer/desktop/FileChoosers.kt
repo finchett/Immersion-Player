@@ -6,8 +6,6 @@ import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 
-private val isMac = System.getProperty("os.name").lowercase().contains("mac")
-
 /** Native folder picker on macOS (FileDialog can pick directories there); Swing's elsewhere. */
 fun chooseFolder(start: File?): File? {
     if (isMac) {
