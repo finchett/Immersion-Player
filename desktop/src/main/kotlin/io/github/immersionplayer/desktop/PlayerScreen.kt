@@ -174,11 +174,9 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val shape = if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape
-    // rounded cards sit below the title bar; square panes run under it
-    val topGap = if (rounded) maxOf(CARD_GAP, TitleBarInset) else 0.dp
     val gap = if (rounded) CARD_GAP else 0.dp
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(gutter).padding(start = gap, end = gap, bottom = gap, top = topGap)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(gutter).padding(gap)) {
         val totalWidth = maxWidth
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
         Row(Modifier.fillMaxSize()) {
@@ -214,7 +212,7 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
             ) {
                 if (!rounded) Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
             }
-            CompositionLocalProvider(LocalTitleBarInset provides if (rounded) 0.dp else TitleBarInset) {
+            run {
                 StudyPanel(
                     app = app,
                     session = session,
@@ -265,6 +263,7 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, modifier: Modifi
             },
     ) {
         VideoSurface(session.player, Modifier.fillMaxSize())
+        TrafficLightsPill(Modifier.align(Alignment.TopStart))
         AnimatedVisibility(
             visible,
             enter = fadeIn(tween(120)),
@@ -400,7 +399,7 @@ private fun StudyPanel(
     var mouseHold by remember { mutableStateOf(false) }
 
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
-        BoxWithConstraints(Modifier.fillMaxSize().padding(top = TitleBarInset)) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
             val maxLineHeight = maxHeight * 0.4f
             Column(Modifier.fillMaxSize()) {
                 PanelHeader(session, onBack)

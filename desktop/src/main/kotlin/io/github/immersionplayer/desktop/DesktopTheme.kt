@@ -6,7 +6,9 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -31,11 +33,23 @@ import io.github.immersionplayer.ui.AppTheme
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 
-/** Height of the macOS title bar the content runs under (traffic lights live there); 0 in full screen. */
-val LocalTitleBarInset = staticCompositionLocalOf { if (isMac) 28.dp else 0.dp }
+/** Whether the macOS traffic lights are drawn over the content (not in full screen). */
+val LocalTrafficLights = staticCompositionLocalOf { isMac }
 
-val TitleBarInset: Dp
-    @Composable get() = LocalTitleBarInset.current
+/** Where a header on the title-bar line starts: clear of the traffic lights when they're shown. */
+val HeaderStart: Dp
+    @Composable get() = if (LocalTrafficLights.current) 76.dp else 12.dp
+
+/** A translucent pill behind the traffic lights, so they read over video. */
+@Composable
+fun TrafficLightsPill(modifier: Modifier = Modifier) {
+    if (!LocalTrafficLights.current) return
+    Box(
+        modifier.padding(start = 5.dp, top = 5.dp)
+            .size(width = 62.dp, height = 20.dp)
+            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+    )
+}
 
 /**
  * The app themes, retuned for a desktop: a denser type scale sized for reading at arm's length
