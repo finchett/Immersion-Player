@@ -1,5 +1,6 @@
 package io.github.immersionplayer.desktop
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -112,17 +113,20 @@ fun main(args: Array<String>) {
                     window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
                 }
             }
+            val fullscreen = windowState.placement == WindowPlacement.Fullscreen
             DesktopTheme(app.settings.theme) {
-                when (val s = screen) {
-                    is Screen.Library -> LibraryScreen(
-                        app = app,
-                        folder = s.folder,
-                        onOpenFolder = { screen = Screen.Library(it) },
-                        onOpenVideo = { openVideo(it, s.folder ?: it.parentFile) },
-                        onOpenSettings = { screen = Screen.Settings(s) },
-                    )
-                    is Screen.Player -> session?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
-                    is Screen.Settings -> SettingsScreen(app, onBack = { screen = s.from })
+                CompositionLocalProvider(LocalTitleBarInset provides if (isMac && !fullscreen) 28.dp else 0.dp) {
+                    when (val s = screen) {
+                        is Screen.Library -> LibraryScreen(
+                            app = app,
+                            folder = s.folder,
+                            onOpenFolder = { screen = Screen.Library(it) },
+                            onOpenVideo = { openVideo(it, s.folder ?: it.parentFile) },
+                            onOpenSettings = { screen = Screen.Settings(s) },
+                        )
+                        is Screen.Player -> session?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
+                        is Screen.Settings -> SettingsScreen(app, onBack = { screen = s.from })
+                    }
                 }
             }
         }
