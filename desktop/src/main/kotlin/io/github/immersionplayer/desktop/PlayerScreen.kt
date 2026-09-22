@@ -36,6 +36,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.HorizontalDivider
@@ -154,15 +159,32 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         if (mine == generation) lookup = found ?: ActiveLookup(lineIndex, text, 0, LookupResult(text, 0, 0, emptyList()))
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // pan & scan: mpv crops to fill the area instead of letterboxing
+    LaunchedEffect(settings.videoFill) {
+        session.player.property("panscan", if (settings.videoFill) "1.0" else "0.0")
+    }
+
+    val rounded = settings.roundedCorners
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val gutter = when {
+        !rounded -> MaterialTheme.colorScheme.background
+        dark -> Color.Black
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val shape = if (rounded) RoundedCornerShape(CARD_RADIUS) else RectangleShape
+    // rounded cards sit below the title bar; square panes run under it
+    val topGap = if (rounded) maxOf(CARD_GAP, TitleBarInset) else 0.dp
+    val gap = if (rounded) CARD_GAP else 0.dp
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(gutter).padding(start = gap, end = gap, bottom = gap, top = topGap)) {
         val totalWidth = maxWidth
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
         Row(Modifier.fillMaxSize()) {
-            VideoArea(session, keys, Modifier.weight(1f).fillMaxHeight())
-            // a hairline, with a wider invisible strip to grab
+            VideoArea(session, keys, Modifier.weight(1f).fillMaxHeight().clip(shape))
+            // the divider: a hairline (or the gap between cards), with a wider strip to grab
             val density = LocalDensity.current
             Box(
-                Modifier.width(9.dp).fillMaxHeight()
+                Modifier.width(if (rounded) CARD_GAP.coerceAtLeast(9.dp) else 9.dp).fillMaxHeight()
                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
@@ -175,24 +197,29 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+                if (!rounded) Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
             }
-            StudyPanel(
-                app = app,
-                session = session,
-                keys = keys,
-                status = subtitleStatus,
-                lookup = lookup,
-                hasDictionaries = hasDictionaries,
-                setupStatus = setupStatus,
-                onBack = onBack,
-                onLookup = { line, text, start -> startLookup(line, text, start) },
-                onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
-                modifier = Modifier.width(totalWidth * panelFraction).fillMaxHeight(),
-            )
+            CompositionLocalProvider(LocalTitleBarInset provides if (rounded) 0.dp else TitleBarInset) {
+                StudyPanel(
+                    app = app,
+                    session = session,
+                    keys = keys,
+                    status = subtitleStatus,
+                    lookup = lookup,
+                    hasDictionaries = hasDictionaries,
+                    setupStatus = setupStatus,
+                    onBack = onBack,
+                    onLookup = { line, text, start -> startLookup(line, text, start) },
+                    onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
+                    modifier = Modifier.width(totalWidth * panelFraction).fillMaxHeight().clip(shape),
+                )
+            }
         }
     }
 }
+
+private val CARD_GAP = 8.dp
+private val CARD_RADIUS = 14.dp
 
 /** How long the controls stay after the mouse stops moving over the video. */
 private const val CONTROLS_TIMEOUT_MS = 2000L

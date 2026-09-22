@@ -117,6 +117,14 @@ class PlayerScreenTest {
 
                 session.nextLine()
                 waitUntil(timeoutMillis = 10_000) { shows("勉強しましょう") && shows("study") }
+
+                // rounded cards, and the video cropped to fill its card
+                app.settings.updateRoundedCorners(true)
+                app.settings.updateVideoFill(true)
+                session.pause()
+                Thread.sleep(600)
+                mainClock.advanceTimeBy(500)
+                shot("4-rounded-fill")
             }
         } finally {
             session.close()

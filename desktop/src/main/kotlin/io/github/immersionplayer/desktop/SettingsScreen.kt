@@ -145,6 +145,8 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
                 }
 
                 Section("Appearance") {
+                    Toggle("Fill the video area (crop the edges)", settings.videoFill, settings::updateVideoFill)
+                    Toggle("Rounded corners", settings.roundedCorners, settings::updateRoundedCorners)
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextAction(
                             "System",

@@ -56,6 +56,12 @@ class Settings(node: String = "io/github/immersionplayer") {
         private set
     var libraryRoot by mutableStateOf(prefs.get("library_root", null))
         private set
+    /** Crop the video to fill its area (mpv panscan) instead of letterboxing. */
+    var videoFill by mutableStateOf(prefs.getBoolean("video_fill", false))
+        private set
+    /** Video and panel as separate rounded cards with a gap between them. */
+    var roundedCorners by mutableStateOf(prefs.getBoolean("rounded_corners", false))
+        private set
     /** Language being studied: its subtitles are the line. */
     var targetLanguage by mutableStateOf(prefs.get("target_language", "ja"))
         private set
@@ -72,6 +78,8 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun updateAutoPause(value: Boolean) { autoPause = value; prefs.putBoolean("auto_pause", value) }
     fun updatePauseOnLookup(value: Boolean) { pauseOnLookup = value; prefs.putBoolean("pause_on_lookup", value) }
     fun updateCopyLines(value: Boolean) { copyLines = value; prefs.putBoolean("copy_lines", value) }
+    fun updateVideoFill(value: Boolean) { videoFill = value; prefs.putBoolean("video_fill", value) }
+    fun updateRoundedCorners(value: Boolean) { roundedCorners = value; prefs.putBoolean("rounded_corners", value) }
     fun updateTargetLanguage(code: String) { targetLanguage = code; prefs.put("target_language", code) }
     fun updatePeekLanguage(code: String?) { peekLanguage = code; prefs.put("peek_language", code ?: "") }
     fun updateLibraryRoot(value: String?) {
