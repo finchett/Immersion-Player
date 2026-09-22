@@ -1,6 +1,7 @@
 package io.github.immersionplayer.desktop
 
 import io.github.immersionplayer.desktop.mpv.MpvPlayer
+import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.subs.SubtitleTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,9 +35,6 @@ class PlayerSession(
     private val _secondary = MutableStateFlow<SubtitleTrack?>(null)
     val secondary: StateFlow<SubtitleTrack?> = _secondary.asStateFlow()
 
-    private val _tracks = MutableStateFlow<List<SubtitleTrack>>(emptyList())
-    val tracks: StateFlow<List<SubtitleTrack>> = _tracks.asStateFlow()
-
     /** Subtitle shift in seconds; positive means subtitles appear later. */
     private val _offset = MutableStateFlow(settings.subtitleOffset(path))
     val offset: StateFlow<Double> = _offset.asStateFlow()
@@ -69,29 +67,12 @@ class PlayerSession(
         player.command("stop")
     }
 
-    /** Loads a video's tracks, restoring the user's earlier choices for this video if any. */
-    fun setTracks(all: List<SubtitleTrack>, defaultPrimary: SubtitleTrack?, defaultSecondary: SubtitleTrack?) {
-        _tracks.value = all
-        val savedPrimary = settings.trackChoice(path, "primary")
-        val savedSecondary = settings.trackChoice(path, "secondary")
-        _primary.value = all.firstOrNull { it.name == savedPrimary } ?: defaultPrimary
-        _secondary.value = when (savedSecondary) {
-            null -> defaultSecondary
-            "" -> null
-            else -> all.firstOrNull { it.name == savedSecondary } ?: defaultSecondary
-        }
+    /** Picks the line and peek tracks by the languages chosen in settings. */
+    fun setTracks(all: List<SubtitleTrack>) {
+        val primary = SubtitleFiles.pickPrimary(all, settings.targetLanguage)
+        _primary.value = primary
+        _secondary.value = SubtitleFiles.pickSecondary(all, primary, settings.peekLanguage)
         updateLine(player.position.value)
-    }
-
-    fun selectPrimary(track: SubtitleTrack) {
-        _primary.value = track
-        settings.setTrackChoice(path, "primary", track.name)
-        updateLine(player.position.value)
-    }
-
-    fun selectSecondary(track: SubtitleTrack?) {
-        _secondary.value = track
-        settings.setTrackChoice(path, "secondary", track?.name ?: "")
     }
 
     fun shiftOffset(delta: Double) {

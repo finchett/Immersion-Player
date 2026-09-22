@@ -2,6 +2,7 @@ package io.github.immersionplayer.desktop
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
+import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.ui.AppTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,6 +71,21 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
                 Modifier.widthIn(max = 720.dp).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
+                Section("Languages") {
+                    LanguageRow(
+                        label = "Studying",
+                        selected = settings.targetLanguage,
+                        allowNone = false,
+                        onSelect = { it?.let(settings::updateTargetLanguage) },
+                    )
+                    LanguageRow(
+                        label = "Peek (hold i)",
+                        selected = settings.peekLanguage,
+                        allowNone = true,
+                        onSelect = settings::updatePeekLanguage,
+                    )
+                }
+
                 Section("Dictionaries") {
                     setupStatus?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     dictionaries.forEachIndexed { index, dictionary ->
@@ -167,7 +186,7 @@ val KEYS = listOf(
     "j / k" to "previous / next line",
     "h / l" to "previous / next line, stop at its end",
     ";" to "replay this line, stop at its end",
-    "hold i, or hold the line" to "show the English",
+    "hold i, or hold the line" to "show the peek language",
     "y / o" to "seek 5 s back / forward",
     "n / m" to "shift subtitles 0.1 s earlier / later",
     "u" to "stop at end of every line on/off",
@@ -181,6 +200,27 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         content()
+    }
+}
+
+@Composable
+private fun LanguageRow(label: String, selected: String?, allowNone: Boolean, onSelect: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Box {
+            TextAction(
+                (selected?.let { SubtitleFiles.language(it)?.name ?: it } ?: "None") + " ▾",
+                onClick = { open = true },
+                color = MaterialTheme.colorScheme.primary,
+            )
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                if (allowNone) DropdownMenuItem(text = { Text("None") }, onClick = { onSelect(null); open = false })
+                SubtitleFiles.LANGUAGES.forEach { language ->
+                    DropdownMenuItem(text = { Text(language.name) }, onClick = { onSelect(language.code); open = false })
+                }
+            }
+        }
     }
 }
 
