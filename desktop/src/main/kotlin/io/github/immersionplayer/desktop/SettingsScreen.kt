@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
@@ -40,6 +41,7 @@ import io.github.immersionplayer.ui.AppTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
@@ -72,6 +74,26 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
                 Modifier.widthIn(max = 720.dp).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
+                Section("Library") {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            settings.libraryRoot ?: "No folder chosen",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (settings.libraryRoot == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.MiddleEllipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextAction(
+                            if (settings.libraryRoot == null) "Choose…" else "Change…",
+                            onClick = {
+                                chooseFolder(settings.libraryRoot?.let(::File))?.let { settings.updateLibraryRoot(it.path) }
+                            },
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+
                 Section("Languages") {
                     LanguageRow(
                         label = "Studying",

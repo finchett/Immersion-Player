@@ -455,8 +455,9 @@ private fun StudyPanel(
 @Composable
 private fun PanelHeader(session: PlayerSession, onBack: () -> Unit) {
     val offset by session.offset.collectAsState()
+    // same height as the other headers, so it lines up with the traffic lights across the window
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().height(HeaderHeight).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextAction("‹ Library", onClick = onBack)

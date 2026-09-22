@@ -2,8 +2,9 @@ package io.github.immersionplayer.subs
 
 /**
  * Guesses a subtitle track's language from its text, for files whose tags are wrong.
- * Script settles Japanese, Korean, Chinese and Russian; Latin-script languages are told apart
- * by counting a handful of very common words, which is weaker, so tags win there.
+ * Each line votes by script (Japanese, Korean, Chinese, Russian, or Latin); Latin-script
+ * languages are then told apart by counting a handful of very common words, which is weaker,
+ * so tags win there.
  */
 object LanguageDetector {
 
@@ -17,13 +18,36 @@ object LanguageDetector {
     )
 
     private const val SAMPLE_CUES = 300
-    private const val MIN_LETTERS = 20
+    private const val MIN_LINES = 3
+    private const val MAJORITY = 0.6
+    private const val LATIN = "latin"
 
-    /** The language code this text is written in, or null when there's too little to tell. */
-    fun detect(track: SubtitleTrack): String? =
-        detect(track.cues.asSequence().take(SAMPLE_CUES).joinToString("\n") { it.text })
+    /**
+     * The language most of this track's lines are in, or null when there's too little text or no
+     * clear majority. Voting per line keeps an English track with Japanese song lyrics English.
+     */
+    fun detect(track: SubtitleTrack): String? {
+        val votes = HashMap<String, Int>()
+        val latinText = StringBuilder()
+        for (cue in track.cues.asSequence().take(SAMPLE_CUES)) {
+            val script = scriptOf(cue.text) ?: continue
+            votes.merge(script, 1, Int::plus)
+            if (script == LATIN) latinText.append(cue.text).append('\n')
+        }
+        val total = votes.values.sum()
+        if (total < MIN_LINES) return null
+        val (winner, count) = votes.maxByOrNull { it.value } ?: return null
+        if (count < total * MAJORITY) return null
+        return if (winner == LATIN) latinLanguage(latinText.toString()) else winner
+    }
 
-    fun detect(text: String): String? {
+    /** The language of one piece of text, by script alone (Latin-script text is [LATIN]). */
+    fun detect(text: String): String? = when (val script = scriptOf(text)) {
+        LATIN -> latinLanguage(text)
+        else -> script
+    }
+
+    private fun scriptOf(text: String): String? {
         var kana = 0
         var han = 0
         var hangul = 0
@@ -40,14 +64,14 @@ object LanguageDetector {
             }
         }
         val letters = kana + han + hangul + cyrillic + latin
-        if (letters < MIN_LETTERS) return null
+        if (letters < 2) return null
         return when {
-            // Japanese always mixes in kana; a few percent is plenty
-            kana > letters * 0.05 -> "ja"
-            hangul > letters * 0.3 -> "ko"
-            han > letters * 0.3 -> "zh"
-            cyrillic > letters * 0.3 -> "ru"
-            latin > letters * 0.5 -> latinLanguage(text)
+            // Japanese always mixes in kana
+            kana > 0 && kana + han >= latin -> "ja"
+            hangul * 2 > letters -> "ko"
+            han * 2 > letters -> "zh"
+            cyrillic * 2 > letters -> "ru"
+            latin * 2 > letters -> LATIN
             else -> null
         }
     }

@@ -66,7 +66,8 @@ object SubtitleFiles {
 
     /** Track in the language being studied; falls back to the first track. */
     fun pickPrimary(tracks: List<SubtitleTrack>, target: String = "ja"): SubtitleTrack? =
-        tracks.firstOrNull { isLanguage(it, target) } ?: tracks.firstOrNull()
+        // the fullest matching track: dialogue over signs-and-songs
+        tracks.filter { isLanguage(it, target) }.maxByOrNull { it.cues.size } ?: tracks.firstOrNull()
 
     /** Full track in the [peek] language (null for none), skipping signs-only tracks. */
     fun pickSecondary(tracks: List<SubtitleTrack>, primary: SubtitleTrack?, peek: String? = "en"): SubtitleTrack? {
