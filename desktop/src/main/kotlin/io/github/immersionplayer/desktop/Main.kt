@@ -125,7 +125,10 @@ fun main(args: Array<String>) {
             }
             val fullscreen = windowState.placement == WindowPlacement.Fullscreen
             DesktopTheme(app.settings.theme) {
-                CompositionLocalProvider(LocalTrafficLights provides (isMac && !fullscreen)) {
+                CompositionLocalProvider(
+                    LocalTrafficLights provides (isMac && !fullscreen),
+                    LocalCorners provides Corners(if (fullscreen) 0.0 else MacTrafficLights.cornerRadius),
+                ) {
                     when (val s = screen) {
                         is Screen.Library -> LibraryScreen(
                             app = app,

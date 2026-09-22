@@ -61,7 +61,7 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Row(
-                Modifier.height(40.dp).padding(start = HeaderStart, end = 12.dp),
+                Modifier.height(HeaderHeight).padding(start = HeaderStart, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextAction("‹", onClick = onBack, style = MaterialTheme.typography.titleLarge)
