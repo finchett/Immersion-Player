@@ -183,67 +183,63 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
     val shape = if (rounded) RoundedCornerShape(corners.cardRadius) else RectangleShape
     val gap = if (rounded) corners.cardGap else 0.dp
 
-    // the pill is placed against the window, where the traffic lights are, not the (inset) video card
-    Box(Modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(gutter).padding(gap)) {
-            val totalWidth = maxWidth
-            var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
-            Row(Modifier.fillMaxSize()) {
-                VideoArea(
-                    session,
-                    keys,
-                    Modifier.weight(1f).fillMaxHeight().clip(shape)
-                        // ⌘/Ctrl + scroll: up fills the area, down fits the whole picture
-                        .onPointerEvent(PointerEventType.Scroll) { event ->
-                            val modifier = event.keyboardModifiers
-                            if (!modifier.isMetaPressed && !modifier.isCtrlPressed) return@onPointerEvent
-                            val dy = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
-                            if (dy < 0 && !settings.videoFill) settings.updateVideoFill(true)
-                            if (dy > 0 && settings.videoFill) settings.updateVideoFill(false)
-                            event.changes.forEach { it.consume() }
+    BoxWithConstraints(Modifier.fillMaxSize().background(gutter).padding(gap)) {
+        val totalWidth = maxWidth
+        var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
+        Row(Modifier.fillMaxSize()) {
+            VideoArea(
+                session,
+                keys,
+                Modifier.weight(1f).fillMaxHeight().clip(shape)
+                    // ⌘/Ctrl + scroll: up fills the area, down fits the whole picture
+                    .onPointerEvent(PointerEventType.Scroll) { event ->
+                        val modifier = event.keyboardModifiers
+                        if (!modifier.isMetaPressed && !modifier.isCtrlPressed) return@onPointerEvent
+                        val dy = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
+                        if (dy < 0 && !settings.videoFill) settings.updateVideoFill(true)
+                        if (dy > 0 && settings.videoFill) settings.updateVideoFill(false)
+                        event.changes.forEach { it.consume() }
+                    },
+            )
+            val density = LocalDensity.current
+            // the divider: a hairline, or the gap between cards. The grab area is wider than
+            // what's drawn and sits above both sides, so a thin gap is still easy to catch.
+            Box(
+                Modifier.width(if (rounded) gap else 1.dp).fillMaxHeight().zIndex(1f)
+                    .wrapContentWidth(unbounded = true),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!rounded) Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+                Box(
+                    Modifier.requiredWidth(11.dp).fillMaxHeight()
+                        .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = { settings.updatePanelFraction(panelFraction) },
+                            ) { change, amount ->
+                                change.consume()
+                                val widthPx = with(density) { totalWidth.toPx() }
+                                panelFraction = (panelFraction - amount / widthPx).coerceIn(0.2f, 0.6f)
+                            }
                         },
                 )
-                val density = LocalDensity.current
-                // the divider: a hairline, or the gap between cards. The grab area is wider than
-                // what's drawn and sits above both sides, so a thin gap is still easy to catch.
-                Box(
-                    Modifier.width(if (rounded) gap else 1.dp).fillMaxHeight().zIndex(1f)
-                        .wrapContentWidth(unbounded = true),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (!rounded) Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
-                    Box(
-                        Modifier.requiredWidth(11.dp).fillMaxHeight()
-                            .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
-                            .pointerInput(Unit) {
-                                detectHorizontalDragGestures(
-                                    onDragEnd = { settings.updatePanelFraction(panelFraction) },
-                                ) { change, amount ->
-                                    change.consume()
-                                    val widthPx = with(density) { totalWidth.toPx() }
-                                    panelFraction = (panelFraction - amount / widthPx).coerceIn(0.2f, 0.6f)
-                                }
-                            },
-                    )
-                }
-                run {
-                    StudyPanel(
-                        app = app,
-                        session = session,
-                        keys = keys,
-                        status = subtitleStatus,
-                        lookup = lookup,
-                        hasDictionaries = hasDictionaries,
-                        setupStatus = setupStatus,
-                        onBack = onBack,
-                        onLookup = { line, text, start -> startLookup(line, text, start) },
-                        onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
-                        modifier = Modifier.width(totalWidth * panelFraction).fillMaxHeight().clip(shape),
-                    )
-                }
+            }
+            run {
+                StudyPanel(
+                    app = app,
+                    session = session,
+                    keys = keys,
+                    status = subtitleStatus,
+                    lookup = lookup,
+                    hasDictionaries = hasDictionaries,
+                    setupStatus = setupStatus,
+                    onBack = onBack,
+                    onLookup = { line, text, start -> startLookup(line, text, start) },
+                    onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
+                    modifier = Modifier.width(totalWidth * panelFraction).fillMaxHeight().clip(shape),
+                )
             }
         }
-        TrafficLightsPill(keys.chromeVisible, Modifier.align(Alignment.TopStart))
     }
 }
 
