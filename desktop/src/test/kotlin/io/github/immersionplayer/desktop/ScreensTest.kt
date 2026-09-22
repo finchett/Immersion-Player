@@ -1,6 +1,5 @@
 package io.github.immersionplayer.desktop
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -45,10 +44,10 @@ class ScreensTest {
                 var folder by mutableStateOf<File?>(null)
                 setContent {
                     DesktopTheme(AppTheme.Midnight) {
-                        Column {
-                            LibraryHeader(app, folder, onOpenFolder = { folder = it }, onOpenSettings = {})
-                            LibraryBody(app, folder, onOpenFolder = { folder = it }, onOpenVideo = {})
-                        }
+                        Chrome(
+                            header = { LibraryHeader(app, folder, onOpenFolder = { folder = it }, onOpenSettings = {}) },
+                            body = { LibraryBody(app, folder, onOpenFolder = { folder = it }, onOpenVideo = {}) },
+                        )
                     }
                 }
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Lectures").fetchSemanticsNodes().isNotEmpty() }
@@ -65,11 +64,8 @@ class ScreensTest {
                 shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "library.png")) }
 
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
-                        Column {
-                            SettingsHeader(onBack = {})
-                            SettingsBody(app)
-                        }
+                    DesktopTheme(AppTheme.Oled) {
+                        Chrome(header = { SettingsHeader(onBack = {}) }, body = { SettingsBody(app) })
                     }
                 }
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Dictionaries").fetchSemanticsNodes().isNotEmpty() }
