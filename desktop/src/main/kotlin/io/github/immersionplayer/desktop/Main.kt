@@ -87,6 +87,7 @@ fun main(args: Array<String>) {
                 Key.M -> current.shiftOffset(0.1)
                 Key.U -> current.setAutoPause(!app.settings.autoPause)
                 Key.F -> toggleFullscreen()
+                Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
                 Key.DirectionLeft -> if (event.isShiftPressed) current.seekBy(-5.0) else current.previousLine()
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
                 Key.Escape -> if (windowState.placement == WindowPlacement.Fullscreen) toggleFullscreen() else closeVideo()

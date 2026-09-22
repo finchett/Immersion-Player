@@ -17,6 +17,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import kotlinx.coroutines.delay
 import androidx.compose.animation.fadeIn
@@ -180,7 +182,20 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         val totalWidth = maxWidth
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
         Row(Modifier.fillMaxSize()) {
-            VideoArea(session, keys, Modifier.weight(1f).fillMaxHeight().clip(shape))
+            VideoArea(
+                session,
+                keys,
+                Modifier.weight(1f).fillMaxHeight().clip(shape)
+                    // ⌘/Ctrl + scroll: up fills the area, down fits the whole picture
+                    .onPointerEvent(PointerEventType.Scroll) { event ->
+                        val modifier = event.keyboardModifiers
+                        if (!modifier.isMetaPressed && !modifier.isCtrlPressed) return@onPointerEvent
+                        val dy = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
+                        if (dy < 0 && !settings.videoFill) settings.updateVideoFill(true)
+                        if (dy > 0 && settings.videoFill) settings.updateVideoFill(false)
+                        event.changes.forEach { it.consume() }
+                    },
+            )
             // the divider: a hairline (or the gap between cards), with a wider strip to grab
             val density = LocalDensity.current
             Box(

@@ -193,6 +193,7 @@ val KEYS = listOf(
     "n / m" to "shift subtitles 0.1 s earlier / later",
     "u" to "stop at end of every line on/off",
     "f or double-click" to "full screen",
+    "z, or ⌘ + scroll on the video" to "fill the area (crop) / fit the whole picture",
     "Esc" to "leave full screen, then back to the library",
     "click / drag a word" to "look it up",
 )
