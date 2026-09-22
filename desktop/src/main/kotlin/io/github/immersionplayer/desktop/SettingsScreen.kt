@@ -14,11 +14,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,8 +41,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** Header content for the settings screen. */
 @Composable
-fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
+fun SettingsHeader(onBack: () -> Unit) {
+    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        TextAction("‹", onClick = onBack, style = MaterialTheme.typography.titleLarge)
+        Text("Settings", style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+/** Everything below the header; scrolls under it. */
+@Composable
+fun SettingsBody(app: DesktopApp) {
     val settings = app.settings
     val scope = rememberCoroutineScope()
     var dictionaries by remember { mutableStateOf<List<DictionaryInfo>>(emptyList()) }
@@ -60,145 +68,135 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
         refreshCount++
     }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Row(
-                Modifier.height(HeaderHeight).padding(start = HeaderStart, end = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextAction("‹", onClick = onBack, style = MaterialTheme.typography.titleLarge)
-                Text("Settings", style = MaterialTheme.typography.titleLarge)
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(
+            Modifier.widthIn(max = 720.dp).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Section("Library") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        settings.libraryRoot ?: "No folder chosen",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (settings.libraryRoot == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.MiddleEllipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextAction(
+                        if (settings.libraryRoot == null) "Choose…" else "Change…",
+                        onClick = {
+                            chooseFolder(settings.libraryRoot?.let(::File))?.let { settings.updateLibraryRoot(it.path) }
+                        },
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Column(
-                Modifier.widthIn(max = 720.dp).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Section("Library") {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            settings.libraryRoot ?: "No folder chosen",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (settings.libraryRoot == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.MiddleEllipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextAction(
-                            if (settings.libraryRoot == null) "Choose…" else "Change…",
-                            onClick = {
-                                chooseFolder(settings.libraryRoot?.let(::File))?.let { settings.updateLibraryRoot(it.path) }
-                            },
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
 
-                Section("Languages") {
-                    LanguageRow(
-                        label = "Studying",
-                        selected = settings.targetLanguage,
-                        allowNone = false,
-                        onSelect = { it?.let(settings::updateTargetLanguage) },
-                    )
-                    LanguageRow(
-                        label = "Peek (hold i)",
-                        selected = settings.peekLanguage,
-                        allowNone = true,
-                        onSelect = settings::updatePeekLanguage,
-                    )
-                }
+            Section("Languages") {
+                LanguageRow(
+                    label = "Studying",
+                    selected = settings.targetLanguage,
+                    allowNone = false,
+                    onSelect = { it?.let(settings::updateTargetLanguage) },
+                )
+                LanguageRow(
+                    label = "Peek (hold i)",
+                    selected = settings.peekLanguage,
+                    allowNone = true,
+                    onSelect = settings::updatePeekLanguage,
+                )
+            }
 
-                Section("Dictionaries") {
-                    setupStatus?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    dictionaries.forEachIndexed { index, dictionary ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(dictionary.title, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    "${dictionary.termCount} terms" +
-                                        (if (dictionary.metaCount > 0) " · ${dictionary.metaCount} frequency/pitch" else ""),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            TextAction("↑", onClick = { change { app.database.move(dictionary.id, -1) } }, enabled = index > 0)
-                            TextAction(
-                                "↓",
-                                onClick = { change { app.database.move(dictionary.id, 1) } },
-                                enabled = index < dictionaries.lastIndex,
+            Section("Dictionaries") {
+                setupStatus?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                dictionaries.forEachIndexed { index, dictionary ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(dictionary.title, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "${dictionary.termCount} terms" +
+                                    (if (dictionary.metaCount > 0) " · ${dictionary.metaCount} frequency/pitch" else ""),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Switch(dictionary.enabled, onCheckedChange = { on -> change { app.database.setEnabled(dictionary.id, on) } })
-                            TextAction("Remove", onClick = { change { app.database.delete(dictionary.id) } })
                         }
+                        TextAction("↑", onClick = { change { app.database.move(dictionary.id, -1) } }, enabled = index > 0)
+                        TextAction(
+                            "↓",
+                            onClick = { change { app.database.move(dictionary.id, 1) } },
+                            enabled = index < dictionaries.lastIndex,
+                        )
+                        Switch(dictionary.enabled, onCheckedChange = { on -> change { app.database.setEnabled(dictionary.id, on) } })
+                        TextAction("Remove", onClick = { change { app.database.delete(dictionary.id) } })
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(
-                            enabled = importing == null,
-                            onClick = {
-                                val file = chooseDictionaryZip() ?: return@OutlinedButton
-                                importError = null
-                                importing = "Importing ${file.name}…"
-                                scope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        runCatching {
-                                            YomitanImporter(app.database).import(file.name, { progress ->
-                                                importing = "Importing ${file.name}… ${progress.terms} terms"
-                                            }) { file.inputStream() }
-                                        }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        enabled = importing == null,
+                        onClick = {
+                            val file = chooseDictionaryZip() ?: return@OutlinedButton
+                            importError = null
+                            importing = "Importing ${file.name}…"
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        YomitanImporter(app.database).import(file.name, { progress ->
+                                            importing = "Importing ${file.name}… ${progress.terms} terms"
+                                        }) { file.inputStream() }
                                     }
-                                    importing = null
-                                    result.onFailure {
-                                        app.logError("import ${file.name}", it)
-                                        importError = it.message ?: it.toString()
-                                    }
-                                    refreshCount++
                                 }
-                            },
-                        ) { Text("Import Yomitan dictionary…") }
-                        importing?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-                    importError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                                importing = null
+                                result.onFailure {
+                                    app.logError("import ${file.name}", it)
+                                    importError = it.message ?: it.toString()
+                                }
+                                refreshCount++
+                            }
+                        },
+                    ) { Text("Import Yomitan dictionary…") }
+                    importing?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
+                importError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
 
-                Section("Playback") {
-                    Toggle("Stop at the end of each line", settings.autoPause, settings::updateAutoPause)
-                    Toggle("Pause when you look up a word", settings.pauseOnLookup, settings::updatePauseOnLookup)
-                    Toggle("Copy each line to the clipboard", settings.copyLines, settings::updateCopyLines)
-                }
+            Section("Playback") {
+                Toggle("Stop at the end of each line", settings.autoPause, settings::updateAutoPause)
+                Toggle("Pause when you look up a word", settings.pauseOnLookup, settings::updatePauseOnLookup)
+                Toggle("Copy each line to the clipboard", settings.copyLines, settings::updateCopyLines)
+            }
 
-                Section("Appearance") {
-                    Toggle("Fill the video area (crop the edges)", settings.videoFill, settings::updateVideoFill)
-                    Toggle("Rounded corners", settings.roundedCorners, settings::updateRoundedCorners)
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextAction(
-                            "System",
-                            onClick = { settings.updateTheme(null) },
-                            color = if (settings.theme == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        AppTheme.entries.forEach { theme ->
-                            TextAction(
-                                theme.label,
-                                onClick = { settings.updateTheme(theme) },
-                                color = if (settings.theme == theme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Text("Subtitle size: ${settings.subtitleSize.toInt()}", style = MaterialTheme.typography.bodyMedium)
-                    Slider(
-                        value = settings.subtitleSize,
-                        onValueChange = { settings.updateSubtitleSize(it) },
-                        valueRange = 18f..56f,
+            Section("Appearance") {
+                Toggle("Fill the video area (crop the edges)", settings.videoFill, settings::updateVideoFill)
+                Toggle("Rounded corners", settings.roundedCorners, settings::updateRoundedCorners)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextAction(
+                        "System",
+                        onClick = { settings.updateTheme(null) },
+                        color = if (settings.theme == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    AppTheme.entries.forEach { theme ->
+                        TextAction(
+                            theme.label,
+                            onClick = { settings.updateTheme(theme) },
+                            color = if (settings.theme == theme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+                Text("Subtitle size: ${settings.subtitleSize.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = settings.subtitleSize,
+                    onValueChange = { settings.updateSubtitleSize(it) },
+                    valueRange = 18f..56f,
+                )
+            }
 
-                Section("Keys") {
-                    KEYS.forEach { (key, action) ->
-                        Row {
-                            Text(key, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.widthIn(min = 160.dp))
-                            Text(action, style = MaterialTheme.typography.bodyMedium)
-                        }
+            Section("Keys") {
+                KEYS.forEach { (key, action) ->
+                    Row {
+                        Text(key, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.widthIn(min = 160.dp))
+                        Text(action, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
