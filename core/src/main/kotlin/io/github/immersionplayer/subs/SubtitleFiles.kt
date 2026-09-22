@@ -28,10 +28,18 @@ object SubtitleFiles {
 
     fun language(code: String): Language? = LANGUAGES.firstOrNull { it.code == code }
 
-    fun isLanguage(track: SubtitleTrack, code: String): Boolean {
-        val tag = track.language?.lowercase() ?: return false
-        return tag in (language(code)?.tags ?: setOf(code))
+    /** The language code a tag like "jpn" or "ja-JP" stands for, or the tag itself if unknown. */
+    fun codeForTag(tag: String?): String? {
+        val lower = tag?.lowercase() ?: return null
+        return LANGUAGES.firstOrNull { lower in it.tags }?.code ?: lower
     }
+
+    /** Whether [track] is in [code], by its text when its tag is clearly wrong (see [LanguageDetector]). */
+    fun isLanguage(track: SubtitleTrack, code: String): Boolean =
+        effectiveLanguage(track) == code
+
+    fun effectiveLanguage(track: SubtitleTrack): String? =
+        LanguageDetector.effectiveLanguage(track, codeForTag(track.language))
 
     fun isJapanese(track: SubtitleTrack) = isLanguage(track, "ja")
     fun isEnglish(track: SubtitleTrack) = isLanguage(track, "en")
