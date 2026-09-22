@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ImmersionPlayer"
-include(":app")
+include(":app", ":core")

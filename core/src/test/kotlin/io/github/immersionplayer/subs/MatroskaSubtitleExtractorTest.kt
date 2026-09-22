@@ -26,7 +26,7 @@ class MatroskaSubtitleExtractorTest {
         val millis = (System.nanoTime() - started) / 1_000_000
         println("extracted ${tracks.size} tracks in ${millis}ms: " + tracks.joinToString { "${it.name} [${it.language}] ${it.cues.size}" })
 
-        val japanese = tracks.single { SubtitleLoader.isJapanese(it) }
+        val japanese = tracks.single { SubtitleFiles.isJapanese(it) }
         val expectedJa = SrtParser.parse(jaSrt!!.readText())
         assertEquals(expectedJa.size, japanese.cues.size)
         expectedJa.zip(japanese.cues).forEach { (expected, actual) ->
@@ -39,7 +39,7 @@ class MatroskaSubtitleExtractorTest {
         val expectedEn = AssParser.parse(enAss!!.readText())
         assertEquals(expectedEn.map { it.text }, english.cues.map { it.text })
 
-        assertEquals(english, SubtitleLoader.pickSecondary(tracks, japanese))
+        assertEquals(english, SubtitleFiles.pickSecondary(tracks, japanese))
         assertTrue(tracks.size == 5)
     }
 }

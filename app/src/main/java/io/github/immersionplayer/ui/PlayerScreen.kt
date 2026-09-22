@@ -133,7 +133,7 @@ import io.github.immersionplayer.player.PlayerCommand
 import io.github.immersionplayer.triggers.ShoulderTriggers
 import io.github.immersionplayer.player.PlayerCommands
 import io.github.immersionplayer.player.PlayerSession
-import io.github.immersionplayer.subs.SubtitleLoader
+import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.subs.SubtitleTrack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -337,8 +337,8 @@ fun PlayerScreen(
             runCatching { app.subtitleLoader.load(video, siblings) }
         }
         tracks.onSuccess { list ->
-            val primary = SubtitleLoader.pickPrimary(list)
-            session.setTracks(list, primary, SubtitleLoader.pickSecondary(list, primary))
+            val primary = SubtitleFiles.pickPrimary(list)
+            session.setTracks(list, primary, SubtitleFiles.pickSecondary(list, primary))
             subtitleStatus = if (primary == null) "No text subtitles found for this video" else null
         }.onFailure {
             subtitleStatus = "Couldn't read subtitles: ${it.message}"
