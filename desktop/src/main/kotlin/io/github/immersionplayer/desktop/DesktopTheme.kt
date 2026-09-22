@@ -17,20 +17,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.immersionplayer.ui.AppTheme
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 
-/** Height of the macOS title bar the content runs under (traffic lights live there). */
-val TitleBarInset = if (isMac) 28.dp else 0.dp
+/** Height of the macOS title bar the content runs under (traffic lights live there); 0 in full screen. */
+val LocalTitleBarInset = staticCompositionLocalOf { if (isMac) 28.dp else 0.dp }
+
+val TitleBarInset: Dp
+    @Composable get() = LocalTitleBarInset.current
 
 /**
  * The app themes, retuned for a desktop: a denser type scale sized for reading at arm's length
