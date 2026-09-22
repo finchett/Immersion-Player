@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -18,7 +17,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,11 +55,14 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("‹") }
+            Row(
+                Modifier.padding(start = 12.dp, end = 12.dp, top = TitleBarInset + 4.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextAction("‹", onClick = onBack, style = MaterialTheme.typography.titleLarge)
                 Text("Settings", style = MaterialTheme.typography.titleLarge)
             }
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(
                 Modifier.widthIn(max = 720.dp).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -79,13 +80,14 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            TextButton(onClick = { change { app.database.move(dictionary.id, -1) } }, enabled = index > 0) { Text("↑") }
-                            TextButton(
+                            TextAction("↑", onClick = { change { app.database.move(dictionary.id, -1) } }, enabled = index > 0)
+                            TextAction(
+                                "↓",
                                 onClick = { change { app.database.move(dictionary.id, 1) } },
                                 enabled = index < dictionaries.lastIndex,
-                            ) { Text("↓") }
+                            )
                             Switch(dictionary.enabled, onCheckedChange = { on -> change { app.database.setEnabled(dictionary.id, on) } })
-                            TextButton(onClick = { change { app.database.delete(dictionary.id) } }) { Text("Remove") }
+                            TextAction("Remove", onClick = { change { app.database.delete(dictionary.id) } })
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -124,12 +126,17 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
                 }
 
                 Section("Appearance") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextAction(
+                            "System",
+                            onClick = { settings.updateTheme(null) },
+                            color = if (settings.theme == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         AppTheme.entries.forEach { theme ->
-                            FilterChip(
-                                selected = settings.theme == theme,
+                            TextAction(
+                                theme.label,
                                 onClick = { settings.updateTheme(theme) },
-                                label = { Text(theme.label) },
+                                color = if (settings.theme == theme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -157,13 +164,14 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
 
 val KEYS = listOf(
     "Space" to "play / pause",
-    "← / →" to "previous / next line",
-    "↓ or R" to "replay this line",
-    "hold E, or hold the line" to "show the English",
-    "S" to "stop at end of line on/off",
-    "Shift + ← / →" to "seek 5 s",
-    "[ / ]" to "shift subtitles 0.1 s earlier / later",
-    "F or double-click" to "full screen",
+    "j / k" to "previous / next line",
+    "h / l" to "previous / next line, stop at its end",
+    ";" to "replay this line, stop at its end",
+    "hold i, or hold the line" to "show the English",
+    "y / o" to "seek 5 s back / forward",
+    "n / m" to "shift subtitles 0.1 s earlier / later",
+    "u" to "stop at end of every line on/off",
+    "f or double-click" to "full screen",
     "Esc" to "leave full screen, then back to the library",
     "click / drag a word" to "look it up",
 )

@@ -1,6 +1,5 @@
 package io.github.immersionplayer.desktop
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -28,6 +27,12 @@ class ScreensTest {
         val dir = Files.createTempDirectory("immersion-library").toFile()
         val show = File(dir, "Lectures").apply { mkdirs() }
         listOf("Lesson 1.mkv", "Lesson 2.mkv", "Lesson 10.mkv", "notes.txt").forEach { File(show, it).writeText("") }
+        // with a real video, Lesson 1 also gets a thumbnail
+        val video = System.getenv("IMMERSION_TEST_VIDEO")?.let(::File)?.takeIf { it.isFile }
+        if (video != null) {
+            File(show, "Lesson 1.mkv").delete()
+            Files.createSymbolicLink(File(show, "Lesson 1.mkv").toPath(), video.absoluteFile.toPath())
+        }
         File(dir, "Other").mkdirs()
         val node = "io/github/immersionplayer-test-screens"
         Preferences.userRoot().node(node).removeNode()
@@ -38,7 +43,7 @@ class ScreensTest {
             runDesktopComposeUiTest(width = 1100, height = 640) {
                 var folder by mutableStateOf<File?>(null)
                 setContent {
-                    MaterialTheme(colorScheme = AppTheme.Midnight.scheme) {
+                    DesktopTheme(AppTheme.Midnight) {
                         LibraryScreen(app, folder, onOpenFolder = { folder = it }, onOpenVideo = {}, onOpenSettings = {})
                     }
                 }
@@ -49,10 +54,14 @@ class ScreensTest {
                     .map { it.config.toString() }
                 assertTrue(order.indexOfFirst { "Lesson 2" in it } < order.indexOfFirst { "Lesson 10" in it })
                 assertTrue(onAllNodesWithText("notes").fetchSemanticsNodes().isEmpty())
+                if (video != null) {
+                    waitUntil(timeoutMillis = 20_000) { app.thumbnails.versions.containsKey(File(show, "Lesson 1.mkv").path) }
+                    waitForIdle()
+                }
                 shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "library.png")) }
 
                 setContent {
-                    MaterialTheme(colorScheme = AppTheme.Midnight.scheme) { SettingsScreen(app, onBack = {}) }
+                    DesktopTheme(AppTheme.Midnight) { SettingsScreen(app, onBack = {}) }
                 }
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Dictionaries").fetchSemanticsNodes().isNotEmpty() }
                 shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "settings.png")) }

@@ -23,6 +23,7 @@ class DesktopApp(
     val database = DictionaryDatabase { JdbcSql("jdbc:sqlite:" + File(dataDir, "dictionaries.db").path) }
     val lookup = DictionaryLookup(database)
     private val subtitleCache = EmbeddedSubtitleCache(File(cacheDir, "subtitles"))
+    val thumbnails = Thumbnails(cacheDir)
 
     private val _setupStatus = MutableStateFlow<String?>(null)
     /** Progress while a bundled dictionary is being installed, else null. */
