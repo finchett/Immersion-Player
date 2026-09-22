@@ -63,9 +63,8 @@ object MacTrafficLights {
     private val pending = java.util.Collections.synchronizedSet(HashSet<Work>())
 
     /**
-     * Centres the first light on the centre of the window's corner curve, so the lights, the pill
-     * behind them and the video card are all concentric with the window corner, and shows or fades
-     * them. No-op off macOS.
+     * Centres the first light on the centre of the window's corner curve, so the lights and the
+     * video card are concentric with the window corner, and shows or fades them. No-op off macOS.
      */
     fun apply(visible: Boolean) {
         if (!isMac) return
@@ -96,9 +95,11 @@ object MacTrafficLights {
                     val x = center + i * LIGHT_SPACING - f.width / 2
                     val y = height - center - f.height / 2
                     sendVoid(button, "setFrameOrigin:", Point(x, y))
-                    if (DEBUG) println("lights: button $i at $x,$y (${f.width}x${f.height}), bar $height, radius $cornerRadius")
-                    sendVoid(send(button, "animator"), "setAlphaValue:", if (visible) 1.0 else 0.0)
                 }
+                // the buttons' own alpha is ignored by the titlebar on recent macOS; fading the
+                // whole (transparent) titlebar container works
+                sendVoid(send(container, "animator"), "setAlphaValue:", if (visible) 1.0 else 0.0)
+                if (DEBUG) println("lights: visible=$visible window=${sendLong(window, "windowNumber")}")
             }
             if (DEBUG) result.exceptionOrNull()?.printStackTrace()
         }

@@ -6,16 +6,13 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -23,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
@@ -39,18 +35,20 @@ val isMac = System.getProperty("os.name").lowercase().contains("mac")
 val LocalTrafficLights = staticCompositionLocalOf { isMac }
 
 /**
- * Corner geometry, all concentric with the window corner (radius R): each layer steps in by the
- * same amount, from the window edge to the video card, the pill, and the traffic lights.
+ * Corner geometry, all concentric with the window corner (radius R): the video card steps in
+ * from the window edge by the same amount the traffic lights' edge sits inside the card.
  * On macOS R is the real window radius; elsewhere there are no lights, so plain values.
  */
 class Corners(windowRadius: Double) {
+    // only a window with rounded corners and traffic lights has anything to be concentric with;
+    // full screen (radius 0) and other systems get plain values
+    private val concentric = isMac && windowRadius > MacTrafficLights.LIGHT_RADIUS
     /** One step in, shared by every layer: three steps span the window corner to a light's edge. */
-    val step: Dp = if (isMac) ((windowRadius - MacTrafficLights.LIGHT_RADIUS) / 3).dp else 6.dp
+    private val step: Dp = if (concentric) ((windowRadius - MacTrafficLights.LIGHT_RADIUS) / 3).dp else 6.dp
     val cardGap: Dp = step
-    val cardRadius: Dp = if (isMac) windowRadius.dp - step else 12.dp
+    val cardRadius: Dp = if (concentric) windowRadius.dp - step else 12.dp
     /** Centre of the corner curve, where the first light sits. */
     val lightCenter: Dp = windowRadius.dp
-    val pillRadius: Dp = MacTrafficLights.LIGHT_RADIUS.dp + step
 }
 
 val LocalCorners = staticCompositionLocalOf { Corners(16.0) }
@@ -60,26 +58,12 @@ val HeaderStart: Dp
     @Composable get() {
         if (!LocalTrafficLights.current) return 12.dp
         val c = LocalCorners.current
-        return c.lightCenter + (MacTrafficLights.LIGHT_SPACING * 2).dp + c.pillRadius + 12.dp
+        return c.lightCenter + (MacTrafficLights.LIGHT_SPACING * 2 + MacTrafficLights.LIGHT_RADIUS).dp + 16.dp
     }
 
 /** Height of a header row whose middle lines up with the traffic lights. */
 val HeaderHeight: Dp
     @Composable get() = if (LocalTrafficLights.current) LocalCorners.current.lightCenter * 2 else 40.dp
-
-/** A translucent pill behind the traffic lights, concentric with the window corner; fades with them. */
-@Composable
-fun TrafficLightsPill(visible: Boolean, modifier: Modifier = Modifier) {
-    if (!LocalTrafficLights.current) return
-    val c = LocalCorners.current
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, label = "pill")
-    Box(
-        modifier.padding(start = c.lightCenter - c.pillRadius, top = c.lightCenter - c.pillRadius)
-            .size(width = (MacTrafficLights.LIGHT_SPACING * 2).dp + c.pillRadius * 2, height = c.pillRadius * 2)
-            .graphicsLayer { this.alpha = alpha }
-            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(c.pillRadius)),
-    )
-}
 
 /**
  * The app themes, retuned for a desktop: a denser type scale sized for reading at arm's length
