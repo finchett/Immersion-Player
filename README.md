@@ -94,7 +94,7 @@ class — keep the two in step when you update either.
 ## Tests
 
 ```sh
-./gradlew :app:testDebugUnitTest
+./gradlew :core:test
 ```
 
 The Matroska test checks extraction against reference files produced by ffmpeg, and skips itself
@@ -104,7 +104,7 @@ unless you point it at a real episode:
 IMMERSION_TEST_MKV=episode.mkv \
 IMMERSION_TEST_JA_SRT=episode.ja.srt \  # ffmpeg -i episode.mkv -map 0:s:<ja> episode.ja.srt
 IMMERSION_TEST_EN_ASS=episode.en.ass \  # ffmpeg -i episode.mkv -map 0:s:<en> -c:s copy episode.en.ass
-./gradlew :app:testDebugUnitTest
+./gradlew :core:test
 ```
 
 ## Debugging
@@ -119,12 +119,15 @@ adb shell run-as io.github.immersionplayer cat files/last_crash.txt
 ## Layout
 
 ```
-app/src/main/java/io/github/immersionplayer/
-  player/      MpvView (libmpv surface), PlayerSession (playback state, line stepping)
-  subs/        SRT/ASS parsers, Matroska extractor, subtitle loading and caching
-  dictionary/  Yomitan importer, SQLite store, deinflector, lookup, bundled dictionaries
-  triggers/    Shizuku user service for the RedMagic shoulder buttons
+core/     plain Kotlin/JVM, shared by every platform
+  subs/        SRT/ASS parsers, Matroska extractor, embedded-track cache
+  dictionary/  Yomitan importer, SQLite store (behind Sql), deinflector, lookup
   mining/      card model and store for Anki export
+app/      Android
+  player/      MpvView (libmpv surface), PlayerSession (playback state, line stepping)
+  subs/        sidecar and embedded subtitle loading via SAF
+  dictionary/  AndroidSql, bundled dictionaries
+  triggers/    Shizuku user service for the RedMagic shoulder buttons
   ui/          library, player, dictionary panel, settings
 ```
 
