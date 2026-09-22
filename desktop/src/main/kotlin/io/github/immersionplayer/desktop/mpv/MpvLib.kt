@@ -56,7 +56,15 @@ interface MpvLib : Library {
 
         val INSTANCE: MpvLib by lazy {
             useCNumericLocale()
-            Native.load(if (Platform.isWindows()) "libmpv-2" else "mpv", MpvLib::class.java)
+            Native.load(bundled() ?: if (Platform.isWindows()) "libmpv-2" else "mpv", MpvLib::class.java)
+        }
+
+        /** The libmpv packaged with the app, if this is a packaged build; else the system's. */
+        private fun bundled(): String? {
+            val dir = System.getProperty("compose.application.resources.dir") ?: return null
+            return listOf("libmpv.2.dylib", "libmpv-2.dll", "libmpv.so.2")
+                .map { java.io.File(dir, it) }
+                .firstOrNull { it.isFile }?.path
         }
 
         /** mpv refuses to start unless LC_NUMERIC is "C" (it parses floats with the C library). */

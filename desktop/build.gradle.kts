@@ -51,7 +51,42 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Immersion Player"
-            packageVersion = "0.1.0"
+            packageVersion = "0.2.0"
+            description = "Japanese video player with a built-in dictionary"
+            copyright = "GPL-3.0-or-later"
+            modules("java.instrument", "java.prefs", "java.sql", "jdk.unsupported")
+            // libmpv and its libraries, bundled per OS by bundleLibmpv
+            appResourcesRootDir.set(layout.buildDirectory.dir("native"))
+            macOS {
+                // jpackage refuses a 0.x version on macOS; packageMacRelease writes the real one
+                packageVersion = "1.0.0"
+                bundleID = "io.github.immersionplayer.desktop"
+                appCategory = "public.app-category.education"
+                minimumSystemVersion = "12.0"
+            }
         }
     }
+}
+
+// Copies Homebrew's libmpv and everything it loads into the app, relinked to find each other there.
+// Only macOS on Apple Silicon is packaged so far.
+val bundleLibmpv by tasks.registering(Exec::class) {
+    val out = layout.buildDirectory.dir("native/macos-arm64")
+    onlyIf { System.getProperty("os.name").lowercase().contains("mac") }
+    inputs.file("scripts/bundle-libmpv-macos.sh")
+    outputs.dir(out)
+    commandLine("scripts/bundle-libmpv-macos.sh", out.get().asFile.path)
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bundleLibmpv) }
+
+// The release .dmg: the app jpackage builds, with the real (0.x) version written into Info.plist,
+// ad-hoc signed again after that edit, next to an Applications link.
+val packageMacRelease by tasks.registering(Exec::class) {
+    dependsOn("createDistributable")
+    val version = "0.2.0"
+    val app = layout.buildDirectory.dir("compose/binaries/main/app/Immersion Player.app")
+    val out = layout.buildDirectory.file("release/Immersion-Player-$version-macos-arm64.dmg")
+    outputs.file(out)
+    commandLine("scripts/package-dmg-macos.sh", app.get().asFile.path, version, out.get().asFile.path)
 }
