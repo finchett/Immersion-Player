@@ -135,6 +135,7 @@ import io.github.immersionplayer.player.PlayerCommands
 import io.github.immersionplayer.player.PlayerSession
 import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.subs.SubtitleTrack
+import io.github.immersionplayer.subs.translationFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -142,13 +143,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-/** A lookup started by tapping a character in a subtitle line. */
-data class ActiveLookup(
-    val lineIndex: Int,
-    val text: String,
-    val start: Int,
-    val result: LookupResult? = null,
-)
 
 /** Seconds covered by dragging across the full width of the video at normal speed. */
 private const val SCRUB_SECONDS_PER_WIDTH = 90.0
@@ -1152,7 +1146,7 @@ private fun CurrentLine(
                     onTapOutside = onTapOutside,
                     modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = japaneseAlpha },
                 )
-                val translation = secondary?.let { translationFor(it, cue.start, cue.end) }
+                val translation = secondary?.let { it.translationFor(cue.start, cue.end) }
                 AnimatedVisibility(peeking, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.matchParentSize()) {
                     Box(contentAlignment = Alignment.Center) {
                         BasicText(
@@ -1266,10 +1260,4 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
 private fun trackLabel(track: SubtitleTrack): String {
     val language = track.language?.let { " · $it" }.orEmpty()
     return "${track.name}$language · ${track.cues.size} lines"
-}
-
-/** English text overlapping a Japanese line's time range. */
-fun translationFor(track: SubtitleTrack, start: Double, end: Double): String? {
-    val lines = track.cues.filter { it.start < end - 0.1 && it.end > start + 0.1 }
-    return lines.joinToString("\n") { it.text }.ifEmpty { null }
 }

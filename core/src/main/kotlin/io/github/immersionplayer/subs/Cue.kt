@@ -56,3 +56,9 @@ internal fun List<Cue>.normalized(): List<Cue> =
             }
             acc
         }
+
+/** Text of this track overlapping [start]..[end], e.g. the English for a Japanese line. */
+fun SubtitleTrack.translationFor(start: Double, end: Double): String? {
+    val lines = cues.filter { it.start < end - 0.1 && it.end > start + 0.1 }
+    return lines.joinToString("\n") { it.text }.ifEmpty { null }
+}

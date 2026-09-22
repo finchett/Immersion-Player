@@ -52,6 +52,9 @@ android {
         }
     }
 
+    // Compose code shared with the desktop app, compiled here against androidx Compose
+    sourceSets.getByName("main").kotlin.srcDir("../shared-ui/src")
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

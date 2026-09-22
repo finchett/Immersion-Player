@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.dictionary.Definition
 import io.github.immersionplayer.dictionary.TermEntry
 
-
 /**
  * Text where tapping a character reports its index and dragging selects a range.
  * A long press reports hold start/end instead. With [autoSize], shrinks to fit its bounds.
@@ -166,6 +165,9 @@ fun DictionaryPanel(
     lookup: ActiveLookup,
     hasDictionaries: Boolean,
     setupStatus: String?,
+    noDictionariesMessage: String =
+        "No dictionaries yet. Import a Yomitan dictionary (e.g. Jitendex) under Dictionaries & settings.",
+    nothingFoundMessage: String = "Nothing to look up here. Tap or drag across a word to try another spot.",
 ) {
     val colors = GlossaryColors(
         tag = MaterialTheme.colorScheme.secondary,
@@ -176,10 +178,10 @@ fun DictionaryPanel(
         val result = lookup.result
         when {
             !hasDictionaries && setupStatus != null -> Message("$setupStatus\nThis only happens once.")
-            !hasDictionaries -> Message("No dictionaries yet. Import a Yomitan dictionary (e.g. Jitendex) under Dictionaries & settings.")
+            !hasDictionaries -> Message(noDictionariesMessage)
             // nothing while a lookup runs: it finishes in milliseconds and a spinner just flickers
             result == null -> Unit
-            result.entries.isEmpty() -> Message("Nothing to look up here. Tap or drag across a word to try another spot.")
+            result.entries.isEmpty() -> Message(nothingFoundMessage)
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(result.entries) { _, entry ->
                     TermCard(entry, colors)
