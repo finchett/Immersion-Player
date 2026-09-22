@@ -38,8 +38,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -74,7 +72,6 @@ import io.github.immersionplayer.desktop.mpv.MpvPlayer
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.library.formatTime
-import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.subs.SubtitleTrack
 import io.github.immersionplayer.subs.translationFor
 import io.github.immersionplayer.ui.ActiveLookup
@@ -100,9 +97,8 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
     LaunchedEffect(session) {
         val tracks = withContext(Dispatchers.IO) { runCatching { app.loadSubtitles(session.video) } }
         tracks.onSuccess { list ->
-            val primary = SubtitleFiles.pickPrimary(list)
-            session.setTracks(list, primary, SubtitleFiles.pickSecondary(list, primary))
-            subtitleStatus = if (primary == null) "No text subtitles found for this video." else null
+            session.setTracks(list)
+            subtitleStatus = if (list.isEmpty()) "No text subtitles found for this video." else null
         }.onFailure {
             app.logError("subtitles ${session.video}", it)
             subtitleStatus = "Couldn't read subtitles: ${it.message}"
@@ -365,7 +361,7 @@ private fun StudyPanel(
         BoxWithConstraints(Modifier.fillMaxSize().padding(top = TitleBarInset)) {
             val maxLineHeight = maxHeight * 0.4f
             Column(Modifier.fillMaxSize()) {
-                PanelHeader(app, session, onBack)
+                PanelHeader(session, onBack)
                 CurrentLine(
                     track = primary,
                     secondary = secondary,
@@ -404,12 +400,9 @@ private fun StudyPanel(
     }
 }
 
-/** Back to the library, track choice, subtitle offset and stop-at-end, above the line. */
+/** Back to the library, and the subtitle offset when it isn't zero. */
 @Composable
-private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> Unit) {
-    val tracks by session.tracks.collectAsState()
-    val primary by session.primary.collectAsState()
-    val secondary by session.secondary.collectAsState()
+private fun PanelHeader(session: PlayerSession, onBack: () -> Unit) {
     val offset by session.offset.collectAsState()
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
@@ -425,51 +418,8 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> U
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
-        TrackMenu("Japanese", primary, tracks, allowNone = false) { it?.let(session::selectPrimary) }
-        TrackMenu("English", secondary, tracks, allowNone = true, onSelect = session::selectSecondary)
-        val autoPause = app.settings.autoPause
-        TextAction(
-            "Stop at end",
-            onClick = { session.setAutoPause(!autoPause) },
-            color = if (autoPause) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
-
-@Composable
-private fun TrackMenu(
-    label: String,
-    selected: SubtitleTrack?,
-    tracks: List<SubtitleTrack>,
-    allowNone: Boolean,
-    onSelect: (SubtitleTrack?) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        TextAction(
-            if (selected == null) "$label off ▾" else "$label ▾",
-            onClick = { open = true },
-            enabled = tracks.isNotEmpty(),
-        )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            if (allowNone) DropdownMenuItem(text = { Text("None") }, onClick = { onSelect(null); open = false })
-            tracks.forEach { track ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            "${trackLabel(track)} · ${track.cues.size} lines",
-                            color = if (track === selected) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                        )
-                    },
-                    onClick = { onSelect(track); open = false },
-                )
-            }
-        }
-    }
-}
-
-private fun trackLabel(track: SubtitleTrack): String =
-    track.language?.let { "${track.name} ($it)" } ?: track.name
 
 @Composable
 private fun CurrentLine(
@@ -529,7 +479,7 @@ private fun CurrentLine(
             AnimatedVisibility(peeking, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.matchParentSize()) {
                 Box(contentAlignment = Alignment.Center) {
                     BasicText(
-                        translation ?: "No English line here.",
+                        translation ?: if (secondary == null) "No subtitles in your peek language." else "Nothing here in your peek language.",
                         style = MaterialTheme.typography.bodyLarge.copy(
                             color = if (translation != null) {
                                 MaterialTheme.colorScheme.onSurface

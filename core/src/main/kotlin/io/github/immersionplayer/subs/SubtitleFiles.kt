@@ -10,11 +10,31 @@ object SubtitleFiles {
     val SUBTITLE_EXTENSIONS = setOf("srt", "ass", "ssa", "vtt")
     private val MATROSKA_EXTENSIONS = setOf("mkv", "mka", "webm")
 
-    private val JAPANESE = setOf("ja", "jpn", "jp", "ja-jp")
-    private val ENGLISH = setOf("en", "eng", "en-us", "en-gb")
+    /** A language users can pick, with the tags subtitle files and Matroska tracks use for it. */
+    data class Language(val code: String, val name: String, val tags: Set<String>)
 
-    fun isJapanese(track: SubtitleTrack) = track.language?.lowercase() in JAPANESE
-    fun isEnglish(track: SubtitleTrack) = track.language?.lowercase() in ENGLISH
+    val LANGUAGES = listOf(
+        Language("ja", "Japanese", setOf("ja", "jpn", "jp", "ja-jp")),
+        Language("en", "English", setOf("en", "eng", "en-us", "en-gb")),
+        Language("zh", "Chinese", setOf("zh", "zho", "chi", "zh-cn", "zh-tw", "zh-hans", "zh-hant", "chs", "cht")),
+        Language("ko", "Korean", setOf("ko", "kor", "ko-kr")),
+        Language("es", "Spanish", setOf("es", "spa", "es-es", "es-419", "es-mx")),
+        Language("fr", "French", setOf("fr", "fre", "fra", "fr-fr")),
+        Language("de", "German", setOf("de", "ger", "deu", "de-de")),
+        Language("pt", "Portuguese", setOf("pt", "por", "pt-br", "pt-pt")),
+        Language("it", "Italian", setOf("it", "ita")),
+        Language("ru", "Russian", setOf("ru", "rus")),
+    )
+
+    fun language(code: String): Language? = LANGUAGES.firstOrNull { it.code == code }
+
+    fun isLanguage(track: SubtitleTrack, code: String): Boolean {
+        val tag = track.language?.lowercase() ?: return false
+        return tag in (language(code)?.tags ?: setOf(code))
+    }
+
+    fun isJapanese(track: SubtitleTrack) = isLanguage(track, "ja")
+    fun isEnglish(track: SubtitleTrack) = isLanguage(track, "en")
 
     fun isMatroska(fileName: String) = fileName.substringAfterLast('.', "").lowercase() in MATROSKA_EXTENSIONS
 
@@ -36,15 +56,16 @@ object SubtitleFiles {
         return SubtitleTrack(fileName, language, cues)
     }
 
-    /** Japanese track to study with; falls back to the first track. */
-    fun pickPrimary(tracks: List<SubtitleTrack>): SubtitleTrack? =
-        tracks.firstOrNull(::isJapanese) ?: tracks.firstOrNull()
+    /** Track in the language being studied; falls back to the first track. */
+    fun pickPrimary(tracks: List<SubtitleTrack>, target: String = "ja"): SubtitleTrack? =
+        tracks.firstOrNull { isLanguage(it, target) } ?: tracks.firstOrNull()
 
-    /** English "full" track to show on demand, skipping signs-only tracks. */
-    fun pickSecondary(tracks: List<SubtitleTrack>, primary: SubtitleTrack?): SubtitleTrack? {
-        val english = tracks.filter { it !== primary && isEnglish(it) }
-        return english.firstOrNull { !it.name.contains("sign", ignoreCase = true) }
-            ?: english.maxByOrNull { it.cues.size }
+    /** Full track in the [peek] language (null for none), skipping signs-only tracks. */
+    fun pickSecondary(tracks: List<SubtitleTrack>, primary: SubtitleTrack?, peek: String? = "en"): SubtitleTrack? {
+        if (peek == null) return null
+        val candidates = tracks.filter { it !== primary && isLanguage(it, peek) }
+        return candidates.firstOrNull { !it.name.contains("sign", ignoreCase = true) }
+            ?: candidates.maxByOrNull { it.cues.size }
     }
 }
 

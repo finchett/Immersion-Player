@@ -56,6 +56,12 @@ class Settings(node: String = "io/github/immersionplayer") {
         private set
     var libraryRoot by mutableStateOf(prefs.get("library_root", null))
         private set
+    /** Language being studied: its subtitles are the line. */
+    var targetLanguage by mutableStateOf(prefs.get("target_language", "ja"))
+        private set
+    /** Language shown while peeking, or null for none. */
+    var peekLanguage by mutableStateOf(prefs.get("peek_language", "en").ifEmpty { null })
+        private set
 
     fun updateTheme(value: AppTheme?) {
         theme = value
@@ -66,6 +72,8 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun updateAutoPause(value: Boolean) { autoPause = value; prefs.putBoolean("auto_pause", value) }
     fun updatePauseOnLookup(value: Boolean) { pauseOnLookup = value; prefs.putBoolean("pause_on_lookup", value) }
     fun updateCopyLines(value: Boolean) { copyLines = value; prefs.putBoolean("copy_lines", value) }
+    fun updateTargetLanguage(code: String) { targetLanguage = code; prefs.put("target_language", code) }
+    fun updatePeekLanguage(code: String?) { peekLanguage = code; prefs.put("peek_language", code ?: "") }
     fun updateLibraryRoot(value: String?) {
         libraryRoot = value
         if (value == null) prefs.remove("library_root") else prefs.put("library_root", value)
@@ -94,8 +102,6 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun subtitleOffset(path: String): Double = videos.getDouble("${key(path)}.offset", 0.0)
     fun setSubtitleOffset(path: String, seconds: Double) = videos.putDouble("${key(path)}.offset", seconds)
 
-    fun trackChoice(path: String, role: String): String? = videos.get("${key(path)}.$role", null)
-    fun setTrackChoice(path: String, role: String, name: String) = videos.put("${key(path)}.$role", name)
 
     private fun key(path: String): String =
         MessageDigest.getInstance("SHA-1").digest(path.toByteArray())
