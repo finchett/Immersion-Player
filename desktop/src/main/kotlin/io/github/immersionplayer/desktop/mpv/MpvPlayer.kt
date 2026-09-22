@@ -78,7 +78,11 @@ class MpvPlayer {
         Thread(::renderLoop, "mpv-render").apply { isDaemon = true }.start()
     }
 
-    fun load(path: String) = command("loadfile", path)
+    fun load(path: String) {
+        _position.value = 0.0
+        _duration.value = 0.0
+        command("loadfile", path)
+    }
     fun togglePause() = command("cycle", "pause")
     fun setPaused(paused: Boolean) = property("pause", if (paused) "yes" else "no")
     fun seek(seconds: Double) = command("seek", seconds.toString(), "absolute+exact")
@@ -119,7 +123,7 @@ class MpvPlayer {
     private var serial = 0L
     private val size = Memory(8)
     private val stride = Memory(8)
-    private val format = Memory(5).apply { setString(0, "bgr0") }
+    private val format = Memory(5).apply { setString(0, "rgb0") }
 
     private fun renderLoop() {
         var renderedSize = 0 to 0
@@ -160,9 +164,10 @@ class MpvPlayer {
     private fun bufferFor(index: Int, width: Int, height: Int): Bitmap {
         val existing = buffers[index]
         if (existing != null && existing.width == width && existing.height == height) return existing
-        // "bgr0" is B,G,R,x in memory, which is Skia's BGRA_8888 on little-endian machines
+        // "rgb0" is R,G,B then a byte mpv leaves as garbage (usually 0), which is Skia's RGB_888X.
+        // Calling it BGRA_8888 would make that byte alpha and the video transparent.
         val bitmap = Bitmap()
-        bitmap.allocPixels(ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.OPAQUE))
+        bitmap.allocPixels(ImageInfo(width, height, ColorType.RGB_888X, ColorAlphaType.OPAQUE))
         buffers[index] = bitmap
         return bitmap
     }

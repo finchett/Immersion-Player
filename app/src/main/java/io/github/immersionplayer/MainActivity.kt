@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.MotionEvent
+import io.github.immersionplayer.library.NaturalOrder
 import io.github.immersionplayer.triggers.ShoulderTriggers
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -29,7 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.ui.LibraryScreen
-import io.github.immersionplayer.ui.NaturalOrder
 import io.github.immersionplayer.ui.PlayerScreen
 import io.github.immersionplayer.ui.SettingsScreen
 import io.github.immersionplayer.ui.isVideo

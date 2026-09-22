@@ -123,6 +123,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
+import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryLookup

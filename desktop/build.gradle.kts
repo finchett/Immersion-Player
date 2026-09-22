@@ -24,6 +24,16 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.19.1")
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")
     implementation("org.json:json:20250517")
+
+    testImplementation(compose.desktop.uiTestJUnit4)
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.test {
+    // the UI test drives real libmpv; same lookup path as the dev run
+    systemProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib:/usr/lib")
+    System.getenv("IMMERSION_TEST_VIDEO")?.let { environment("IMMERSION_TEST_VIDEO", it) }
+    System.getenv("IMMERSION_TEST_SHOTS")?.let { environment("IMMERSION_TEST_SHOTS", it) }
 }
 
 compose.desktop {
