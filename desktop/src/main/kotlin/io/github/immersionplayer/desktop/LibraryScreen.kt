@@ -80,7 +80,7 @@ fun LibraryScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = TitleBarInset + 4.dp, bottom = 8.dp),
+                Modifier.fillMaxWidth().height(40.dp).padding(start = HeaderStart, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // the path from the library root, each part a way back up

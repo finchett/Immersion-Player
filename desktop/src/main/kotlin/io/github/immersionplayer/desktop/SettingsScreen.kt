@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -60,7 +61,7 @@ fun SettingsScreen(app: DesktopApp, onBack: () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Row(
-                Modifier.padding(start = 12.dp, end = 12.dp, top = TitleBarInset + 4.dp, bottom = 8.dp),
+                Modifier.height(40.dp).padding(start = HeaderStart, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextAction("‹", onClick = onBack, style = MaterialTheme.typography.titleLarge)

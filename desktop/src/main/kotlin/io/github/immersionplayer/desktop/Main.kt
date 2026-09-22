@@ -116,7 +116,7 @@ fun main(args: Array<String>) {
             }
             val fullscreen = windowState.placement == WindowPlacement.Fullscreen
             DesktopTheme(app.settings.theme) {
-                CompositionLocalProvider(LocalTitleBarInset provides if (isMac && !fullscreen) 28.dp else 0.dp) {
+                CompositionLocalProvider(LocalTrafficLights provides (isMac && !fullscreen)) {
                     when (val s = screen) {
                         is Screen.Library -> LibraryScreen(
                             app = app,
