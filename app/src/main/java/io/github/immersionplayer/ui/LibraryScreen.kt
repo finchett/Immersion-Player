@@ -76,13 +76,14 @@ import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
+import io.github.immersionplayer.library.NaturalOrder
+import io.github.immersionplayer.library.episodeNumber
+import io.github.immersionplayer.library.formatTime
+import io.github.immersionplayer.library.isVideoName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val VIDEO_EXTENSIONS = setOf("mkv", "mp4", "webm", "avi", "m4v", "mov", "ts", "m2ts", "wmv", "flv")
-
-fun DocumentFile.isVideo(): Boolean =
-    isFile && name?.substringAfterLast('.', "")?.lowercase() in VIDEO_EXTENSIONS
+fun DocumentFile.isVideo(): Boolean = isFile && name?.let(::isVideoName) == true
 
 private data class Listing(
     val folders: List<DocumentFile>,
@@ -503,10 +504,6 @@ private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
     }
 }
 
-/** "日常 12.mkv" -> "12" */
-private fun episodeNumber(name: String): String? =
-    Regex("""(\d{1,3})(?!.*\d)""").find(name.substringBeforeLast('.'))?.groupValues?.get(1)
-
 private fun list(folder: DocumentFile): Listing {
     val all = folder.listFiles().toList()
     val folders = all.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
@@ -516,33 +513,4 @@ private fun list(folder: DocumentFile): Listing {
         child.uri.toString() to runCatching { child.listFiles().count { it.isVideo() } }.getOrDefault(0)
     }
     return Listing(folders, videos, all, counts)
-}
-
-/** Sorts "Episode 2" before "Episode 10". */
-object NaturalOrder : Comparator<String> {
-    private val chunk = Regex("""\d+|\D+""")
-
-    override fun compare(a: String, b: String): Int {
-        val ca = chunk.findAll(a).map { it.value }.toList()
-        val cb = chunk.findAll(b).map { it.value }.toList()
-        for (i in 0 until minOf(ca.size, cb.size)) {
-            val x = ca[i]
-            val y = cb[i]
-            val result = if (x[0].isDigit() && y[0].isDigit()) {
-                x.toBigInteger().compareTo(y.toBigInteger())
-            } else {
-                x.compareTo(y, ignoreCase = true)
-            }
-            if (result != 0) return result
-        }
-        return ca.size - cb.size
-    }
-}
-
-fun formatTime(seconds: Double): String {
-    val total = seconds.toInt().coerceAtLeast(0)
-    val h = total / 3600
-    val m = (total % 3600) / 60
-    val s = total % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
