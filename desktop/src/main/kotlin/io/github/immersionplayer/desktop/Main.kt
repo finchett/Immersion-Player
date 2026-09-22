@@ -18,6 +18,7 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.immersionplayer.desktop.mpv.MpvPlayer
+import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -112,6 +113,14 @@ fun main(args: Array<String>) {
                     window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
                     window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
                     window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+                }
+                // traffic lights pushed in and faded with the player controls; AppKit resets their
+                // layout on resize, so this runs again whenever the size or state changes
+                val lightsVisible = screen !is Screen.Player || keys.chromeVisible
+                LaunchedEffect(windowState.size, windowState.placement, lightsVisible, screen::class) {
+                    MacTrafficLights.apply(lightsVisible)
+                    delay(150) // after AppKit's own relayout following a resize
+                    MacTrafficLights.apply(lightsVisible)
                 }
             }
             val fullscreen = windowState.placement == WindowPlacement.Fullscreen

@@ -44,6 +44,7 @@ compose.desktop {
         // ./gradlew :desktop:run -PappArgs="--bench video.mkv 1920" (split on '|' so paths may hold spaces)
         (project.findProperty("mpvOptions") as String?)?.let { jvmArgs += "-Dmpv.options=$it" }
         if (project.hasProperty("stats")) jvmArgs += "-Dimmersion.stats=1"
+        if (project.hasProperty("debugLights")) jvmArgs += "-Dimmersion.debugLights=1"
         (project.findProperty("dumpFrame") as String?)?.let { jvmArgs += "-Dimmersion.dumpFrame=$it" }
         (project.findProperty("appArgs") as String?)?.let { args += it.split('|') }
         nativeDistributions {

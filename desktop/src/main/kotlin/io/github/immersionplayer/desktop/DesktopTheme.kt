@@ -15,6 +15,7 @@ import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
@@ -38,15 +40,18 @@ val LocalTrafficLights = staticCompositionLocalOf { isMac }
 
 /** Where a header on the title-bar line starts: clear of the traffic lights when they're shown. */
 val HeaderStart: Dp
-    @Composable get() = if (LocalTrafficLights.current) 76.dp else 12.dp
+    @Composable get() = if (LocalTrafficLights.current) (76 + MacTrafficLights.INSET).dp else 12.dp
 
-/** A translucent pill behind the traffic lights, so they read over video. */
+/** A translucent pill behind the traffic lights, so they read over video; fades with them. */
 @Composable
-fun TrafficLightsPill(modifier: Modifier = Modifier) {
+fun TrafficLightsPill(visible: Boolean, modifier: Modifier = Modifier) {
     if (!LocalTrafficLights.current) return
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, label = "pill")
+    val inset = MacTrafficLights.INSET.dp
     Box(
-        modifier.padding(start = 5.dp, top = 5.dp)
+        modifier.padding(start = 5.dp + inset, top = 4.dp + inset)
             .size(width = 62.dp, height = 20.dp)
+            .graphicsLayer { this.alpha = alpha }
             .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
     )
 }

@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -92,6 +93,8 @@ import java.awt.Cursor
 /** Keyboard actions the window forwards to the player. */
 class PlayerKeys {
     var peeking by mutableStateOf(false)
+    /** Whether the player's controls are showing; the traffic lights come and go with them. */
+    var chromeVisible by mutableStateOf(true)
     var onToggleFullscreen: () -> Unit = {}
 }
 
@@ -231,7 +234,7 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                 }
             }
         }
-        TrafficLightsPill(Modifier.align(Alignment.TopStart))
+        TrafficLightsPill(keys.chromeVisible, Modifier.align(Alignment.TopStart))
     }
 }
 
@@ -254,6 +257,8 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, modifier: Modifi
         moving = false
     }
     val visible = paused || moving || overControls
+    LaunchedEffect(visible) { keys.chromeVisible = visible }
+    DisposableEffect(Unit) { onDispose { keys.chromeVisible = true } }
     Box(
         modifier.background(Color.Black)
             .onPointerEvent(PointerEventType.Move) { lastMove = System.nanoTime() }
