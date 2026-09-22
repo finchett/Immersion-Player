@@ -6,9 +6,16 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,7 +82,12 @@ fun DesktopTheme(choice: AppTheme?, content: @Composable () -> Unit) {
     val theme = choice ?: if (isSystemInDarkTheme()) AppTheme.Midnight else AppTheme.Paper
     val scheme = remember(theme) { theme.scheme.forDesktop() }
     MaterialTheme(colorScheme = scheme, typography = DesktopTypography) {
-        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp, content = content)
+        // default text colour for everything, so no screen depends on a Surface to set it
+        CompositionLocalProvider(
+            LocalMinimumInteractiveComponentSize provides 0.dp,
+            LocalContentColor provides scheme.onBackground,
+            content = content,
+        )
     }
 }
 
@@ -152,4 +164,14 @@ fun TextAction(
             .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
+}
+
+/** A header bar that stays put, a hairline, and the body below it. */
+@Composable
+fun Chrome(header: @Composable () -> Unit, body: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(start = HeaderStart, end = 12.dp)) { header() }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Box(Modifier.fillMaxSize()) { body() }
+    }
 }

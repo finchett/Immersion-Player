@@ -14,13 +14,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -226,8 +220,8 @@ private val slide = tween<IntOffset>(260, easing = FastOutSlowInEasing)
  */
 @Composable
 private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, onOpenVideo: (File, File?) -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(start = HeaderStart, end = 12.dp)) {
+    Chrome(
+        header = {
             AnimatedContent(
                 targetState = screen,
                 contentKey = { it::class },
@@ -244,25 +238,26 @@ private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, 
                     is Screen.Player -> Unit
                 }
             }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        AnimatedContent(
-            modifier = Modifier.fillMaxSize(),
-            targetState = screen,
-            transitionSpec = { bodyTransition(initialState, targetState) },
-            label = "body",
-        ) { s ->
-            when (s) {
-                is Screen.Library -> LibraryBody(
-                    app, s.folder,
-                    onOpenFolder = { navigate(Screen.Library(it)) },
-                    onOpenVideo = { onOpenVideo(it, s.folder ?: it.parentFile) },
-                )
-                is Screen.Settings -> SettingsBody(app)
-                is Screen.Player -> Unit
+        },
+        body = {
+            AnimatedContent(
+                modifier = Modifier.fillMaxSize(),
+                targetState = screen,
+                transitionSpec = { bodyTransition(initialState, targetState) },
+                label = "body",
+            ) { s ->
+                when (s) {
+                    is Screen.Library -> LibraryBody(
+                        app, s.folder,
+                        onOpenFolder = { navigate(Screen.Library(it)) },
+                        onOpenVideo = { onOpenVideo(it, s.folder ?: it.parentFile) },
+                    )
+                    is Screen.Settings -> SettingsBody(app)
+                    is Screen.Player -> Unit
+                }
             }
-        }
-    }
+        },
+    )
 }
 
 private fun bodyTransition(from: Screen, to: Screen): ContentTransform {
