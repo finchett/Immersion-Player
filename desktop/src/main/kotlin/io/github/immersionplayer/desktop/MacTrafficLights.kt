@@ -105,6 +105,36 @@ object MacTrafficLights {
         }
     }
 
+    /** Debug only: prints where the first light is each second, to catch AppKit moving it back. */
+    fun probe() {
+        if (!isMac || !DEBUG) return
+        Thread {
+            while (true) {
+                Thread.sleep(1000)
+                onMain {
+                    val window = appWindow() ?: return@onMain
+                    val button = send(window, "standardWindowButton:", 0L) ?: return@onMain
+                    val container = send(send(button, "superview"), "superview")
+                    val f = frame(button)
+                    val parent = send(button, "superview")
+                    System.getProperty("immersion.snapTitlebar")?.let { path -> snapshot(parent!!, path) }
+                    println("probe: light0 x=${f.x} y=${f.y} bar=${frame(container).height} parentFlipped=${sendLong(parent!!, "isFlipped") and 0xFF} parentH=${frame(parent).height} parentY=${frame(parent).y}")
+                }
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    /** Debug only: renders [view] (and its subviews) to a PNG, no screen-recording permission needed. */
+    private fun snapshot(view: Pointer, path: String) {
+        val bounds = msgSendStret.invoke(Rect::class.java, arrayOf(view, sel("bounds"))) as Rect
+        val rep = msgSend.invokePointer(arrayOf(view, sel("bitmapImageRepForCachingDisplayInRect:"), bounds))
+        sendVoid(view, "cacheDisplayInRect:toBitmapImageRep:", bounds, rep)
+        val props = send(cls("NSDictionary"), "dictionary")!!
+        val png = msgSend.invokePointer(arrayOf(rep, sel("representationUsingType:properties:"), 4L, props))
+        val nsPath = msgSend.invokePointer(arrayOf(cls("NSString"), sel("stringWithUTF8String:"), path))
+        sendVoid(png, "writeToFile:atomically:", nsPath, 1.toByte())
+    }
+
     /** The app's (single) AWT window: AWTWindow_Normal, as opposed to file dialogs and menus. */
     private fun appWindow(): Pointer? {
         val app = send(cls("NSApplication"), "sharedApplication")

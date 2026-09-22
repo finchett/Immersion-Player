@@ -22,6 +22,15 @@ class LanguageDetectorTest {
     }
 
     @Test
+    fun englishWithJapaneseLyricsStaysEnglish() {
+        // a signs-and-songs track: mostly English, some lines of Japanese lyrics
+        val signs = track("eng", *english, *english, "君の声が聞こえる", "空へ飛んでいく")
+        assertEquals("en", SubtitleFiles.effectiveLanguage(signs))
+        val dialogue = track("jpn", *japanese)
+        assertEquals(dialogue, SubtitleFiles.pickPrimary(listOf(signs, dialogue), "ja"))
+    }
+
+    @Test
     fun tooLittleTextIsUnknown() {
         assertNull(LanguageDetector.detect(track(null, "♪～", "はい")))
     }

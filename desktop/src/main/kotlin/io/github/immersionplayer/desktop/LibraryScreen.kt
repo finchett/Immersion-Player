@@ -105,12 +105,6 @@ fun LibraryScreen(
                         }
                     }
                 }
-                TextAction(if (root == null) "Choose folder" else "Change folder", onClick = {
-                    chooseFolder(root)?.let {
-                        settings.updateLibraryRoot(it.path)
-                        onOpenFolder(it)
-                    }
-                })
                 TextAction("Settings", onClick = onOpenSettings)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

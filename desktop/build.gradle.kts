@@ -45,6 +45,7 @@ compose.desktop {
         (project.findProperty("mpvOptions") as String?)?.let { jvmArgs += "-Dmpv.options=$it" }
         if (project.hasProperty("stats")) jvmArgs += "-Dimmersion.stats=1"
         if (project.hasProperty("debugLights")) jvmArgs += "-Dimmersion.debugLights=1"
+        (project.findProperty("snapTitlebar") as String?)?.let { jvmArgs += "-Dimmersion.snapTitlebar=$it" }
         (project.findProperty("dumpFrame") as String?)?.let { jvmArgs += "-Dimmersion.dumpFrame=$it" }
         (project.findProperty("appArgs") as String?)?.let { args += it.split('|') }
         nativeDistributions {

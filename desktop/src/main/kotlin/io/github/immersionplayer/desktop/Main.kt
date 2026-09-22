@@ -1,6 +1,24 @@
 package io.github.immersionplayer.desktop
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +49,7 @@ private sealed interface Screen {
 fun main(args: Array<String>) {
     if (args.firstOrNull() == "--bench") return bench(args[1], args.getOrNull(2)?.toInt() ?: 1920)
     val app = DesktopApp()
+    MacTrafficLights.probe()
     Thread({ app.prepareDictionaries() }, "dictionary-setup").apply { isDaemon = true }.start()
 
     application {
@@ -129,16 +148,31 @@ fun main(args: Array<String>) {
                     LocalTrafficLights provides (isMac && !fullscreen),
                     LocalCorners provides Corners(if (fullscreen) 0.0 else MacTrafficLights.cornerRadius),
                 ) {
-                    when (val s = screen) {
-                        is Screen.Library -> LibraryScreen(
-                            app = app,
-                            folder = s.folder,
-                            onOpenFolder = { screen = Screen.Library(it) },
-                            onOpenVideo = { openVideo(it, s.folder ?: it.parentFile) },
-                            onOpenSettings = { screen = Screen.Settings(s) },
-                        )
-                        is Screen.Player -> session?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
-                        is Screen.Settings -> SettingsScreen(app, onBack = { screen = s.from })
+                    // keep the session of each player screen, so a closing player still shows its last frame
+                    val sessions = remember { HashMap<Screen.Player, PlayerSession>() }
+                    (screen as? Screen.Player)?.let { current -> session?.let { sessions[current] = it } }
+                    // the native window too, so a resize never flashes white before Compose repaints
+                    val background = MaterialTheme.colorScheme.background
+                    LaunchedEffect(background) { window.background = java.awt.Color(background.toArgb()) }
+                    // the theme background behind the screens, so a crossfade never shows the window's white
+                    AnimatedContent(
+                        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                        targetState = screen,
+                        transitionSpec = { screenTransition(initialState, targetState) },
+                        label = "screen",
+                    ) { s ->
+                        when (s) {
+                            is Screen.Library -> LibraryScreen(
+                                app = app,
+                                folder = s.folder,
+                                onOpenFolder = { screen = Screen.Library(it) },
+                                onOpenVideo = { openVideo(it, s.folder ?: it.parentFile) },
+                                onOpenSettings = { screen = Screen.Settings(s) },
+                            )
+                            is Screen.Player -> sessions[s]?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
+                            is Screen.Settings -> SettingsScreen(app, onBack = { screen = s.from })
+                        }
+                        DisposableEffect(s) { onDispose { if (s is Screen.Player && screen != s) sessions.remove(s) } }
                     }
                 }
             }
@@ -165,4 +199,28 @@ private fun bench(path: String, width: Int) {
     println("target ${width}x${width * 9 / 16}: %.1f fps".format(frames / 10.0))
     player.destroy()
     exitProcess(0)
+}
+
+/**
+ * Deeper folders slide in from the right and back out to the right; videos open with a slight
+ * zoom; settings slide over the library. Only transforms and fades, so the video's size (which
+ * mpv renders at) never changes mid-animation.
+ */
+private fun screenTransition(from: Screen, to: Screen): ContentTransform {
+    val spec = tween<Float>(220, easing = FastOutSlowInEasing)
+    val slide = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+    fun horizontal(forward: Boolean) =
+        (slideInHorizontally(slide) { if (forward) it / 6 else -it / 6 } + fadeIn(spec)) togetherWith
+            (slideOutHorizontally(slide) { if (forward) -it / 6 else it / 6 } + fadeOut(spec))
+    return when {
+        from is Screen.Library && to is Screen.Library -> {
+            val deeper = to.folder != null && (from.folder == null || to.folder.path.startsWith(from.folder.path + File.separator))
+            horizontal(forward = deeper)
+        }
+        to is Screen.Player -> (fadeIn(spec) + scaleIn(spec, initialScale = 0.97f)) togetherWith fadeOut(spec)
+        from is Screen.Player -> fadeIn(spec) togetherWith (fadeOut(spec) + scaleOut(spec, targetScale = 0.97f))
+        to is Screen.Settings -> horizontal(forward = true)
+        from is Screen.Settings -> horizontal(forward = false)
+        else -> fadeIn(spec) togetherWith fadeOut(spec)
+    }
 }
