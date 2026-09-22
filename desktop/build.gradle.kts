@@ -10,6 +10,13 @@ kotlin {
     jvmToolchain(17)
 }
 
+sourceSets.main {
+    // Compose code shared with the Android app, compiled here against JetBrains Compose
+    kotlin.srcDir("../shared-ui/src")
+    // bundled dictionaries (JMdict), read as resources under dictionaries/
+    resources.srcDir("../app/src/main/assets")
+}
+
 dependencies {
     implementation(project(":core"))
     implementation(compose.desktop.currentOs)
