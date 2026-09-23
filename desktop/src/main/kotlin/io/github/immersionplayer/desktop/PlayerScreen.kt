@@ -7,6 +7,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.height
@@ -74,14 +80,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import io.github.immersionplayer.anki.MinedWord
 import io.github.immersionplayer.desktop.mpv.MpvPlayer
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.LookupResult
+import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.subs.SubtitleTrack
 import io.github.immersionplayer.subs.translationFor
@@ -99,6 +108,8 @@ class PlayerKeys {
     /** Whether the player's controls are showing; the traffic lights come and go with them. */
     var chromeVisible by mutableStateOf(true)
     var onToggleFullscreen: () -> Unit = {}
+    /** Makes an Anki card of the word looked up first, when cards are turned on. */
+    var onAddCard: () -> Unit = {}
 }
 
 @Composable
@@ -165,6 +176,38 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         }
         // never leave the panel waiting: lines like ♪～ have nothing to look up
         if (mine == generation) lookup = found ?: ActiveLookup(lineIndex, text, 0, LookupResult(text, 0, 0, emptyList()))
+    }
+
+    /** The looked-up [entry] in its line, with the line's times in the video's clock. */
+    fun minedWord(entry: TermEntry): MinedWord? {
+        val current = lookup ?: return null
+        val cue = primary?.cues?.getOrNull(current.lineIndex)?.takeIf { it.text == current.text } ?: return null
+        val offset = session.offset.value
+        return MinedWord(
+            sentence = cue.text,
+            wordStart = current.start,
+            wordLength = entry.sourceLength,
+            entry = entry,
+            translation = session.secondary.value?.translationFor(cue.start, cue.end),
+            videoName = session.video.nameWithoutExtension,
+            start = cue.start + offset,
+            end = cue.end + offset,
+        )
+    }
+
+    fun addCard(entry: TermEntry) {
+        val word = minedWord(entry) ?: return
+        // the frame on screen, if it's from this line; otherwise one from the middle of it
+        val position = session.position.value
+        val frameAt = if (position in word.start..word.end) position else (word.start + word.end) / 2
+        app.anki.add(AnkiCards.Request(word, session.video, session.player.propertyString("aid"), frameAt))
+    }
+
+    DisposableEffect(keys, settings.ankiEnabled) {
+        keys.onAddCard = {
+            if (settings.ankiEnabled) lookup?.result?.entries?.firstOrNull()?.let(::addCard)
+        }
+        onDispose { keys.onAddCard = {} }
     }
 
     // pan & scan: mpv crops to fill the area instead of letterboxing
@@ -236,6 +279,17 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                     onBack = onBack,
                     onLookup = { line, text, start -> startLookup(line, text, start) },
                     onSelect = { line, text, start, end -> startLookup(line, text, start, end - start) },
+                    cardButton = if (settings.ankiEnabled) {
+                        { entry ->
+                            val word = minedWord(entry)
+                            CardButton(
+                                added = word != null && app.anki.isAdded(word),
+                                enabled = word != null,
+                                onAdd = { addCard(entry) },
+                                onRemove = { word?.let(app.anki::remove) },
+                            )
+                        }
+                    } else null,
                     modifier = Modifier.width(totalWidth * panelFraction).fillMaxHeight().clip(shape),
                 )
             }
@@ -400,6 +454,7 @@ private fun StudyPanel(
     onBack: () -> Unit,
     onLookup: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
+    cardButton: (@Composable (TermEntry) -> Unit)?,
     modifier: Modifier,
 ) {
     val primary by session.primary.collectAsState()
@@ -412,7 +467,7 @@ private fun StudyPanel(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val maxLineHeight = maxHeight * 0.4f
             Column(Modifier.fillMaxSize()) {
-                PanelHeader(session, onBack)
+                PanelHeader(app, session, onBack)
                 CurrentLine(
                     track = primary,
                     secondary = secondary,
@@ -436,6 +491,7 @@ private fun StudyPanel(
                             setupStatus = setupStatus,
                             noDictionariesMessage = "No dictionaries yet. Import a Yomitan dictionary under Settings.",
                             nothingFoundMessage = "Nothing to look up here. Click or drag across a word to try another spot.",
+                            entryAction = cardButton,
                         )
                     } else if (setupStatus != null) {
                         Text(
@@ -451,17 +507,18 @@ private fun StudyPanel(
     }
 }
 
-/** Back to the library, and the subtitle offset when it isn't zero. */
+/** Back to the library, what Anki is doing, and the subtitle offset when it isn't zero. */
 @Composable
-private fun PanelHeader(session: PlayerSession, onBack: () -> Unit) {
+private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> Unit) {
     val offset by session.offset.collectAsState()
+    val ankiStatus by app.anki.status.collectAsState()
     // same height as the other headers, so it lines up with the traffic lights across the window
     Row(
         Modifier.fillMaxWidth().height(HeaderHeight).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextAction("‹ Library", onClick = onBack)
-        Box(Modifier.weight(1f))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { AnkiStatus(ankiStatus) }
         if (offset != 0.0) {
             Text(
                 "%+.1f s".format(offset),
@@ -547,6 +604,56 @@ private fun CurrentLine(
                 }
             }
         }
+    }
+}
+
+/** What adding a card is doing, or how it went. */
+@Composable
+private fun AnkiStatus(status: AnkiCards.Status?) {
+    // the last message stays while it fades out
+    val shown = remember { object { var status: AnkiCards.Status? = null } }
+    status?.let { shown.status = it }
+    AnimatedVisibility(status != null, enter = fadeIn(), exit = fadeOut()) {
+        val last = shown.status
+        Text(
+            last?.message.orEmpty(),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (last is AnkiCards.Status.Failed) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        )
+    }
+}
+
+/** A small round + that makes a card of one dictionary entry, and becomes a − that takes it out again. */
+@Composable
+private fun CardButton(added: Boolean, enabled: Boolean, onAdd: () -> Unit, onRemove: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val scheme = MaterialTheme.colorScheme
+    val alpha = if (enabled) 1f else 0.35f
+    // a soft tint to add; solid once the card is in Anki
+    val fill = when {
+        added -> scheme.primary
+        hovered -> scheme.primary.copy(alpha = 0.26f)
+        else -> scheme.onSurface.copy(alpha = 0.08f)
+    }.let { it.copy(alpha = it.alpha * alpha) }
+    val mark = (if (added) scheme.onPrimary else if (hovered) scheme.primary else scheme.onSurfaceVariant)
+        .copy(alpha = alpha)
+    Canvas(
+        Modifier.padding(start = 8.dp, bottom = 6.dp).size(18.dp).clip(CircleShape)
+            .hoverable(interaction, enabled)
+            .clickable(interaction, indication = null, enabled = enabled, onClick = if (added) onRemove else onAdd)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .semantics { contentDescription = if (added) "Remove from Anki" else "Add to Anki" },
+    ) {
+        drawCircle(fill)
+        val stroke = 1.3.dp.toPx()
+        val arm = size.minDimension * 0.22f
+        drawLine(mark, Offset(center.x - arm, center.y), Offset(center.x + arm, center.y), stroke, StrokeCap.Round)
+        if (!added) drawLine(mark, Offset(center.x, center.y - arm), Offset(center.x, center.y + arm), stroke, StrokeCap.Round)
     }
 }
 

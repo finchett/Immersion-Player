@@ -40,8 +40,8 @@ Every action is a gesture. The app lists them once, on first run.
 | Key | Does |
 |---|---|
 | Space | play / pause |
-| j / k | previous / next line |
-| h / l | previous / next line, stop at its end |
+| h / l | previous / next line, then keep playing |
+| j / k | previous / next line, stop at its end |
 | ; | replay this line, stop at its end |
 | hold i, or hold the line | show the peek language |
 | y / o | seek 5 s back / forward |
@@ -51,6 +51,12 @@ Every action is a gesture. The app lists them once, on first run.
 | f, or double-click | full screen |
 | Esc | leave full screen, then back to the library |
 | click / drag a word | look it up |
+| a | add the looked-up word to Anki (when turned on) |
+
+Paused, `l` and `k` carry on playing rather than skipping ahead; press again once it plays to
+jump to the next line. (A swipe on Android always jumps, since a tap there already means play.)
+`h` and `l` also hold off `u` (stop at the end of every line), so the video runs on until you ask
+for a stop again with `j`, `k` or `;`.
 
 ## Dictionaries
 
@@ -62,6 +68,23 @@ Every action is a gesture. The app lists them once, on first run.
 - Every new line is looked up automatically — first kanji found, skipping speaker names and
   bracketed readings, falling through candidates until one hits.
 
+## Anki cards (desktop)
+
+Off by default; turn it on under Settings › Anki. Press `a`, or **+ Anki** on any entry, and the
+word goes to Anki through [AnkiConnect](https://ankiweb.net/shared/info/2055492159) (Anki has to
+be open) with:
+
+- the line, the word in bold, and the peek-language line as its translation
+- the word, its reading as Anki furigana, pitch accent graphs and the first dictionary's definition
+- the line's audio, 0.3 s either side, as mono Opus (about 4 KB a second)
+- the line as an animated AVIF at 360 px (plays like a GIF), or a still of the frame on screen
+- the episode and time
+
+Any note type works: pick it, then choose what fills each field. mpvacious's *Japanese
+sentences+* is set up field by field; other note types get a guess from their field names.
+Media are cut by a separate headless mpv from the file itself, so playback isn't interrupted.
+Duplicates (same first field in the deck) are refused before anything is cut.
+
 ## Playback
 
 - libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt binaries.
@@ -72,7 +95,8 @@ Every action is a gesture. The app lists them once, on first run.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.
-- Tracks are picked by language (desktop: set in settings). Tags are checked against the text:
+- Tracks are picked by the languages set in settings on both platforms; on Android a track chosen
+  for one video still overrides that for it. Tags are checked against the text:
   each line votes by script, so a Japanese track tagged `eng` is still found, and an English
   track with Japanese song lyrics stays English.
 

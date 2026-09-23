@@ -3,7 +3,10 @@ package io.github.immersionplayer.desktop
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.github.immersionplayer.anki.AnkiConnect
+import io.github.immersionplayer.anki.CardFormat
 import io.github.immersionplayer.ui.AppTheme
+import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 import java.util.prefs.Preferences
@@ -68,6 +71,55 @@ class Settings(node: String = "io/github/immersionplayer") {
     /** Language shown while peeking, or null for none. */
     var peekLanguage by mutableStateOf(prefs.get("peek_language", "en").ifEmpty { null })
         private set
+
+    // --- Anki ---
+
+    /** Making Anki cards from the player: off until turned on in settings. */
+    var ankiEnabled by mutableStateOf(prefs.getBoolean("anki_enabled", false))
+        private set
+    /** Where AnkiConnect listens. */
+    var ankiUrl by mutableStateOf(prefs.get("anki_url", AnkiConnect.DEFAULT_URL))
+        private set
+    var ankiDeck by mutableStateOf(prefs.get("anki_deck", null))
+        private set
+    var ankiNoteType by mutableStateOf(prefs.get("anki_note_type", null))
+        private set
+    /** Tags for new cards, separated by spaces. */
+    var ankiTags by mutableStateOf(prefs.get("anki_tags", "immersion-player"))
+        private set
+    /** Seconds of audio kept before and after the line. */
+    var ankiAudioPadding by mutableStateOf(prefs.getDouble("anki_audio_padding", 0.3))
+        private set
+    /** The screenshot moves: the whole line, animated, instead of the one frame on screen. */
+    var ankiImageAnimated by mutableStateOf(prefs.getBoolean("anki_image_animated", true))
+        private set
+    /** Height of the screenshot in pixels. */
+    var ankiImageHeight by mutableStateOf(prefs.getInt("anki_image_height", 360))
+        private set
+    /** The fields of each note type used so far, so switching back keeps its setup. */
+    private var ankiFormats by mutableStateOf(runCatching { JSONObject(prefs.get("anki_formats", "{}")) }.getOrElse { JSONObject() })
+
+    /** How the chosen note type's fields are filled, once set up. */
+    val ankiFormat: CardFormat?
+        get() = ankiNoteType?.let(::cardFormat)
+
+    fun cardFormat(noteType: String): CardFormat? =
+        ankiFormats.optJSONObject(noteType)?.let { CardFormat.fromJson(noteType, it) }
+
+    fun saveCardFormat(format: CardFormat) {
+        val all = JSONObject(ankiFormats.toString()).put(format.noteType, format.toJson())
+        ankiFormats = all
+        prefs.put("anki_formats", all.toString())
+    }
+
+    fun updateAnkiEnabled(value: Boolean) { ankiEnabled = value; prefs.putBoolean("anki_enabled", value) }
+    fun updateAnkiUrl(value: String) { ankiUrl = value; prefs.put("anki_url", value) }
+    fun updateAnkiDeck(value: String) { ankiDeck = value; prefs.put("anki_deck", value) }
+    fun updateAnkiNoteType(value: String) { ankiNoteType = value; prefs.put("anki_note_type", value) }
+    fun updateAnkiTags(value: String) { ankiTags = value; prefs.put("anki_tags", value) }
+    fun updateAnkiAudioPadding(value: Double) { ankiAudioPadding = value; prefs.putDouble("anki_audio_padding", value) }
+    fun updateAnkiImageAnimated(value: Boolean) { ankiImageAnimated = value; prefs.putBoolean("anki_image_animated", value) }
+    fun updateAnkiImageHeight(value: Int) { ankiImageHeight = value; prefs.putInt("anki_image_height", value) }
 
     fun updateTheme(value: AppTheme?) {
         theme = value

@@ -104,6 +104,12 @@ class MpvPlayer {
         lib.mpv_set_property_string(handle, name, value)
     }
 
+    /** A property's current value as mpv formats it, or null if it has none. */
+    fun propertyString(name: String): String? {
+        val value = lib.mpv_get_property_string(handle, name) ?: return null
+        return try { value.getString(0) } finally { lib.mpv_free(value) }
+    }
+
     private fun option(name: String, value: String) {
         lib.mpv_set_option_string(handle, name, value)
     }

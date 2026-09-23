@@ -14,7 +14,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.io.RandomAccessFile
 
-/** App-wide services: settings, the dictionary, subtitle loading. */
+/** Shown in settings; a packaged build carries the same number in its bundle (build.gradle.kts). */
+const val APP_VERSION = "0.2.0"
+
+/** App-wide services: settings, the dictionary, subtitle loading, Anki. */
 class DesktopApp(
     private val dataDir: File = AppDirs.data,
     cacheDir: File = AppDirs.cache,
@@ -24,6 +27,7 @@ class DesktopApp(
     val lookup = DictionaryLookup(database)
     private val subtitleCache = EmbeddedSubtitleCache(File(cacheDir, "subtitles"))
     val thumbnails = Thumbnails(cacheDir)
+    val anki = AnkiCards(settings, cacheDir, ::logError)
 
     private val _setupStatus = MutableStateFlow<String?>(null)
     /** Progress while a bundled dictionary is being installed, else null. */
