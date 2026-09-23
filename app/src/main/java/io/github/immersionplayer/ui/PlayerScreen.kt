@@ -332,8 +332,9 @@ fun PlayerScreen(
             runCatching { app.subtitleLoader.load(video, siblings) }
         }
         tracks.onSuccess { list ->
-            val primary = SubtitleFiles.pickPrimary(list)
-            session.setTracks(list, primary, SubtitleFiles.pickSecondary(list, primary))
+            // the languages chosen in settings; a track picked for this video still wins
+            val primary = SubtitleFiles.pickPrimary(list, app.prefs.targetLanguage)
+            session.setTracks(list, primary, SubtitleFiles.pickSecondary(list, primary, app.prefs.peekLanguage))
             subtitleStatus = if (primary == null) "No text subtitles found for this video" else null
         }.onFailure {
             subtitleStatus = "Couldn't read subtitles: ${it.message}"

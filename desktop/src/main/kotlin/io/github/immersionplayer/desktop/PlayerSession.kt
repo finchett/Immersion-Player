@@ -50,6 +50,12 @@ class PlayerSession(
     private var autoPausedLine = -1
     /** A line to stop at the end of once, whatever the stop-at-end setting says (-1 for none). */
     private var stopAfterLine = -1
+    /**
+     * Whether the stop-at-end setting is held off. The plain keys (h/l, and carrying on from a
+     * pause) mean "don't stop", so playback runs on until a key that stops at the end (j/k/;)
+     * or the setting itself asks for stops again.
+     */
+    private var keepPlaying = false
     private var lastCopiedLine = -1
 
     init {
@@ -84,6 +90,7 @@ class PlayerSession(
 
     fun setAutoPause(enabled: Boolean) {
         settings.updateAutoPause(enabled)
+        keepPlaying = false
         autoPausedLine = _lineIndex.value.takeIf { enabled && !_lineActive.value } ?: -1
     }
 
@@ -99,13 +106,14 @@ class PlayerSession(
     fun seekBy(seconds: Double) = seekTo(player.position.value + seconds)
 
     /**
-     * Jump to a line and play it. With [stopAtEnd] it pauses when the line finishes; otherwise
-     * it stops there only if stop-at-end is on in settings.
+     * Jump to a line and play it. With [stopAtEnd] it pauses when that line finishes; otherwise
+     * it plays on past the end of the line, holding off the stop-at-end setting ([keepPlaying]).
      */
     fun playLine(index: Int, stopAtEnd: Boolean = false) {
         val cue = _primary.value?.cues?.getOrNull(index) ?: return
         autoPausedLine = -1
         stopAfterLine = if (stopAtEnd) index else -1
+        keepPlaying = !stopAtEnd
         seekTo(cue.start + _offset.value)
         play()
     }
@@ -122,9 +130,25 @@ class PlayerSession(
         playLine(target.coerceAtLeast(0), stopAtEnd)
     }
 
+    /**
+     * Forward one line. While paused the first press only carries on playing, so the rest of the
+     * line and the pause after it aren't skipped; pressing again, now that it plays, jumps to the
+     * line ahead.
+     */
     fun nextLine(stopAtEnd: Boolean = false) {
         val cues = _primary.value?.cues ?: return
+        if (player.paused.value) return resume(stopAtEnd)
         playLine((_lineIndex.value + 1).coerceAtMost(cues.lastIndex), stopAtEnd)
+    }
+
+    /** Carries on from where playback stopped, without seeking. */
+    private fun resume(stopAtEnd: Boolean) {
+        // the line ahead is the current one while it's still on screen, otherwise the next one
+        val ahead = if (_lineActive.value) _lineIndex.value else _lineIndex.value + 1
+        stopAfterLine = if (stopAtEnd) ahead else -1
+        keepPlaying = !stopAtEnd
+        // autoPausedLine is left alone: it's what stops us pausing again on the line we just left
+        play()
     }
 
     fun savePosition() {
@@ -147,7 +171,7 @@ class PlayerSession(
             }
         }
 
-        val stopHere = settings.autoPause || index == stopAfterLine
+        val stopHere = (settings.autoPause && !keepPlaying) || index == stopAfterLine
         if (stopHere && index >= 0 && index != autoPausedLine && !player.paused.value) {
             val cue = track.cues[index]
             if (time >= cue.end - END_MARGIN && time < cue.end + 1.0) {

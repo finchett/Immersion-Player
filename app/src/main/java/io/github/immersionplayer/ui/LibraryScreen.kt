@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,16 +52,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.widthIn
 import io.github.immersionplayer.player.MpvOwner
 import io.github.immersionplayer.player.ThumbnailGenerator
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,10 +83,12 @@ private data class Listing(
     val videos: List<DocumentFile>,
     val all: List<DocumentFile>,
     val episodeCounts: Map<String, Int>,
+    /** The first video inside each folder, whose frame stands for it in the grid. */
+    val covers: Map<String, DocumentFile>,
 )
 
 private sealed interface Entry {
-    data class Folder(val file: DocumentFile, val episodes: Int) : Entry
+    data class Folder(val file: DocumentFile, val episodes: Int, val cover: DocumentFile?) : Entry
     data class Video(val file: DocumentFile) : Entry
 }
 
@@ -136,8 +131,6 @@ fun LibraryScreen(
             app.prefs.libraryPath = path.drop(1).joinToString("/") { it.name.orEmpty() }
         }
     }
-    var listing by remember { mutableStateOf<Listing?>(null) }
-
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -148,108 +141,38 @@ fun LibraryScreen(
 
     BackHandler(enabled = path.size > 1) { path = path.dropLast(1) }
 
-    val current = path.lastOrNull()
-    LaunchedEffect(current) {
-        listing = null
-        if (current != null) listing = withContext(Dispatchers.IO) { list(current) }
-    }
-
-    // warm the cache so scrolling never waits on a decode
-    LaunchedEffect(listing) {
-        val videos = listing?.videos ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) {
-            videos.forEach { app.thumbnails.load(it.uri.toString()) }
-        }
-    }
-
-    // fill in missing thumbnails while the library is open (libmpv is free then)
-    LaunchedEffect(listing) {
-        val videos = listing?.videos ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) {
-            for (video in videos) {
-                val uri = video.uri.toString()
-                val watched = app.prefs.position(uri)
-                val takenAt = app.prefs.thumbnailPosition(uri)
-                val wanted = if (watched > 0) watched else 0.0
-                // make one if it's missing, or refresh it when you've watched further on
-                val needed = !app.thumbnails.exists(uri) || kotlin.math.abs(takenAt - wanted) > 30.0
-                if (!needed) continue
-                if (!MpvOwner.tryAcquire("thumbnails")) return@withContext
-                try {
-                    val start = if (watched > 0) watched.toInt().toString() else "20%"
-                    if (ThumbnailGenerator.generate(context, uri, app.thumbnails, start)) {
-                        app.prefs.setThumbnailPosition(uri, wanted)
-                    }
-                } finally {
-                    MpvOwner.release("thumbnails")
-                }
-            }
-        }
-    }
+    val controlsVisible = remember { mutableStateOf(true) }
     DisposableEffect(Unit) {
         onDispose { ThumbnailGenerator.requestAbort() }
     }
 
-    val gridState = rememberLazyGridState()
-    // controls hide as you scroll into the grid and come back when you scroll up
-    var lastIndex by remember { mutableIntStateOf(0) }
-    var lastOffset by remember { mutableIntStateOf(0) }
-    val controlsVisible = remember { mutableStateOf(true) }
-    LaunchedEffect(gridState) {
-        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) ->
-                val scrollingDown = index > lastIndex || (index == lastIndex && offset > lastOffset + 8)
-                val scrollingUp = index < lastIndex || (index == lastIndex && offset < lastOffset - 8)
-                if (scrollingDown && index > 0) controlsVisible.value = false
-                if (scrollingUp) controlsVisible.value = true
-                lastIndex = index
-                lastOffset = offset
-            }
-    }
-
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
-            when {
-                root == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (root == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Choose the folder that holds your shows, e.g. Movies/Immersion.")
                         Button(onClick = { pickFolder.launch(null) }) { Text("Choose folder") }
                     }
                 }
-                listing == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                else -> {
-                    val entries = listing!!.let { l ->
-                        l.folders.map { Entry.Folder(it, l.episodeCounts[it.uri.toString()] ?: 0) } +
-                            l.videos.map { Entry.Video(it) }
-                    }
-                    if (entries.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nothing here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = GridCells.Adaptive(200.dp),
-                        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 56.dp, bottom = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        items(entries, key = {
-                            when (it) {
-                                is Entry.Folder -> it.file.uri.toString()
-                                is Entry.Video -> it.file.uri.toString()
-                            }
-                        }) { entry ->
-                            when (entry) {
-                                is Entry.Folder -> FolderCard(entry) { path = path + entry.file }
-                                is Entry.Video -> VideoCard(app, entry.file) {
-                                    onOpenVideo(entry.file, listing!!.all)
-                                }
-                            }
-                        }
+            } else if (!restoring) {
+                // each folder is its own grid, so one can slide out while the next slides in.
+                // Held back until the folder you were last in is known, so opening the app doesn't
+                // animate from the root to it.
+                AnimatedContent(
+                    targetState = path,
+                    contentKey = { it.lastOrNull()?.uri?.toString() },
+                    transitionSpec = { Motion.intoFolder(deeper = targetState.size >= initialState.size) },
+                    label = "folder",
+                ) { folder ->
+                    folder.lastOrNull()?.let {
+                        FolderGrid(
+                            app = app,
+                            folder = it,
+                            controlsVisible = controlsVisible,
+                            onOpenFolder = { child -> path = path + child },
+                            onOpenVideo = onOpenVideo,
+                        )
                     }
                 }
             }
@@ -261,10 +184,8 @@ fun LibraryScreen(
                 onUp = { path = path.dropLast(1) },
                 modifier = Modifier.align(Alignment.TopStart),
             )
-            LibraryMenu(
+            SettingsButton(
                 visible = controlsVisible,
-                hasFolder = root != null,
-                onPickFolder = { pickFolder.launch(null) },
                 onOpenSettings = onOpenSettings,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
@@ -288,16 +209,123 @@ fun LibraryScreen(
     }
 }
 
+/** The last listing of each folder, kept while the app runs so navigation doesn't wait on SAF. */
+private object LibraryCache {
+    private const val KEEP = 16
+    private val folders = object : LinkedHashMap<String, Listing>(0, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Listing>) = size > KEEP
+    }
+
+    operator fun get(uri: String): Listing? = synchronized(folders) { folders[uri] }
+
+    operator fun set(uri: String, listing: Listing) {
+        synchronized(folders) { folders[uri] = listing }
+    }
+}
+
+/** One folder's contents: its own listing, thumbnails and scroll position. */
 @Composable
-private fun MenuRow(label: String, onClick: () -> Unit) {
-    Text(
-        label,
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 13.dp),
-    )
+private fun FolderGrid(
+    app: App,
+    folder: DocumentFile,
+    controlsVisible: MutableState<Boolean>,
+    onOpenFolder: (DocumentFile) -> Unit,
+    onOpenVideo: (DocumentFile, List<DocumentFile>) -> Unit,
+) {
+    val context = LocalContext.current
+    // what this folder held last time, so coming back from a video paints at once; the listing is
+    // then refreshed in the background in case the folder has changed
+    var listing by remember(folder) { mutableStateOf(LibraryCache[folder.uri.toString()]) }
+    LaunchedEffect(folder) {
+        val fresh = withContext(Dispatchers.IO) { list(folder) }
+        LibraryCache[folder.uri.toString()] = fresh
+        listing = fresh
+    }
+
+    // warm the cache so scrolling never waits on a decode
+    LaunchedEffect(listing) {
+        val videos = listing?.let { it.videos + it.covers.values } ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            videos.forEach { app.thumbnails.load(it.uri.toString()) }
+        }
+    }
+
+    // fill in missing thumbnails while the library is open (libmpv is free then), folder covers too
+    LaunchedEffect(listing) {
+        val videos = listing?.let { it.videos + it.covers.values } ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            for (video in videos) {
+                val uri = video.uri.toString()
+                val watched = app.prefs.position(uri)
+                val takenAt = app.prefs.thumbnailPosition(uri)
+                val wanted = if (watched > 0) watched else 0.0
+                // make one if it's missing, or refresh it when you've watched further on
+                val needed = !app.thumbnails.exists(uri) || kotlin.math.abs(takenAt - wanted) > 30.0
+                if (!needed) continue
+                if (!MpvOwner.tryAcquire("thumbnails")) return@withContext
+                try {
+                    val start = if (watched > 0) watched.toInt().toString() else "20%"
+                    if (ThumbnailGenerator.generate(context, uri, app.thumbnails, start)) {
+                        app.prefs.setThumbnailPosition(uri, wanted)
+                    }
+                } finally {
+                    MpvOwner.release("thumbnails")
+                }
+            }
+        }
+    }
+
+    val gridState = rememberLazyGridState()
+    // controls hide as you scroll into the grid and come back when you scroll up
+    var lastIndex by remember { mutableIntStateOf(0) }
+    var lastOffset by remember { mutableIntStateOf(0) }
+    LaunchedEffect(gridState) {
+        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val scrollingDown = index > lastIndex || (index == lastIndex && offset > lastOffset + 8)
+                val scrollingUp = index < lastIndex || (index == lastIndex && offset < lastOffset - 8)
+                if (scrollingDown && index > 0) controlsVisible.value = false
+                if (scrollingUp) controlsVisible.value = true
+                lastIndex = index
+                lastOffset = offset
+            }
+    }
+
+    val shown = listing
+    if (shown == null) {
+        // the folder is listed on the IO thread; leave the space empty rather than flash a spinner
+        Box(Modifier.fillMaxSize())
+        return
+    }
+    val entries = shown.folders.map {
+        Entry.Folder(it, shown.episodeCounts[it.uri.toString()] ?: 0, shown.covers[it.uri.toString()])
+    } + shown.videos.map { Entry.Video(it) }
+    if (entries.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Nothing here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    LazyVerticalGrid(
+        state = gridState,
+        columns = GridCells.Adaptive(200.dp),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 56.dp, bottom = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        items(entries, key = {
+            when (it) {
+                is Entry.Folder -> it.file.uri.toString()
+                is Entry.Video -> it.file.uri.toString()
+            }
+        }) { entry ->
+            when (entry) {
+                is Entry.Folder -> FolderCard(app, entry) { onOpenFolder(entry.file) }
+                is Entry.Video -> VideoCard(app, entry.file) { onOpenVideo(entry.file, shown.all) }
+            }
+        }
+    }
 }
 
 /** Current folder, floating over the grid; tapping it goes up. */
@@ -335,75 +363,47 @@ private fun FolderChip(
 }
 
 @Composable
-private fun LibraryMenu(
-    visible: State<Boolean>,
-    hasFolder: Boolean,
-    onPickFolder: () -> Unit,
-    onOpenSettings: () -> Unit,
-    modifier: Modifier,
-) {
+private fun SettingsButton(visible: State<Boolean>, onOpenSettings: () -> Unit, modifier: Modifier) {
     AnimatedVisibility(visible = visible.value, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         Box(Modifier.safeDrawingPadding().padding(end = 10.dp, top = 8.dp)) {
-            val menuState = remember { MutableTransitionState(false) }
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
                 shape = CircleShape,
-                modifier = Modifier.clickable { menuState.targetState = true },
+                modifier = Modifier.clickable(onClick = onOpenSettings),
             ) {
-                Text(
-                    "⋯",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
-            // kept mounted until the close animation finishes
-            if (menuState.currentState || menuState.targetState) {
-                val density = LocalDensity.current
-                Popup(
-                    alignment = Alignment.TopEnd,
-                    offset = IntOffset(0, with(density) { 42.dp.roundToPx() }),
-                    onDismissRequest = { menuState.targetState = false },
-                    properties = PopupProperties(focusable = true),
-                ) {
-                    AnimatedVisibility(
-                        visibleState = menuState,
-                        enter = fadeIn(tween(120)) + scaleIn(tween(160), initialScale = 0.88f, transformOrigin = TransformOrigin(1f, 0f)),
-                        exit = fadeOut(tween(90)) + scaleOut(tween(120), targetScale = 0.9f, transformOrigin = TransformOrigin(1f, 0f)),
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(16.dp),
-                            shadowElevation = 12.dp,
-                        ) {
-                            Column(Modifier.width(260.dp).padding(vertical = 6.dp)) {
-                                MenuRow(if (hasFolder) "Change folder" else "Choose folder") {
-                                    menuState.targetState = false
-                                    onPickFolder()
-                                }
-                                MenuRow("Dictionaries & settings") {
-                                    menuState.targetState = false
-                                    onOpenSettings()
-                                }
-                            }
-                        }
-                    }
-                }
+                Box(Modifier.padding(10.dp)) { Cog(MaterialTheme.colorScheme.onSurface, diameter = 20.dp) }
             }
         }
     }
 }
 
-/** Current folder, floating over the grid; tapping it goes up. */
+/** A show: a frame from the first video in it, its name, and how many videos are inside. */
 @Composable
-private fun FolderCard(folder: Entry.Folder, onClick: () -> Unit) {
+private fun FolderCard(app: App, folder: Entry.Folder, onClick: () -> Unit) {
+    val thumbnail = folder.cover?.let { rememberThumbnail(app, it.uri.toString()) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("📁", fontSize = 22.sp, modifier = Modifier.width(38.dp))
-            Column(Modifier.weight(1f)) {
+        Column {
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Text("📁", fontSize = 26.sp)
+                }
+            }
+            Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Text(
                     folder.file.name.orEmpty(),
                     style = MaterialTheme.typography.titleMedium,
@@ -422,18 +422,25 @@ private fun FolderCard(folder: Entry.Folder, onClick: () -> Unit) {
     }
 }
 
+/** The cached frame for a video, kept up to date as thumbnails are generated. */
 @Composable
-private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
-    val uri = video.uri.toString()
-    val position = app.prefs.position(uri)
-    val duration = app.prefs.duration(uri)
-    val progress = if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
+private fun rememberThumbnail(app: App, uri: String): android.graphics.Bitmap? {
     var thumbnail by remember(uri) { mutableStateOf(app.thumbnails.cached(uri)) }
     // reloads only when this video's thumbnail changes
     val version = app.thumbnails.versions[uri] ?: 0L
     LaunchedEffect(uri, version) {
         thumbnail = withContext(Dispatchers.IO) { app.thumbnails.load(uri) }
     }
+    return thumbnail
+}
+
+@Composable
+private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
+    val uri = video.uri.toString()
+    val position = app.prefs.position(uri)
+    val duration = app.prefs.duration(uri)
+    val progress = if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
+    val thumbnail = rememberThumbnail(app, uri)
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -508,9 +515,15 @@ private fun list(folder: DocumentFile): Listing {
     val all = folder.listFiles().toList()
     val folders = all.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
     val videos = all.filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
-    // one level deep only: enough for "12 videos" under each show without a slow full scan
-    val counts = folders.associate { child ->
-        child.uri.toString() to runCatching { child.listFiles().count { it.isVideo() } }.getOrDefault(0)
+    // one level deep only: enough for "12 videos" and a cover under each show without a slow full scan
+    val inside = folders.associate { child ->
+        child.uri.toString() to runCatching {
+            child.listFiles().filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
+        }.getOrDefault(emptyList())
     }
-    return Listing(folders, videos, all, counts)
+    return Listing(
+        folders, videos, all,
+        episodeCounts = inside.mapValues { it.value.size },
+        covers = inside.mapNotNull { (uri, list) -> list.firstOrNull()?.let { uri to it } }.toMap(),
+    )
 }
