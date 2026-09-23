@@ -2,15 +2,11 @@ package io.github.immersionplayer.desktop
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
@@ -31,12 +27,14 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.immersionplayer.desktop.mpv.MpvPlayer
+import io.github.immersionplayer.ui.Motion
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.system.exitProcess
@@ -97,10 +95,10 @@ fun main(args: Array<String>) {
             if (event.type != KeyEventType.KeyDown) return false
             when (event.key) {
                 Key.Spacebar -> current.togglePause()
-                Key.J -> current.previousLine()
-                Key.K -> current.nextLine()
-                Key.H -> current.previousLine(stopAtEnd = true)
-                Key.L -> current.nextLine(stopAtEnd = true)
+                Key.H -> current.previousLine()
+                Key.L -> current.nextLine()
+                Key.J -> current.previousLine(stopAtEnd = true)
+                Key.K -> current.nextLine(stopAtEnd = true)
                 Key.Semicolon, Key.DirectionDown -> current.replayLine(stopAtEnd = true)
                 Key.Y -> current.seekBy(-5.0)
                 Key.O -> current.seekBy(5.0)
@@ -109,6 +107,7 @@ fun main(args: Array<String>) {
                 Key.U -> current.setAutoPause(!app.settings.autoPause)
                 Key.F -> toggleFullscreen()
                 Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
+                Key.A -> keys.onAddCard()
                 Key.DirectionLeft -> if (event.isShiftPressed) current.seekBy(-5.0) else current.previousLine()
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
                 Key.Escape -> if (windowState.placement == WindowPlacement.Fullscreen) toggleFullscreen() else closeVideo()
@@ -116,6 +115,10 @@ fun main(args: Array<String>) {
             }
             return true
         }
+
+        // the Dock icon of a dev run; a packaged app takes it from the bundle instead
+        val appIcon = painterResource("icon.png")
+        LaunchedEffect(Unit) { setDockIcon() }
 
         Window(
             onCloseRequest = {
@@ -125,6 +128,7 @@ fun main(args: Array<String>) {
             },
             state = windowState,
             title = (screen as? Screen.Player)?.video?.nameWithoutExtension ?: "Immersion Player",
+            icon = appIcon,
             onPreviewKeyEvent = ::onKey,
         ) {
             if (isMac) {
@@ -163,11 +167,7 @@ fun main(args: Array<String>) {
                         targetState = screen,
                         contentKey = { if (it is Screen.Player) it else Screen.Library::class },
                         transitionSpec = {
-                            if (targetState is Screen.Player) {
-                                (fadeIn(fade) + scaleIn(fade, initialScale = 0.97f)) togetherWith fadeOut(fade)
-                            } else {
-                                fadeIn(fade) togetherWith (fadeOut(fade) + scaleOut(fade, targetScale = 0.97f))
-                            }
+                            if (targetState is Screen.Player) Motion.intoPlayer() else Motion.outOfPlayer()
                         },
                         label = "player",
                     ) { s ->
@@ -210,66 +210,70 @@ private fun bench(path: String, width: Int) {
     exitProcess(0)
 }
 
-private val fade = tween<Float>(220, easing = FastOutSlowInEasing)
-private val slide = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+// the transitions themselves are shared with the Android app, in Motion
+private val fade = Motion.fade
+private val slide = Motion.slide
 
 /**
- * Library and settings: a header bar that stays put (its content crossfades between library and
- * settings, and changes in place between folders) over a body that slides. Deeper folders and
- * settings come in from the right.
+ * Library and settings. Each is a whole screen of its own, and one crossfades into the other:
+ * settings brings a sidebar, so the two don't share a layout to animate within. Inside the
+ * library, moving between folders slides the body under a header that stays put.
  */
 @Composable
 private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, onOpenVideo: (File, File?) -> Unit) {
-    Chrome(
-        header = {
-            AnimatedContent(
-                targetState = screen,
-                contentKey = { it::class },
-                transitionSpec = { fadeIn(fade) togetherWith fadeOut(fade) },
-                label = "header",
-            ) { s ->
-                when (s) {
-                    is Screen.Library -> LibraryHeader(
-                        app, s.folder,
+    // which settings pane is open: kept out of Screen so switching pane doesn't animate the screen
+    var pane by remember { mutableStateOf(SettingsPane.General) }
+    // the folder the library is in, kept so it still shows it while it fades out under settings
+    var library by remember { mutableStateOf(screen as? Screen.Library ?: Screen.Library(null)) }
+    (screen as? Screen.Library)?.let { library = it }
+
+    Crossfade(targetState = screen is Screen.Settings, animationSpec = fade, label = "settings") { settings ->
+        if (settings) {
+            Chrome(
+                header = { SettingsHeader(pane) },
+                body = { SettingsBody(app, pane) },
+                // the panes live in a sidebar that runs the whole height, under the lights
+                leading = { SettingsSidebar(pane, onPane = { pane = it }, onBack = { navigate(library) }) },
+            )
+        } else {
+            Chrome(
+                header = {
+                    LibraryHeader(
+                        app, library.folder,
                         onOpenFolder = { navigate(Screen.Library(it)) },
-                        onOpenSettings = { navigate(Screen.Settings(s)) },
+                        onOpenSettings = { navigate(Screen.Settings(library)) },
                     )
-                    is Screen.Settings -> SettingsHeader(onBack = { navigate(s.from) })
-                    is Screen.Player -> Unit
-                }
-            }
-        },
-        body = {
-            AnimatedContent(
-                modifier = Modifier.fillMaxSize(),
-                targetState = screen,
-                transitionSpec = { bodyTransition(initialState, targetState) },
-                label = "body",
-            ) { s ->
-                when (s) {
-                    is Screen.Library -> LibraryBody(
-                        app, s.folder,
-                        onOpenFolder = { navigate(Screen.Library(it)) },
-                        onOpenVideo = { onOpenVideo(it, s.folder ?: it.parentFile) },
-                    )
-                    is Screen.Settings -> SettingsBody(app)
-                    is Screen.Player -> Unit
-                }
-            }
-        },
-    )
+                },
+                body = {
+                    AnimatedContent(
+                        modifier = Modifier.fillMaxSize(),
+                        targetState = library,
+                        transitionSpec = { folderTransition(initialState, targetState) },
+                        label = "folder",
+                    ) { s ->
+                        LibraryBody(
+                            app, s.folder,
+                            onOpenFolder = { navigate(Screen.Library(it)) },
+                            onOpenVideo = { onOpenVideo(it, s.folder ?: it.parentFile) },
+                        )
+                    }
+                },
+            )
+        }
+    }
 }
 
-private fun bodyTransition(from: Screen, to: Screen): ContentTransform {
-    fun horizontal(forward: Boolean) =
-        (slideInHorizontally(slide) { if (forward) it / 6 else -it / 6 } + fadeIn(fade)) togetherWith
-            (slideOutHorizontally(slide) { if (forward) -it / 6 else it / 6 } + fadeOut(fade))
-    return when {
-        from is Screen.Library && to is Screen.Library -> {
-            val deeper = to.folder != null && (from.folder == null || to.folder.path.startsWith(from.folder.path + File.separator))
-            horizontal(forward = deeper)
-        }
-        to is Screen.Settings -> horizontal(forward = true)
-        else -> horizontal(forward = false)
+/** Deeper folders come in from the right, the way back from the left. */
+private fun folderTransition(from: Screen.Library, to: Screen.Library): ContentTransform =
+    Motion.intoFolder(
+        deeper = to.folder != null &&
+            (from.folder == null || to.folder.path.startsWith(from.folder.path + File.separator)),
+    )
+
+/** macOS reads the Dock icon from the bundle, so an unpackaged run has to set it itself. */
+private fun setDockIcon() {
+    runCatching {
+        val url = object {}.javaClass.getResource("/icon.png") ?: return
+        java.awt.Taskbar.getTaskbar().iconImage = javax.imageio.ImageIO.read(url)
     }
 }

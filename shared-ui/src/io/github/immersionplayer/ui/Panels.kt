@@ -168,6 +168,8 @@ fun DictionaryPanel(
     noDictionariesMessage: String =
         "No dictionaries yet. Import a Yomitan dictionary (e.g. Jitendex) under Dictionaries & settings.",
     nothingFoundMessage: String = "Nothing to look up here. Tap or drag across a word to try another spot.",
+    /** Drawn at the end of each entry's headword, e.g. a button that makes a card of it. */
+    entryAction: (@Composable (TermEntry) -> Unit)? = null,
 ) {
     val colors = GlossaryColors(
         tag = MaterialTheme.colorScheme.secondary,
@@ -184,7 +186,7 @@ fun DictionaryPanel(
             result.entries.isEmpty() -> Message(nothingFoundMessage)
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(result.entries) { _, entry ->
-                    TermCard(entry, colors)
+                    TermCard(entry, colors, entryAction)
                     HorizontalDivider()
                 }
             }
@@ -200,7 +202,7 @@ private fun Message(text: String) {
 }
 
 @Composable
-private fun TermCard(entry: TermEntry, colors: GlossaryColors) {
+private fun TermCard(entry: TermEntry, colors: GlossaryColors, action: (@Composable (TermEntry) -> Unit)?) {
     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
@@ -209,6 +211,7 @@ private fun TermCard(entry: TermEntry, colors: GlossaryColors) {
                 }
                 Text(entry.expression, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
             }
+            action?.invoke(entry)
         }
         if (entry.reasons.isNotEmpty() || entry.frequencies.isNotEmpty() || entry.pitchPositions.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

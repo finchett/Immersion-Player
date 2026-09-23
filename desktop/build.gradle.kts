@@ -34,6 +34,8 @@ tasks.test {
     systemProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib:/usr/lib")
     System.getenv("IMMERSION_TEST_VIDEO")?.let { environment("IMMERSION_TEST_VIDEO", it) }
     System.getenv("IMMERSION_TEST_SHOTS")?.let { environment("IMMERSION_TEST_SHOTS", it) }
+    // an AnkiConnect to read note types and decks from (read only); the Anki pane is tested offline without it
+    System.getenv("IMMERSION_TEST_ANKI")?.let { environment("IMMERSION_TEST_ANKI", it) }
 }
 
 compose.desktop {
@@ -57,13 +59,17 @@ compose.desktop {
             modules("java.instrument", "java.prefs", "java.sql", "jdk.unsupported")
             // libmpv and its libraries, bundled per OS by bundleLibmpv
             appResourcesRootDir.set(layout.buildDirectory.dir("native"))
+            // the Android launcher icon, rebuilt for each platform by scripts/make-icons.sh
             macOS {
+                iconFile.set(project.file("icons/icon.icns"))
                 // jpackage refuses a 0.x version on macOS; packageMacRelease writes the real one
                 packageVersion = "1.0.0"
                 bundleID = "io.github.immersionplayer.desktop"
                 appCategory = "public.app-category.education"
                 minimumSystemVersion = "12.0"
             }
+            windows { iconFile.set(project.file("icons/icon.ico")) }
+            linux { iconFile.set(project.file("src/main/resources/icon.png")) }
         }
     }
 }
@@ -87,6 +93,9 @@ val packageMacRelease by tasks.registering(Exec::class) {
     val version = "0.2.0"
     val app = layout.buildDirectory.dir("compose/binaries/main/app/Immersion Player.app")
     val out = layout.buildDirectory.file("release/Immersion-Player-$version-macos-arm64.dmg")
+    inputs.dir(app)
+    inputs.file("scripts/package-dmg-macos.sh")
+    inputs.property("version", version)
     outputs.file(out)
     commandLine("scripts/package-dmg-macos.sh", app.get().asFile.path, version, out.get().asFile.path)
 }
