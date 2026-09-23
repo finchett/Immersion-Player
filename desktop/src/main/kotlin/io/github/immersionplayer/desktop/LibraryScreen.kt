@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.library.NaturalOrder
 import io.github.immersionplayer.library.episodeNumber
 import io.github.immersionplayer.library.isVideoName
+import io.github.immersionplayer.ui.Cog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -96,7 +97,7 @@ fun LibraryHeader(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, 
                 }
             }
         }
-        TextAction("Settings", onClick = onOpenSettings)
+        IconAction(onClick = onOpenSettings) { Cog(it) }
     }
 }
 

@@ -8,10 +8,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
@@ -26,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -35,6 +38,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.immersionplayer.ui.AppTheme
+import io.github.immersionplayer.ui.Cog
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 
@@ -166,12 +170,40 @@ fun TextAction(
     )
 }
 
-/** A header bar that stays put, a hairline, and the body below it. */
+/** An action drawn as an icon rather than a word, with the same hover tint as [TextAction]. */
 @Composable
-fun Chrome(header: @Composable () -> Unit, body: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(start = HeaderStart, end = 12.dp)) { header() }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Box(Modifier.fillMaxSize()) { body() }
+fun IconAction(onClick: () -> Unit, modifier: Modifier = Modifier, icon: @Composable (Color) -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Box(
+        modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (hovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+            .hoverable(interaction)
+            .clickable(interaction, indication = null, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(5.dp),
+    ) {
+        icon(if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * A header bar that stays put, a hairline, and the body below it. A screen with a sidebar passes
+ * it as [leading]: it runs the full height, the traffic lights sit over its top, and the header
+ * and its hairline start where it ends.
+ */
+@Composable
+fun Chrome(header: @Composable () -> Unit, body: @Composable () -> Unit, leading: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        leading?.invoke()
+        Column(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxWidth().height(HeaderHeight)
+                    .padding(start = if (leading == null) HeaderStart else 32.dp, end = 12.dp),
+            ) { header() }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Box(Modifier.fillMaxSize()) { body() }
+        }
     }
 }

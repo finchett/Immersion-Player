@@ -180,6 +180,10 @@ class PlayerSession(
         playLine(target.coerceAtLeast(0))
     }
 
+    /**
+     * Forward one line, always jumping to it. Unlike the desktop keys, a swipe doesn't carry on
+     * from a pause: a tap already means play, so "next" can just mean next.
+     */
     fun nextLine() {
         val cues = _primary.value?.cues ?: return
         playLine((_lineIndex.value + 1).coerceAtMost(cues.lastIndex))

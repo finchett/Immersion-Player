@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Android launcher icon (app/src/main/res/drawable/ic_launcher_foreground.xml) on the
+     macOS icon grid: the play button over a "highlighted word" pill. Its 72 dp safe zone is
+     mapped onto the 824 px rounded square, leaving the usual 100 px margin. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="#111316"/>
+  <g transform="translate(-106 -106) scale(11.444444)">
+    <path fill="#4F7BE0" fill-opacity="0.4"
+          d="M36,63h36a8,8 0,0 1,8 8v0a8,8 0,0 1,-8 8h-36a8,8 0,0 1,-8 -8v0a8,8 0,0 1,8 -8z"/>
+    <path fill="#8AB4F8"
+          d="M45.5,30.5L67.5,44.2Q70,45.8 67.5,47.4L45.5,61.1Q42.5,63 42.5,59.4L42.5,32.2Q42.5,28.6 45.5,30.5Z"/>
+    <path fill="#FFFFFF"
+          d="M40,69.5h28a1.5,1.5 0,0 1,0 3h-28a1.5,1.5 0,0 1,0 -3z"/>
+  </g>
+</svg>

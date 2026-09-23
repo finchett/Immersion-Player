@@ -1,12 +1,12 @@
 package io.github.immersionplayer.ui
 
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -49,8 +48,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryInfo
@@ -173,6 +176,42 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                     }
                 }
 
+                SettingsSection("Library") {
+                    var folderName by remember { mutableStateOf(libraryFolderName(context, app.prefs.libraryTreeUri)) }
+                    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+                        if (uri != null) {
+                            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            app.prefs.libraryTreeUri = uri.toString()
+                            // the folder you were last in belongs to the old library
+                            app.prefs.libraryPath = null
+                            folderName = libraryFolderName(context, uri.toString())
+                        }
+                    }
+                    SettingRow(
+                        title = "Media folder",
+                        description = folderName ?: "No folder chosen",
+                    ) {
+                        OutlinedButton(onClick = { pickFolder.launch(null) }) {
+                            Text(if (folderName == null) "Choose…" else "Change…")
+                        }
+                    }
+                }
+
+                SettingsSection("Languages") {
+                    LanguageRow(
+                        title = "Studying",
+                        selected = app.prefs.targetLanguage,
+                        allowNone = false,
+                    ) { it?.let { code -> app.prefs.targetLanguage = code } }
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    LanguageRow(
+                        title = "Peek language",
+                        description = "Hold the line to show subtitles in this language.",
+                        selected = app.prefs.peekLanguage,
+                        allowNone = true,
+                    ) { app.prefs.peekLanguage = it }
+                }
+
                 SettingsSection("Playback") {
                     SettingSwitchRow(
                         title = "Stop at the end of each line",
@@ -201,6 +240,24 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                         onValueChangeFinished = { app.prefs.subtitleSize = size },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
+                    Box(
+                        Modifier
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)
+                            .fillMaxWidth()
+                            .height(96.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF16181C)),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        Text(
+                            "今日はいい天気ですね",
+                            color = Color.White,
+                            fontSize = size.sp,
+                            lineHeight = (size * 1.2f).sp,
+                            maxLines = 1,
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                    }
                 }
 
                 SettingsSection("Appearance") {
@@ -213,20 +270,13 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
+                            ThemeSwatch("System", null, app.appearance.theme == null) {
+                                app.appearance.updateTheme(null)
+                            }
                             AppTheme.entries.forEach { theme ->
-                                FilterChip(
-                                    selected = app.appearance.theme == theme,
-                                    onClick = { app.appearance.updateTheme(theme) },
-                                    leadingIcon = {
-                                        Box(
-                                            Modifier
-                                                .size(16.dp)
-                                                .background(theme.scheme.background, CircleShape)
-                                                .border(3.dp, theme.scheme.primary, CircleShape),
-                                        )
-                                    },
-                                    label = { Text(theme.label) },
-                                )
+                                ThemeSwatch(theme.label, theme, app.appearance.theme == theme) {
+                                    app.appearance.updateTheme(theme)
+                                }
                             }
                         }
                     }
@@ -257,6 +307,13 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                         Column { ShoulderTriggerSettings(app) }
                     }
                 }
+
+                val version = remember {
+                    runCatching {
+                        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                    }.getOrNull() ?: ""
+                }
+                AppFooter(version)
 
                 Text(
                     "Bundled dictionary: JMdict, © Electronic Dictionary Research and Development Group, used " +
@@ -445,4 +502,11 @@ private fun ShoulderTriggerSettings(app: App) {
             }
         }
     }
+}
+
+/** The name of the library folder behind a tree URI, or null when there isn't one. */
+private fun libraryFolderName(context: android.content.Context, treeUri: String?): String? {
+    val uri = treeUri ?: return null
+    return runCatching { DocumentFile.fromTreeUri(context, Uri.parse(uri))?.takeIf { it.canRead() }?.name }
+        .getOrNull() ?: Uri.parse(uri).lastPathSegment
 }

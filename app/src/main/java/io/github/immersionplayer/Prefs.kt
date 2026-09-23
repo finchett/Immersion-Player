@@ -17,6 +17,16 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("shoulder_triggers", true)
         set(value) = prefs.edit { putBoolean("shoulder_triggers", value) }
 
+    /** The language you are studying: the line track is chosen in it. */
+    var targetLanguage: String
+        get() = prefs.getString("target_language", "ja") ?: "ja"
+        set(value) = prefs.edit { putString("target_language", value) }
+
+    /** The language a hold on the line reveals, or null for none. */
+    var peekLanguage: String?
+        get() = prefs.getString("peek_language", "en")?.takeIf { it.isNotEmpty() }
+        set(value) = prefs.edit { putString("peek_language", value ?: "") }
+
     var theme: String?
         get() = prefs.getString("theme", null)
         set(value) = prefs.edit { putString("theme", value) }
