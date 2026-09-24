@@ -1,5 +1,8 @@
 package io.github.immersionplayer.ui
 
+import io.github.immersionplayer.anki.MinedWord
+import io.github.immersionplayer.anki.PhoneCardMedia
+import `is`.xyz.mpv.MPVLib
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -1050,6 +1053,19 @@ private fun StudyPanel(
                             lookup = lookup,
                             hasDictionaries = hasDictionaries,
                             setupStatus = dictionarySetup,
+                            entryAction = if (app.prefs.ankiEnabled) {
+                                { entry ->
+                                    val word = minedWord(session, lookup, entry)
+                                    CardButton(
+                                        added = word != null && app.anki.isAdded(word),
+                                        enabled = word != null,
+                                        onAdd = { word?.let { addCard(app, session, it) } },
+                                        onRemove = { word?.let(app.anki::remove) },
+                                        size = 26.dp,
+                                        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                                    )
+                                }
+                            } else null,
                         )
                     } else if (dictionarySetup != null) {
                         Text(
@@ -1062,15 +1078,23 @@ private fun StudyPanel(
                 }
             }
 
+            // the stop-at-end notice, or what adding a card is doing; the last one stays while it fades
+            val ankiStatus by app.anki.status.collectAsState()
+            val message = notice ?: ankiStatus?.message
+            val shown = remember { object { var text = ""; var failed = false } }
+            if (message != null) {
+                shown.text = message
+                shown.failed = notice == null && ankiStatus is AnkiCards.Status.Failed
+            }
             AnimatedVisibility(
-                visible = notice != null,
+                visible = message != null,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).zIndex(2f),
             ) {
                 Text(
-                    notice.orEmpty(),
-                    color = Color.White,
+                    shown.text,
+                    color = if (shown.failed) Color(0xFFFFB4AB) else Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
                         .background(Color(0xE0303338), RoundedCornerShape(20.dp))
@@ -1262,4 +1286,25 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
 private fun trackLabel(track: SubtitleTrack): String {
     val language = track.language?.let { " · $it" }.orEmpty()
     return "${track.name}$language · ${track.cues.size} lines"
+}
+
+/** The looked-up [entry] in its line, with the line's times in the video's clock. */
+private fun minedWord(session: PlayerSession, lookup: ActiveLookup, entry: TermEntry): MinedWord? {
+    val cue = session.primary.value?.cues?.getOrNull(lookup.lineIndex)?.takeIf { it.text == lookup.text } ?: return null
+    val offset = session.offset.value
+    return MinedWord(
+        sentence = cue.text,
+        wordStart = lookup.start,
+        wordLength = entry.sourceLength,
+        entry = entry,
+        translation = session.secondary.value?.translationFor(cue.start, cue.end),
+        videoName = session.videoName.substringBeforeLast('.'),
+        start = cue.start + offset,
+        end = cue.end + offset,
+    )
+}
+
+private fun addCard(app: App, session: PlayerSession, word: MinedWord) {
+    val audioTrack = runCatching { MPVLib.getPropertyString("aid")?.toIntOrNull() }.getOrNull()
+    app.anki.add(word, PhoneCardMedia(app, app.prefs, session.videoUri, audioTrack))
 }

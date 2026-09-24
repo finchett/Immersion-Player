@@ -55,7 +55,7 @@ object CardFormats {
             "VocabFurigana" to CardSource.WordFurigana,
             "VocabPitchPattern" to CardSource.PitchAccent,
             "VocabPitchNum" to CardSource.None,
-            "VocabDef" to CardSource.Definition,
+            "VocabDef" to CardSource.ShortDefinition,
             "VocabAudio" to CardSource.None,
             "Image" to CardSource.Screenshot,
             "Notes" to CardSource.Source,
@@ -66,11 +66,35 @@ object CardFormats {
 
     val presets = listOf(JapaneseSentencesPlus)
 
-    /** A preset whose note type and fields match, otherwise a mapping guessed from field names. */
+    /** Presets as earlier versions had them, so a setup nobody changed follows the new ones. */
+    private val formerPresets = listOf(
+        // before the short definition was the default
+        JapaneseSentencesPlus.copy(fields = JapaneseSentencesPlus.fields + ("VocabDef" to CardSource.Definition)),
+    )
+
+    /** [saved], or the current preset if [saved] is an earlier version of it left as it was. */
+    fun upgrade(saved: CardFormat): CardFormat {
+        val former = formerPresets.firstOrNull { it.fields == saved.fields } ?: return saved
+        return presets.first { it.noteType == former.noteType }.copy(noteType = saved.noteType)
+    }
+
+    /**
+     * Where to get Japanese sentences(+): Ajatt-Tools' example deck on AnkiWeb, which brings the
+     * note type with it (named "Japanese sentences"), and the note type's own page.
+     */
+    const val SENTENCES_DECK_URL = "https://ankiweb.net/shared/info/1557722832"
+    const val SENTENCES_SOURCE_URL = "https://github.com/Ajatt-Tools/AnkiNoteTypes/tree/main/templates/Japanese%20sentences"
+
+    /** Names the presets go by: mpvacious users often keep a "+" copy of Japanese sentences. */
+    private val presetNames = listOf("Japanese sentences+", "Japanese sentences")
+
+    /** The note type to start with: a known one if the collection has it. */
+    fun pick(noteTypes: List<String>): String? =
+        presetNames.firstNotNullOfOrNull { name -> noteTypes.firstOrNull { it.equals(name, ignoreCase = true) } }
+
+    /** A preset whose fields match (whatever the note type is called), otherwise a mapping guessed from field names. */
     fun forNoteType(noteType: String, fieldNames: List<String>): CardFormat {
-        val preset = presets.firstOrNull {
-            it.noteType.equals(noteType, ignoreCase = true) && it.fields.keys == fieldNames.toSet()
-        }
+        val preset = presets.firstOrNull { it.fields.keys == fieldNames.toSet() }
         if (preset != null) return preset.copy(noteType = noteType)
         val used = mutableSetOf<CardSource>()
         return CardFormat(noteType, fieldNames.associateWith { name ->

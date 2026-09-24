@@ -68,22 +68,33 @@ for a stop again with `j`, `k` or `;`.
 - Every new line is looked up automatically — first kanji found, skipping speaker names and
   bracketed readings, falling through candidates until one hits.
 
-## Anki cards (desktop)
+## Anki cards
 
-Off by default; turn it on under Settings › Anki. Press `a`, or **+ Anki** on any entry, and the
-word goes to Anki through [AnkiConnect](https://ankiweb.net/shared/info/2055492159) (Anki has to
-be open) with:
+Off by default; turn it on under Settings › Anki. Tap or click the round **+** on a dictionary
+entry (or press `a` on desktop) and the word goes to Anki with:
 
 - the line, the word in bold, and the peek-language line as its translation
-- the word, its reading as Anki furigana, pitch accent graphs and the first dictionary's definition
+- the word, its reading as Anki furigana, pitch accent graphs, and a short definition ("first day, opening day or premiere"; the full one is an option)
 - the line's audio, 0.3 s either side, as mono Opus (about 4 KB a second)
-- the line as an animated AVIF at 360 px (plays like a GIF), or a still of the frame on screen
+- a picture: on desktop the line as an animated AVIF at 360 px (plays like a GIF) or a still;
+  on Android a WebP still of the frame on screen
 - the episode and time
 
+The **+** turns into a **−**, which takes the card out again. Duplicates (same first field in the
+deck) are refused before anything is cut.
+
+- **Desktop** adds through [AnkiConnect](https://ankiweb.net/shared/info/2055492159), so Anki has
+  to be open. Media are cut by a separate headless mpv from the file itself, so playback isn't
+  interrupted.
+- **Android** adds straight into AnkiDroid, which doesn't need to be open; the app asks for
+  AnkiDroid's permission when cards are turned on. The audio is cut with Android's own codecs,
+  since the player has the app's one libmpv.
+
 Any note type works: pick it, then choose what fills each field. mpvacious's *Japanese
-sentences+* is set up field by field; other note types get a guess from their field names.
-Media are cut by a separate headless mpv from the file itself, so playback isn't interrupted.
-Duplicates (same first field in the deck) are refused before anything is cut.
+sentences* note type (often kept as *Japanese sentences+*) is set up field by field; get it with
+its [example deck on AnkiWeb](https://ankiweb.net/shared/info/1557722832) or from
+[Ajatt-Tools](https://github.com/Ajatt-Tools/AnkiNoteTypes/tree/main/templates/Japanese%20sentences).
+Other note types get a guess from their field names.
 
 ## Playback
 

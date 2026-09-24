@@ -1,6 +1,8 @@
 package io.github.immersionplayer.desktop
 
 import com.sun.jna.Pointer
+import io.github.immersionplayer.anki.CardMedia
+import io.github.immersionplayer.anki.MinedWord
 import io.github.immersionplayer.desktop.mpv.MpvLib
 import java.io.File
 import java.util.Locale
@@ -9,7 +11,7 @@ import java.util.Locale
  * The sentence audio and screenshot of a card, each cut by its own headless mpv from the video
  * file (not from what the player shows), so the player carries on undisturbed.
  */
-object CardMedia {
+object VideoClips {
 
     /** [start]..[end] of the video's audio as mono Opus in Ogg: about 4 KB a second. */
     fun audioClip(video: File, start: Double, end: Double, audioTrack: String?, out: File): Boolean = run(
@@ -62,6 +64,25 @@ object CardMedia {
     )
 
     private const val MAX_ANIMATION = 10.0
+
+    /** A card's media from [video]: the line's audio, and the line animated or the frame at [frameAt]. */
+    class ForCard(
+        private val settings: Settings,
+        private val video: File,
+        private val audioTrack: String?,
+        private val frameAt: Double,
+    ) : CardMedia {
+        override val imageExtension = "avif"
+
+        override fun audio(word: MinedWord, out: File): Boolean {
+            val padding = settings.ankiAudioPadding
+            return audioClip(video, word.start - padding, word.end + padding, audioTrack, out)
+        }
+
+        override fun image(word: MinedWord, out: File): Boolean =
+            if (settings.ankiImageAnimated) animation(video, word.start, word.end, settings.ankiImageHeight, out)
+            else screenshot(video, frameAt, settings.ankiImageHeight, out)
+    }
 
     // mpv reads a decimal point whatever the system's locale writes
     private fun seconds(value: Double) = String.format(Locale.ROOT, "%.3f", value.coerceAtLeast(0.0))

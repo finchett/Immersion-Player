@@ -75,6 +75,7 @@ import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
 import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.ui.AppTheme
+import io.github.immersionplayer.ui.NoteTypeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -438,15 +439,14 @@ private fun AnkiPane(app: DesktopApp) {
             runCatching {
                 val anki = AnkiConnect(settings.ankiUrl)
                 anki.version()
-                AnkiCollection(anki.modelNames(), anki.deckNames())
+                AnkiCollection(anki.noteTypes(), anki.decks())
             }
         }
         collection = result
         // first time: the note type of a format known field by field, if the collection has one
         val noteTypes = result.getOrNull()?.noteTypes.orEmpty()
         if (settings.ankiNoteType == null) {
-            noteTypes.firstOrNull { name -> CardFormats.presets.any { it.noteType.equals(name, ignoreCase = true) } }
-                ?.let(settings::updateAnkiNoteType)
+            CardFormats.pick(noteTypes)?.let(settings::updateAnkiNoteType)
         }
     }
 
@@ -458,7 +458,7 @@ private fun AnkiPane(app: DesktopApp) {
         val noteType = settings.ankiNoteType ?: return@LaunchedEffect
         if (connected == null) return@LaunchedEffect
         val names = withContext(Dispatchers.IO) {
-            runCatching { AnkiConnect(settings.ankiUrl).modelFieldNames(noteType) }.getOrNull()
+            runCatching { AnkiConnect(settings.ankiUrl).fieldNames(noteType) }.getOrNull()
         } ?: return@LaunchedEffect
         val saved = settings.cardFormat(noteType)
         if (saved == null || saved.fields.keys != names.toSet()) {
@@ -480,7 +480,7 @@ private fun AnkiPane(app: DesktopApp) {
         Card {
             ToggleRow(
                 "Make Anki cards",
-                "Press A in the player, or + Anki on a word",
+                "Press A in the player, or + on a word. Anki has to be open",
                 settings.ankiEnabled, settings::updateAnkiEnabled,
             )
             if (settings.ankiEnabled) {
@@ -534,12 +534,17 @@ private fun AnkiPane(app: DesktopApp) {
                 TextInput(settings.ankiTags, settings::updateAnkiTags, width = 220.dp)
             }
         }
+        NoteTypeSource(
+            if (CardFormats.pick(connected.noteTypes) != null) "Cards are set up for Japanese sentences, the mpvacious note type."
+            else "Cards are set up for Japanese sentences, the mpvacious note type, which isn't in your collection.",
+            Modifier.padding(start = 2.dp, top = 8.dp),
+        )
     }
 
     val noteType = settings.ankiNoteType
     val format = settings.ankiFormat
     if (noteType != null && format != null && fields.isNotEmpty()) {
-        val preset = CardFormats.presets.any { it.noteType.equals(noteType, ignoreCase = true) }
+        val preset = CardFormats.presets.any { it.fields.keys == fields.toSet() }
         Section("Fields", note = if (preset) "A known format: set up already" else "Guessed from the field names") {
             Card {
                 fields.forEachIndexed { index, field ->

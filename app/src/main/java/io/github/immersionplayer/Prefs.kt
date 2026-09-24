@@ -2,6 +2,11 @@ package io.github.immersionplayer
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.immersionplayer.anki.AnkiException
+import io.github.immersionplayer.anki.CardFormat
+import io.github.immersionplayer.anki.CardFormats
+import io.github.immersionplayer.anki.CardTarget
+import org.json.JSONObject
 
 class Prefs(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -78,6 +83,55 @@ class Prefs(context: Context) {
     var subtitleSize: Float
         get() = prefs.getFloat("subtitle_size", 26f)
         set(value) = prefs.edit { putFloat("subtitle_size", value) }
+
+    // --- Anki cards, through AnkiDroid ---
+
+    /** Making Anki cards from the player: off until turned on in settings. */
+    var ankiEnabled: Boolean
+        get() = prefs.getBoolean("anki_enabled", false)
+        set(value) = prefs.edit { putBoolean("anki_enabled", value) }
+
+    var ankiDeck: String?
+        get() = prefs.getString("anki_deck", null)
+        set(value) = prefs.edit { putString("anki_deck", value) }
+
+    var ankiNoteType: String?
+        get() = prefs.getString("anki_note_type", null)
+        set(value) = prefs.edit { putString("anki_note_type", value) }
+
+    /** Tags for new cards, separated by spaces. */
+    var ankiTags: String
+        get() = prefs.getString("anki_tags", "immersion-player") ?: ""
+        set(value) = prefs.edit { putString("anki_tags", value) }
+
+    /** Seconds of audio kept before and after the line. */
+    var ankiAudioPadding: Float
+        get() = prefs.getFloat("anki_audio_padding", 0.3f)
+        set(value) = prefs.edit { putFloat("anki_audio_padding", value) }
+
+    /** Height of the screenshot in pixels. */
+    var ankiImageHeight: Int
+        get() = prefs.getInt("anki_image_height", 360)
+        set(value) = prefs.edit { putInt("anki_image_height", value) }
+
+    /** How each note type's fields are filled, by note type. */
+    private var ankiFormats: JSONObject
+        get() = runCatching { JSONObject(prefs.getString("anki_formats", "{}")!!) }.getOrElse { JSONObject() }
+        set(value) = prefs.edit { putString("anki_formats", value.toString()) }
+
+    fun cardFormat(noteType: String): CardFormat? =
+        ankiFormats.optJSONObject(noteType)?.let { CardFormats.upgrade(CardFormat.fromJson(noteType, it)) }
+
+    fun saveCardFormat(format: CardFormat) {
+        ankiFormats = ankiFormats.put(format.noteType, format.toJson())
+    }
+
+    /** Where new cards go, or an [AnkiException] saying what still has to be chosen. */
+    fun cardTarget(): CardTarget {
+        val format = ankiNoteType?.let(::cardFormat) ?: throw AnkiException("Choose a note type in settings, under Anki")
+        val deck = ankiDeck ?: throw AnkiException("Choose a deck in settings, under Anki")
+        return CardTarget(format, deck, ankiTags.split(' ', '\u3000').filter { it.isNotBlank() })
+    }
 
     /** Position a video's library thumbnail was taken at, to know when to refresh it. */
     fun thumbnailPosition(uri: String): Double = perVideo.getFloat("thumbpos:$uri", -1f).toDouble()
