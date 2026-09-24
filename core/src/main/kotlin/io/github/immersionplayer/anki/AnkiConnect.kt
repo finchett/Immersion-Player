@@ -8,23 +8,24 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.util.Base64
 
-class AnkiException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class AnkiException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * The AnkiConnect add-on's HTTP API (version 6). The same API is served by desktop Anki with
  * AnkiConnect installed and by AnkiConnect Android, so this works against either.
  */
-class AnkiConnect(private val url: String = DEFAULT_URL) {
+class AnkiConnect(private val url: String = DEFAULT_URL) : AnkiBackend {
 
     fun version(): Int = call("version") as Int
 
-    fun deckNames(): List<String> = strings(call("deckNames"))
+    override fun decks(): List<String> = strings(call("deckNames"))
 
-    fun modelNames(): List<String> = strings(call("modelNames"))
+    override fun noteTypes(): List<String> = strings(call("modelNames"))
 
-    /** Field names of a note type, in order. */
-    fun modelFieldNames(model: String): List<String> =
-        strings(call("modelFieldNames", JSONObject().put("modelName", model)))
+    override fun fieldNames(noteType: String): List<String> =
+        strings(call("modelFieldNames", JSONObject().put("modelName", noteType)))
+
+    override fun storeMedia(file: java.io.File): String = storeMediaFile(file.name, file.readBytes())
 
     /** Saves a file into Anki's media folder and returns the name Anki stored it under. */
     fun storeMediaFile(filename: String, data: ByteArray): String =
@@ -34,36 +35,35 @@ class AnkiConnect(private val url: String = DEFAULT_URL) {
         ) as? String ?: filename
 
     /** Adds a note and returns its id. Anki refuses duplicates of the first field within the deck. */
-    fun addNote(deck: String, model: String, fields: Map<String, String>, tags: List<String>): Long =
-        (call("addNote", JSONObject().put("note", note(deck, model, fields).put("tags", JSONArray(tags)))) as Number).toLong()
+    override fun addNote(deck: String, noteType: String, fields: Map<String, String>, tags: List<String>): Long =
+        (call("addNote", JSONObject().put("note", note(deck, noteType, fields).put("tags", JSONArray(tags)))) as Number).toLong()
 
     /**
      * Why Anki would refuse this note (a duplicate, a missing deck), or null if it would take it,
      * or if this AnkiConnect is too old to say.
      */
-    fun cannotAdd(deck: String, model: String, fields: Map<String, String>): String? {
+    override fun cannotAdd(deck: String, noteType: String, fields: Map<String, String>): String? {
         val result = try {
-            call("canAddNotesWithErrorDetail", JSONObject().put("notes", JSONArray().put(note(deck, model, fields))))
+            call("canAddNotesWithErrorDetail", JSONObject().put("notes", JSONArray().put(note(deck, noteType, fields))))
         } catch (e: AnkiException) {
-            if ("unsupported action" in e.message.orEmpty()) return null else throw e
+            // too old to say: ask the slow way
+            if ("unsupported action" in e.message.orEmpty()) return super.cannotAdd(deck, noteType, fields) else throw e
         }
         val detail = (result as? JSONArray)?.optJSONObject(0) ?: return null
         return if (detail.optBoolean("canAdd", true)) null else detail.optString("error", "Anki won't add this card")
     }
 
     /** Ids of the notes in [deck] whose [field] is exactly [value]. */
-    fun findNotes(deck: String, field: String, value: String): List<Long> {
-        val result = call("findNotes", JSONObject().put("query", "${quote("deck:$deck")} ${quote("$field:$value")}"))
+    override fun findNotes(deck: String, field: String, value: String): List<Long> {
+        val query = AnkiBackend.quote("deck:$deck") + " " + AnkiBackend.quote("$field:$value")
+        val result = call("findNotes", JSONObject().put("query", query))
         val array = result as? JSONArray ?: return emptyList()
         return (0 until array.length()).map { array.getLong(it) }
     }
 
-    fun deleteNotes(ids: List<Long>) {
+    override fun deleteNotes(ids: List<Long>) {
         call("deleteNotes", JSONObject().put("notes", JSONArray(ids)))
     }
-
-    /** A search term Anki takes literally: quoted, with its wildcards and quotes escaped. */
-    private fun quote(term: String) = "\"" + term.replace(Regex("""([\\"*_])"""), "\\\\$1") + "\""
 
     private fun note(deck: String, model: String, fields: Map<String, String>) = JSONObject()
         .put("deckName", deck)

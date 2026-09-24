@@ -1,12 +1,14 @@
 package io.github.immersionplayer
 
 import android.app.Application
+import io.github.immersionplayer.anki.AnkiDroid
 import io.github.immersionplayer.dictionary.AndroidSql
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryDatabase
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.mining.MiningStore
 import io.github.immersionplayer.subs.SubtitleLoader
+import io.github.immersionplayer.ui.AnkiCards
 import io.github.immersionplayer.ui.Appearance
 import io.github.immersionplayer.ui.ThumbnailStore
 
@@ -24,6 +26,8 @@ class App : Application() {
     lateinit var appearance: Appearance
         private set
     lateinit var thumbnails: ThumbnailStore
+        private set
+    lateinit var anki: AnkiCards
         private set
 
     /** Appends a non-fatal error to files/errors.log (the system log isn't always available). */
@@ -50,6 +54,12 @@ class App : Application() {
         subtitleLoader = SubtitleLoader(this)
         appearance = Appearance(prefs)
         thumbnails = ThumbnailStore(this)
+        anki = AnkiCards(
+            connect = { AnkiDroid(this) },
+            target = prefs::cardTarget,
+            mediaDir = java.io.File(cacheDir, "anki"),
+            logError = ::logError,
+        )
         Thread {
             dictionaryDatabase.deleteIncomplete()
             BundledDictionaries.installMissing(this, dictionaryDatabase)

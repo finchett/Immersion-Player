@@ -44,9 +44,10 @@ class MinedWordTest {
         assertEquals("初日[しょにち]", fields["VocabFurigana"])
         assertEquals("<img alt=\"snapshot\" src=\"clip.avif\">", fields["Image"])
         assertEquals("K-ON!! EP19 (02m23s765ms)", fields["Notes"])
+        assertEquals("first day, opening day or premiere", fields["VocabDef"])
         assertEquals(
             "<ol><li><i>(n)</i> first day; opening day</li><li><i>(n)</i> premiere</li></ol>",
-            fields["VocabDef"],
+            word.field(CardSource.Definition),
         )
     }
 
@@ -110,10 +111,27 @@ class MinedWordTest {
         )
     }
 
+    @Test fun untouchedPresetsFollowNewDefaults() {
+        val old = CardFormats.JapaneseSentencesPlus.copy(
+            noteType = "Japanese sentences+",
+            fields = CardFormats.JapaneseSentencesPlus.fields + ("VocabDef" to CardSource.Definition),
+        )
+        assertEquals(CardSource.ShortDefinition, CardFormats.upgrade(old).fields["VocabDef"])
+        // a setup someone changed stays theirs
+        val changed = old.copy(fields = old.fields + ("SentFurigana" to CardSource.Sentence))
+        assertEquals(changed, CardFormats.upgrade(changed))
+    }
+
     @Test fun guessedFormat() {
         val preset = CardFormats.forNoteType("Japanese Sentences+", CardFormats.JapaneseSentencesPlus.fields.keys.toList())
         assertEquals(CardSource.SentenceBold, preset.fields["SentKanji"])
         assertEquals("Japanese Sentences+", preset.noteType)
+        // imported from AnkiWeb it's plain "Japanese sentences": the same fields, so the same preset
+        val imported = CardFormats.forNoteType("Japanese sentences", CardFormats.JapaneseSentencesPlus.fields.keys.toList())
+        assertEquals(CardSource.ShortDefinition, imported.fields["VocabDef"])
+        assertEquals("Japanese sentences+", CardFormats.pick(listOf("Basic", "Japanese sentences", "Japanese sentences+")))
+        assertEquals("Japanese sentences", CardFormats.pick(listOf("Basic", "Japanese sentences")))
+        assertEquals(null, CardFormats.pick(listOf("Basic")))
 
         val guessed = CardFormats.forNoteType(
             "Mining",

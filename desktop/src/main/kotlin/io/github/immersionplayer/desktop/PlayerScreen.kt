@@ -95,6 +95,8 @@ import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.subs.SubtitleTrack
 import io.github.immersionplayer.subs.translationFor
 import io.github.immersionplayer.ui.ActiveLookup
+import io.github.immersionplayer.ui.AnkiStatusText
+import io.github.immersionplayer.ui.CardButton
 import io.github.immersionplayer.ui.DictionaryPanel
 import io.github.immersionplayer.ui.TappableText
 import kotlinx.coroutines.Dispatchers
@@ -200,7 +202,7 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
         // the frame on screen, if it's from this line; otherwise one from the middle of it
         val position = session.position.value
         val frameAt = if (position in word.start..word.end) position else (word.start + word.end) / 2
-        app.anki.add(AnkiCards.Request(word, session.video, session.player.propertyString("aid"), frameAt))
+        app.anki.add(word, VideoClips.ForCard(settings, session.video, session.player.propertyString("aid"), frameAt))
     }
 
     DisposableEffect(keys, settings.ankiEnabled) {
@@ -287,6 +289,7 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                                 enabled = word != null,
                                 onAdd = { addCard(entry) },
                                 onRemove = { word?.let(app.anki::remove) },
+                                modifier = Modifier.padding(start = 8.dp, bottom = 6.dp).pointerHoverIcon(PointerIcon.Hand),
                             )
                         }
                     } else null,
@@ -518,7 +521,7 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> U
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextAction("‹ Library", onClick = onBack)
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { AnkiStatus(ankiStatus) }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { AnkiStatusText(ankiStatus) }
         if (offset != 0.0) {
             Text(
                 "%+.1f s".format(offset),
@@ -604,56 +607,6 @@ private fun CurrentLine(
                 }
             }
         }
-    }
-}
-
-/** What adding a card is doing, or how it went. */
-@Composable
-private fun AnkiStatus(status: AnkiCards.Status?) {
-    // the last message stays while it fades out
-    val shown = remember { object { var status: AnkiCards.Status? = null } }
-    status?.let { shown.status = it }
-    AnimatedVisibility(status != null, enter = fadeIn(), exit = fadeOut()) {
-        val last = shown.status
-        Text(
-            last?.message.orEmpty(),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (last is AnkiCards.Status.Failed) MaterialTheme.colorScheme.error
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 6.dp),
-        )
-    }
-}
-
-/** A small round + that makes a card of one dictionary entry, and becomes a − that takes it out again. */
-@Composable
-private fun CardButton(added: Boolean, enabled: Boolean, onAdd: () -> Unit, onRemove: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val scheme = MaterialTheme.colorScheme
-    val alpha = if (enabled) 1f else 0.35f
-    // a soft tint to add; solid once the card is in Anki
-    val fill = when {
-        added -> scheme.primary
-        hovered -> scheme.primary.copy(alpha = 0.26f)
-        else -> scheme.onSurface.copy(alpha = 0.08f)
-    }.let { it.copy(alpha = it.alpha * alpha) }
-    val mark = (if (added) scheme.onPrimary else if (hovered) scheme.primary else scheme.onSurfaceVariant)
-        .copy(alpha = alpha)
-    Canvas(
-        Modifier.padding(start = 8.dp, bottom = 6.dp).size(18.dp).clip(CircleShape)
-            .hoverable(interaction, enabled)
-            .clickable(interaction, indication = null, enabled = enabled, onClick = if (added) onRemove else onAdd)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .semantics { contentDescription = if (added) "Remove from Anki" else "Add to Anki" },
-    ) {
-        drawCircle(fill)
-        val stroke = 1.3.dp.toPx()
-        val arm = size.minDimension * 0.22f
-        drawLine(mark, Offset(center.x - arm, center.y), Offset(center.x + arm, center.y), stroke, StrokeCap.Round)
-        if (!added) drawLine(mark, Offset(center.x, center.y - arm), Offset(center.x, center.y + arm), stroke, StrokeCap.Round)
     }
 }
 

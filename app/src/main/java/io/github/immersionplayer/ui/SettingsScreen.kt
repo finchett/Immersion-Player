@@ -292,6 +292,10 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                     ) { app.appearance.updateRoundedCorners(it) }
                 }
 
+                SettingsSection("Anki") {
+                    AnkiSettings(app)
+                }
+
                 SettingsSection(
                     title = "Advanced",
                     trailing = {

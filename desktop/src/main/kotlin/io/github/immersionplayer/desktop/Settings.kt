@@ -4,7 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.immersionplayer.anki.AnkiConnect
+import io.github.immersionplayer.anki.AnkiException
 import io.github.immersionplayer.anki.CardFormat
+import io.github.immersionplayer.anki.CardFormats
+import io.github.immersionplayer.anki.CardTarget
 import io.github.immersionplayer.ui.AppTheme
 import org.json.JSONObject
 import java.io.File
@@ -103,8 +106,15 @@ class Settings(node: String = "io/github/immersionplayer") {
     val ankiFormat: CardFormat?
         get() = ankiNoteType?.let(::cardFormat)
 
+    /** Where new cards go, or an [AnkiException] saying what still has to be chosen. */
+    fun cardTarget(): CardTarget {
+        val format = ankiFormat ?: throw AnkiException("Choose a note type under Settings › Anki")
+        val deck = ankiDeck ?: throw AnkiException("Choose a deck under Settings › Anki")
+        return CardTarget(format, deck, ankiTags.split(' ', '\u3000').filter { it.isNotBlank() })
+    }
+
     fun cardFormat(noteType: String): CardFormat? =
-        ankiFormats.optJSONObject(noteType)?.let { CardFormat.fromJson(noteType, it) }
+        ankiFormats.optJSONObject(noteType)?.let { CardFormats.upgrade(CardFormat.fromJson(noteType, it)) }
 
     fun saveCardFormat(format: CardFormat) {
         val all = JSONObject(ankiFormats.toString()).put(format.noteType, format.toJson())

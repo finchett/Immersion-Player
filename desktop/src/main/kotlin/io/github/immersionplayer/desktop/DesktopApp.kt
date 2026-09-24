@@ -1,5 +1,6 @@
 package io.github.immersionplayer.desktop
 
+import io.github.immersionplayer.anki.AnkiConnect
 import io.github.immersionplayer.dictionary.DictionaryDatabase
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.JdbcSql
@@ -8,6 +9,7 @@ import io.github.immersionplayer.subs.EmbeddedSubtitleCache
 import io.github.immersionplayer.subs.MatroskaSubtitleExtractor
 import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.subs.SubtitleTrack
+import io.github.immersionplayer.ui.AnkiCards
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +29,12 @@ class DesktopApp(
     val lookup = DictionaryLookup(database)
     private val subtitleCache = EmbeddedSubtitleCache(File(cacheDir, "subtitles"))
     val thumbnails = Thumbnails(cacheDir)
-    val anki = AnkiCards(settings, cacheDir, ::logError)
+    val anki = AnkiCards(
+        connect = { AnkiConnect(settings.ankiUrl) },
+        target = settings::cardTarget,
+        mediaDir = File(cacheDir, "anki"),
+        logError = ::logError,
+    )
 
     private val _setupStatus = MutableStateFlow<String?>(null)
     /** Progress while a bundled dictionary is being installed, else null. */

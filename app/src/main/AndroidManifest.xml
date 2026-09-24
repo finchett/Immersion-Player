@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- to tell whether Shizuku (shoulder triggers) is installed -->
+    <!-- Anki cards: AnkiDroid's permission to add notes through its content provider -->
+    <uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
+
+    <!-- to tell whether Shizuku (shoulder triggers) and AnkiDroid (Anki cards) are installed -->
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
+        <package android:name="com.ichi2.anki" />
     </queries>
 
     <application
@@ -24,6 +28,17 @@
             android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- hands AnkiDroid the audio and screenshots of new cards -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"
