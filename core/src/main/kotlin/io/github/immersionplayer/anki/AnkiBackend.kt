@@ -43,14 +43,14 @@ interface AnkiBackend {
 
 /** A card's media, made by whatever each platform has for cutting video. */
 interface CardMedia {
-    /** Extension of the images [image] writes, e.g. "avif" or "webp". */
-    val imageExtension: String
-
     /** Writes the line's audio to [out] (Ogg Opus); false if it couldn't. */
     fun audio(word: MinedWord, out: File): Boolean
 
-    /** Writes the line's picture to [out]; false if it couldn't. */
-    fun image(word: MinedWord, out: File): Boolean
+    /**
+     * Writes the line's picture next to [base], named [base] plus the extension of whatever it
+     * turned out to be ("avif", "webp"), and returns that file; null if it couldn't.
+     */
+    fun image(word: MinedWord, base: File): File?
 }
 
 /** Where new cards go and how they're filled. */
@@ -82,18 +82,18 @@ class CardWriter(private val anki: AnkiBackend, private val mediaDir: File) {
         val base = word.mediaBaseName()
         mediaDir.mkdirs()
         val missing = mutableListOf<String>()
-        fun make(extension: String, what: String, write: (File) -> Boolean): String? {
-            val file = File(mediaDir, "$base.$extension")
+        fun store(what: String, file: File?): String? {
             return try {
-                if (write(file) && file.length() > 0) anki.storeMedia(file) else null.also { missing += what }
+                if (file != null && file.length() > 0) anki.storeMedia(file) else null.also { missing += what }
             } finally {
-                file.delete()
+                file?.delete()
             }
         }
-        val audio = if (CardSource.SentenceAudio in sources) make("ogg", "audio") { media.audio(word, it) } else null
-        val image = if (CardSource.Screenshot in sources) {
-            make(media.imageExtension, "screenshot") { media.image(word, it) }
+        val audio = if (CardSource.SentenceAudio in sources) {
+            val file = File(mediaDir, "$base.ogg")
+            store("audio", file.takeIf { media.audio(word, it) }.also { if (it == null) file.delete() })
         } else null
+        val image = if (CardSource.Screenshot in sources) store("screenshot", media.image(word, File(mediaDir, base))) else null
 
         val fields = word.copy(audioFile = audio, imageFile = image).fields(format)
         return Added(anki.addNote(target.deck, format.noteType, fields, target.tags), missing)

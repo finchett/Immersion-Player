@@ -40,7 +40,8 @@ object AudioClipper {
             extractor.selectTrack(track)
             val startUs = (start * 1_000_000).toLong()
             val endUs = (end * 1_000_000).toLong()
-            extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            // a second early, to be sure the seek lands before the start; what's before it is dropped below
+            extractor.seekTo((startUs - 1_000_000).coerceAtLeast(0), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
             val decoder = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
             val samples = FloatList()
@@ -52,6 +53,11 @@ object AudioClipper {
                 var encoding = AudioFormat.ENCODING_PCM_16BIT
                 val info = MediaCodec.BufferInfo()
                 var inputDone = false
+                // the decoded audio is continuous, so time is counted in samples from the first
+                // buffer: decoders don't stamp every buffer (Android's FLAC decoder splits its
+                // output into 16 KB pieces that share one time)
+                var firstUs = -1L
+                var decodedFrames = 0L
                 while (true) {
                     if (!inputDone) {
                         val index = decoder.dequeueInputBuffer(TIMEOUT_US)
@@ -81,8 +87,9 @@ object AudioClipper {
                             buffer.limit(info.offset + info.size)
                             val bytes = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
                             val frames = info.size / (bytes * channels)
+                            if (firstUs < 0 && info.size > 0) firstUs = info.presentationTimeUs
                             for (frame in 0 until frames) {
-                                val timeUs = info.presentationTimeUs + frame * 1_000_000L / rate
+                                val timeUs = firstUs + decodedFrames++ * 1_000_000L / rate
                                 var sum = 0f
                                 for (c in 0 until channels) {
                                     sum += if (bytes == 4) buffer.float else buffer.short / 32768f
@@ -139,14 +146,20 @@ object AudioClipper {
                     val index = encoder.dequeueInputBuffer(TIMEOUT_US)
                     if (index >= 0) {
                         val buffer = encoder.getInputBuffer(index)!!.order(ByteOrder.LITTLE_ENDIAN)
-                        val count = minOf(buffer.remaining() / 2, pcm.size - fed)
-                        for (i in 0 until count) {
-                            buffer.putShort((pcm[fed + i].coerceIn(-1f, 1f) * 32767).toInt().toShort())
-                        }
                         val timeUs = fed * 1_000_000L / RATE
-                        fed += count
-                        inputDone = fed >= pcm.size
-                        encoder.queueInputBuffer(index, 0, count * 2, timeUs, if (inputDone) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0)
+                        if (fed >= pcm.size) {
+                            // end of stream in a buffer of its own: some encoders drop the samples
+                            // of a buffer that also carries the flag
+                            encoder.queueInputBuffer(index, 0, 0, timeUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputDone = true
+                        } else {
+                            val count = minOf(buffer.remaining() / 2, pcm.size - fed)
+                            for (i in 0 until count) {
+                                buffer.putShort((pcm[fed + i].coerceIn(-1f, 1f) * 32767).toInt().toShort())
+                            }
+                            fed += count
+                            encoder.queueInputBuffer(index, 0, count * 2, timeUs, 0)
+                        }
                     }
                 }
                 val index = encoder.dequeueOutputBuffer(info, TIMEOUT_US)

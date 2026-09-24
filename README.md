@@ -76,8 +76,7 @@ entry (or press `a` on desktop) and the word goes to Anki with:
 - the line, the word in bold, and the peek-language line as its translation
 - the word, its reading as Anki furigana, pitch accent graphs, and a short definition ("first day, opening day or premiere"; the full one is an option)
 - the line's audio, 0.3 s either side, as mono Opus (about 4 KB a second)
-- a picture: on desktop the line as an animated AVIF at 360 px (plays like a GIF) or a still;
-  on Android a WebP still of the frame on screen
+- the line as an animated AVIF at 360 px (plays like a GIF), or a still of the frame on screen
 - the episode and time
 
 The **+** turns into a **−**, which takes the card out again. Duplicates (same first field in the
@@ -87,8 +86,11 @@ deck) are refused before anything is cut.
   to be open. Media are cut by a separate headless mpv from the file itself, so playback isn't
   interrupted.
 - **Android** adds straight into AnkiDroid, which doesn't need to be open; the app asks for
-  AnkiDroid's permission when cards are turned on. The audio is cut with Android's own codecs,
-  since the player has the app's one libmpv.
+  AnkiDroid's permission when cards are turned on. A second, headless libmpv (through JNA; the
+  player's JNI holds the first) decodes the line's frames, and the phone's AV1 encoder makes the
+  AVIF: an MP4 from MediaMuxer, relabelled as an AVIF sequence. Phones without AV1 get an
+  animated WebP instead. The audio is cut with Android's own codecs. On-device tests:
+  `app/src/androidTest`, run by hand as described there.
 
 Any note type works: pick it, then choose what fills each field. mpvacious's *Japanese
 sentences* note type (often kept as *Japanese sentences+*) is set up field by field; get it with

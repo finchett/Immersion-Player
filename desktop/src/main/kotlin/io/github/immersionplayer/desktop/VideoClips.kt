@@ -72,16 +72,17 @@ object VideoClips {
         private val audioTrack: String?,
         private val frameAt: Double,
     ) : CardMedia {
-        override val imageExtension = "avif"
-
         override fun audio(word: MinedWord, out: File): Boolean {
             val padding = settings.ankiAudioPadding
             return audioClip(video, word.start - padding, word.end + padding, audioTrack, out)
         }
 
-        override fun image(word: MinedWord, out: File): Boolean =
-            if (settings.ankiImageAnimated) animation(video, word.start, word.end, settings.ankiImageHeight, out)
+        override fun image(word: MinedWord, base: File): File? {
+            val out = File(base.path + ".avif")
+            val made = if (settings.ankiImageAnimated) animation(video, word.start, word.end, settings.ankiImageHeight, out)
             else screenshot(video, frameAt, settings.ankiImageHeight, out)
+            return out.takeIf { made }
+        }
     }
 
     // mpv reads a decimal point whatever the system's locale writes
