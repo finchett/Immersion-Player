@@ -53,7 +53,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Immersion Player"
-            packageVersion = "0.2.0"
+            packageVersion = "0.3.0"
             description = "Japanese video player with a built-in dictionary"
             copyright = "GPL-3.0-or-later"
             modules("java.instrument", "java.prefs", "java.sql", "jdk.unsupported")
@@ -90,7 +90,7 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bu
 // ad-hoc signed again after that edit, next to an Applications link.
 val packageMacRelease by tasks.registering(Exec::class) {
     dependsOn("createDistributable")
-    val version = "0.2.0"
+    val version = "0.3.0"
     val app = layout.buildDirectory.dir("compose/binaries/main/app/Immersion Player.app")
     val out = layout.buildDirectory.file("release/Immersion-Player-$version-macos-arm64.dmg")
     inputs.dir(app)

@@ -17,7 +17,7 @@ import java.io.File
 import java.io.RandomAccessFile
 
 /** Shown in settings; a packaged build carries the same number in its bundle (build.gradle.kts). */
-const val APP_VERSION = "0.2.0"
+const val APP_VERSION = "0.3.0"
 
 /** App-wide services: settings, the dictionary, subtitle loading, Anki. */
 class DesktopApp(
