@@ -29,6 +29,8 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = "0.2"
+        // on-device tests; run by hand (see androidTest), since connectedAndroidTest uninstalls the app after
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += "arm64-v8a"
         }
@@ -84,6 +86,12 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.12.0-alpha03")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.12.0-alpha03")
+
+    // Anki cards: a second, headless libmpv for animated pictures (the player's JNI holds the first)
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
+
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
 
     // shoulder triggers: shell-level access to the trigger sensors via Shizuku
     implementation("dev.rikka.shizuku:api:13.1.5")

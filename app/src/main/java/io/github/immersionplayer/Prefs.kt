@@ -109,6 +109,11 @@ class Prefs(context: Context) {
         get() = prefs.getFloat("anki_audio_padding", 0.3f)
         set(value) = prefs.edit { putFloat("anki_audio_padding", value) }
 
+    /** The screenshot moves: the whole line, animated, instead of the frame on screen. */
+    var ankiImageAnimated: Boolean
+        get() = prefs.getBoolean("anki_image_animated", true)
+        set(value) = prefs.edit { putBoolean("anki_image_animated", value) }
+
     /** Height of the screenshot in pixels. */
     var ankiImageHeight: Int
         get() = prefs.getInt("anki_image_height", 360)

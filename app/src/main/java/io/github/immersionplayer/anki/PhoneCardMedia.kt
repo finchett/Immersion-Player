@@ -9,9 +9,9 @@ import `is`.xyz.mpv.MPVLib
 import java.io.File
 
 /**
- * A card's media on the phone: the line's audio cut by Android's codecs, and the frame the
- * player is showing as a WebP. libmpv is one per process and the player has it, so the frame
- * comes from the player itself (which also means no moving picture here, unlike desktop).
+ * A card's media on the phone: the line's audio cut by Android's codecs, and the line as an
+ * animated WebP cut by a second, headless mpv ([LineFrames]); or, as a still, the frame the
+ * player is showing.
  */
 class PhoneCardMedia(
     private val context: Context,
@@ -20,7 +20,10 @@ class PhoneCardMedia(
     /** mpv's audio track number (1 = the first audio track), or null for the first. */
     private val audioTrack: Int?,
 ) : CardMedia {
-    override val imageExtension = "webp"
+    private companion object {
+        /** Seconds of a long line that get animated. */
+        const val MAX_ANIMATION = 10.0
+    }
 
     override fun audio(word: MinedWord, out: File): Boolean {
         val padding = prefs.ankiAudioPadding.toDouble()
@@ -29,7 +32,22 @@ class PhoneCardMedia(
         )
     }
 
-    override fun image(word: MinedWord, out: File): Boolean {
+    override fun image(word: MinedWord, base: File): File? {
+        if (prefs.ankiImageAnimated) {
+            val animation = runCatching {
+                LineFrames.animate(
+                    context, videoUri, word.start, minOf(word.end, word.start + MAX_ANIMATION),
+                    prefs.ankiImageHeight, base,
+                )
+            }.getOrNull()
+            if (animation != null) return animation
+            // couldn't decode the line: the still is better than no picture
+        }
+        val out = File(base.path + ".webp")
+        return out.takeIf { still(it) }
+    }
+
+    private fun still(out: File): Boolean {
         val shot = File(out.parentFile, out.nameWithoutExtension + ".frame.jpg")
         try {
             MPVLib.setPropertyString("screenshot-format", "jpg")

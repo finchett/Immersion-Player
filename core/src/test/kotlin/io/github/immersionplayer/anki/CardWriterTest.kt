@@ -34,9 +34,8 @@ class CardWriterTest {
 
     private class Media(val audioWorks: Boolean) : CardMedia {
         var made = 0
-        override val imageExtension = "webp"
         override fun audio(word: MinedWord, out: File) = audioWorks.also { if (it) { out.writeText("ogg"); made++ } }
-        override fun image(word: MinedWord, out: File) = true.also { out.writeText("img"); made++ }
+        override fun image(word: MinedWord, base: File) = File(base.path + ".webp").also { it.writeText("img"); made++ }
     }
 
     private val dir: File = Files.createTempDirectory("cards").toFile()

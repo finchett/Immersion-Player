@@ -154,9 +154,19 @@ fun AnkiSettings(app: App) {
         prefs.ankiAudioPadding = padding
     }
     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+    var animated by remember { mutableStateOf(prefs.ankiImageAnimated) }
+    val kinds = listOf("Animated", "Still")
+    ChoiceRow(
+        "Screenshot", kinds[if (animated) 0 else 1], kinds,
+        if (animated) "The whole line, moving, like a GIF." else "The frame on screen when you add the card.",
+    ) { animated = it == kinds[0]; prefs.ankiImageAnimated = animated }
+    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
     val heights = listOf(240, 360, 480, 720)
     var height by remember { mutableIntStateOf(prefs.ankiImageHeight) }
-    ChoiceRow("Screenshot height", "$height px", heights.map { "$it px" }, "WebP of the frame on screen.") { label ->
+    ChoiceRow(
+        "Screenshot height", "$height px", heights.map { "$it px" },
+        if (animated) "AVIF: roughly 25 KB a second at 360 px." else "WebP.",
+    ) { label ->
         height = heights.first { "$it px" == label }
         prefs.ankiImageHeight = height
     }
