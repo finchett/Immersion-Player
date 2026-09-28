@@ -517,13 +517,28 @@ private fun list(folder: DocumentFile): Listing {
     val videos = all.filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
     // one level deep only: enough for "12 videos" and a cover under each show without a slow full scan
     val inside = folders.associate { child ->
-        child.uri.toString() to runCatching {
-            child.listFiles().filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
-        }.getOrDefault(emptyList())
+        child.uri.toString() to runCatching { child.listFiles().toList() }.getOrDefault(emptyList())
+    }
+    val insideVideos = inside.mapValues { (_, files) ->
+        files.filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
     }
     return Listing(
         folders, videos, all,
-        episodeCounts = inside.mapValues { it.value.size },
-        covers = inside.mapNotNull { (uri, list) -> list.firstOrNull()?.let { uri to it } }.toMap(),
+        episodeCounts = insideVideos.mapValues { it.value.size },
+        // a show split into seasons has no videos of its own: take the cover from its first season
+        covers = inside.mapNotNull { (uri, files) ->
+            (insideVideos[uri]?.firstOrNull() ?: coverIn(files))?.let { uri to it }
+        }.toMap(),
     )
+}
+
+/** The first video in the subfolders among [files], looking at most [depth] levels down. */
+private fun coverIn(files: List<DocumentFile>, depth: Int = 3): DocumentFile? {
+    if (depth == 0) return null
+    return files.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
+        .firstNotNullOfOrNull { dir ->
+            val children = runCatching { dir.listFiles().toList() }.getOrDefault(emptyList())
+            children.filter { it.isVideo() }.minWithOrNull(compareBy(NaturalOrder) { it.name.orEmpty() })
+                ?: coverIn(children, depth - 1)
+        }
 }

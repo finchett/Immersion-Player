@@ -50,6 +50,11 @@ class ScreensTest {
             File(show, "Lesson 1.mkv").delete()
             Files.createSymbolicLink(File(show, "Lesson 1.mkv").toPath(), video.absoluteFile.toPath())
         }
+        // a show split into seasons takes its cover from the first season
+        val season = File(dir, "Seasons/Season 1").apply { mkdirs() }
+        File(dir, "Seasons/Season 2").mkdirs()
+        if (video != null) Files.createSymbolicLink(File(season, "Episode 1.mkv").toPath(), video.absoluteFile.toPath())
+        else File(season, "Episode 1.mkv").writeText("")
         File(dir, "Other").mkdirs()
         val node = "io/github/immersionplayer-test-screens"
         Preferences.userRoot().node(node).removeNode()
@@ -69,6 +74,9 @@ class ScreensTest {
                     }
                 }
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Lectures").fetchSemanticsNodes().isNotEmpty() }
+                if (video != null) {
+                    waitUntil(timeoutMillis = 20_000) { app.thumbnails.versions.containsKey(File(season, "Episode 1.mkv").path) }
+                }
                 folder = show
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Lesson 10").fetchSemanticsNodes().isNotEmpty() }
                 val order = onAllNodesWithText("Lesson", substring = true).fetchSemanticsNodes()

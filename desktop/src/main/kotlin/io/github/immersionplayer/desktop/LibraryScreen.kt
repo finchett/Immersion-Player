@@ -59,8 +59,8 @@ private fun videosIn(folder: File): List<File> =
 private fun list(folder: File): Listing {
     val folders = folder.listFiles().orEmpty().filter { it.isDirectory && !it.isHidden }
         .sortedWith(compareBy(NaturalOrder) { it.name })
-        // one level deep only: enough for "12 videos" under each show without a slow full scan
-        .map { dir -> videosIn(dir).let { Folder(dir, it.size, it.firstOrNull()) } }
+        // counts go one level deep only: enough for "12 videos" under each show without a slow full scan
+        .map { dir -> videosIn(dir).let { Folder(dir, it.size, it.firstOrNull() ?: coverIn(dir)) } }
     return Listing(folders, videosIn(folder))
 }
 
@@ -69,6 +69,14 @@ private fun locate(app: DesktopApp, folder: File?): Pair<File?, File?> {
     val root = app.settings.libraryRoot?.let(::File)?.takeIf { it.isDirectory }
     val current = folder?.takeIf { root != null && it.isDirectory && it.path.startsWith(root.path) } ?: root
     return root to current
+}
+
+/** The first video in [folder]'s subfolders, for a show split into seasons, looking at most [depth] levels down. */
+private fun coverIn(folder: File, depth: Int = 3): File? {
+    if (depth == 0) return null
+    return folder.listFiles().orEmpty().filter { it.isDirectory && !it.isHidden }
+        .sortedWith(compareBy(NaturalOrder) { it.name })
+        .firstNotNullOfOrNull { dir -> videosIn(dir).firstOrNull() ?: coverIn(dir, depth - 1) }
 }
 
 /** Header content: the path from the library root, each part a way back up, and Settings. */
@@ -147,7 +155,11 @@ private fun FolderContents(app: DesktopApp, folder: File, onOpenFolder: (File) -
                 badge = null,
                 progress = 0f,
                 title = item.dir.name,
-                subtitle = if (item.videos == 1) "1 video" else "${item.videos} videos",
+                subtitle = when (item.videos) {
+                    0 -> null
+                    1 -> "1 video"
+                    else -> "${item.videos} videos"
+                },
                 onClick = { onOpenFolder(item.dir) },
             )
         }
