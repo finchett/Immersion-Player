@@ -56,6 +56,13 @@ private fun videosIn(folder: File): List<File> =
     folder.listFiles().orEmpty().filter { it.isFile && !it.isHidden && isVideoName(it.name) }
         .sortedWith(compareBy(NaturalOrder) { it.name })
 
+/** The video after [video] in its folder, in the order the library lists them, or null for the last one. */
+fun nextVideo(video: File): File? {
+    val videos = video.parentFile?.let(::videosIn).orEmpty()
+    val index = videos.indexOfFirst { it.name == video.name }
+    return if (index < 0) null else videos.getOrNull(index + 1)
+}
+
 private fun list(folder: File): Listing {
     val folders = folder.listFiles().orEmpty().filter { it.isDirectory && !it.isHidden }
         .sortedWith(compareBy(NaturalOrder) { it.name })
@@ -64,19 +71,19 @@ private fun list(folder: File): Listing {
     return Listing(folders, videosIn(folder))
 }
 
-/** The library root, and the folder being shown (the root unless [folder] is inside it). */
-private fun locate(app: DesktopApp, folder: File?): Pair<File?, File?> {
-    val root = app.settings.libraryRoot?.let(::File)?.takeIf { it.isDirectory }
-    val current = folder?.takeIf { root != null && it.isDirectory && it.path.startsWith(root.path) } ?: root
-    return root to current
-}
-
 /** The first video in [folder]'s subfolders, for a show split into seasons, looking at most [depth] levels down. */
 private fun coverIn(folder: File, depth: Int = 3): File? {
     if (depth == 0) return null
     return folder.listFiles().orEmpty().filter { it.isDirectory && !it.isHidden }
         .sortedWith(compareBy(NaturalOrder) { it.name })
         .firstNotNullOfOrNull { dir -> videosIn(dir).firstOrNull() ?: coverIn(dir, depth - 1) }
+}
+
+/** The library root, and the folder being shown (the root unless [folder] is inside it). */
+private fun locate(app: DesktopApp, folder: File?): Pair<File?, File?> {
+    val root = app.settings.libraryRoot?.let(::File)?.takeIf { it.isDirectory }
+    val current = folder?.takeIf { root != null && it.isDirectory && it.path.startsWith(root.path) } ?: root
+    return root to current
 }
 
 /** Header content: the path from the library root, each part a way back up, and Settings. */

@@ -38,6 +38,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,7 +57,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -74,7 +78,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Switch
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.IntOffset
@@ -331,18 +334,27 @@ fun PlayerScreen(
 
     var subtitleStatus by remember { mutableStateOf<String?>("Reading subtitles…") }
     LaunchedEffect(video) {
-        val tracks = withContext(Dispatchers.IO) {
-            runCatching { app.subtitleLoader.load(video, siblings) }
-        }
-        tracks.onSuccess { list ->
-            // the languages chosen in settings; a track picked for this video still wins
+        // the languages chosen in settings; a track picked for this video still wins
+        fun useTracks(list: List<SubtitleTrack>) {
             val primary = SubtitleFiles.pickPrimary(list, app.prefs.targetLanguage)
             session.setTracks(list, primary, SubtitleFiles.pickSecondary(list, primary, app.prefs.peekLanguage))
             subtitleStatus = if (primary == null) "No text subtitles found for this video" else null
-        }.onFailure {
-            subtitleStatus = "Couldn't read subtitles: ${it.message}"
         }
+        val text = withContext(Dispatchers.IO) { runCatching { app.subtitleLoader.load(video, siblings) } }
+            .getOrElse {
+                subtitleStatus = "Couldn't read subtitles: ${it.message}"
+                return@LaunchedEffect
+            }
+        useTracks(text)
+
+        // picture subtitles come in a moment later: their timing now, their text as they play
+        val languages = listOfNotNull(app.prefs.targetLanguage, app.prefs.peekLanguage)
+        withContext(Dispatchers.IO) { runCatching { app.subtitleLoader.openPictureTracks(video, siblings, text, languages) } }
+            .onSuccess { if (it.isNotEmpty()) useTracks(text + it) }
+            .onFailure { app.logError("picture subtitles ${video.uri}", it) }
     }
+    // the picture tracks' readers go with the player (not its view, which rotation recreates)
+    DisposableEffect(session) { onDispose { session.release() } }
 
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
@@ -374,9 +386,12 @@ fun PlayerScreen(
 
     // every line always has a word defined: the first kanji (or next best) that has an entry
     val lineIndex by session.lineIndex.collectAsState()
-    LaunchedEffect(lineIndex, primary, hasDictionaries) {
-        val cue = primary?.cues?.getOrNull(lineIndex) ?: return@LaunchedEffect
-        if (lookup?.lineIndex == lineIndex) return@LaunchedEffect
+    val linesRead by session.linesRead.collectAsState()
+    // a picture line's text arrives after the line does; this changes when it does
+    val lineText = remember(primary, lineIndex, linesRead) { primary?.cues?.getOrNull(lineIndex)?.text }
+    LaunchedEffect(lineIndex, lineText, hasDictionaries) {
+        val cue = primary?.cues?.getOrNull(lineIndex)?.takeIf { it.text.isNotEmpty() } ?: return@LaunchedEffect
+        if (lookup?.lineIndex == lineIndex && lookup?.text == cue.text) return@LaunchedEffect
         val generation = ++lookupGeneration
         val text = cue.text
         val positions = DictionaryLookup.defaultLookupPositions(text)
@@ -427,6 +442,7 @@ fun PlayerScreen(
                 VideoArea(
                     session = session,
                     startPosition = app.prefs.position(session.videoUri),
+                    audioLanguages = SubtitleFiles.mpvLanguages(app.prefs.targetLanguage),
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
@@ -543,6 +559,7 @@ fun PlayerScreen(
 private fun VideoArea(
     session: PlayerSession,
     startPosition: Double,
+    audioLanguages: String,
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
@@ -630,7 +647,7 @@ private fun VideoArea(
             factory = { ctx ->
                 MpvView(ctx).also { view ->
                     view.keepScreenOn = true
-                    view.initialize(startPosition, session.fill.value)
+                    view.initialize(startPosition, session.fill.value, audioLanguages)
                     session.attach(view)
                     view.playFile(session.videoUri)
                     mpvView = view
@@ -851,17 +868,14 @@ private fun VideoArea(
                         .clickable(onClick = onBack)
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                 )
-                Text(
-                    "⋯",
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    modifier = Modifier
+                Box(
+                    Modifier
                         .align(Alignment.TopEnd)
                         .padding(10.dp)
                         .background(Color(0x88000000), CircleShape)
                         .clickable { showOptions = true }
-                        .padding(horizontal = 14.dp, vertical = 4.dp),
-                )
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) { Cog(Color.White, diameter = 20.dp) }
             }
         }
         if (showOptions) PlayerOptions(session, onDismiss = { showOptions = false })
@@ -947,6 +961,7 @@ private fun StudyPanel(
     val secondary by session.secondary.collectAsState()
     val lineIndex by session.lineIndex.collectAsState()
     val lineActive by session.lineActive.collectAsState()
+    val linesRead by session.linesRead.collectAsState()
 
     val swipeThreshold = with(LocalDensity.current) { 56.dp.toPx() }
     val haptics = LocalHapticFeedback.current
@@ -1036,6 +1051,7 @@ private fun StudyPanel(
                     secondary = secondary,
                     lineIndex = lineIndex,
                     lineActive = lineActive,
+                    linesRead = linesRead,
                     status = status,
                     lookup = lookup,
                     textSize = app.prefs.subtitleSize,
@@ -1111,6 +1127,8 @@ private fun CurrentLine(
     secondary: SubtitleTrack?,
     lineIndex: Int,
     lineActive: Boolean,
+    /** Goes up as picture lines are read, whose text (and translation) then needs showing. */
+    linesRead: Int,
     status: String?,
     lookup: ActiveLookup?,
     textSize: Float,
@@ -1141,7 +1159,7 @@ private fun CurrentLine(
             },
             label = "line",
         ) { index ->
-            val cue = track.cues.getOrNull(index)
+            val cue = remember(track, index, linesRead) { track.cues.getOrNull(index) }
             Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
                 if (cue == null) {
                     Text("…", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1176,7 +1194,11 @@ private fun CurrentLine(
                 AnimatedVisibility(peeking, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.matchParentSize()) {
                     Box(contentAlignment = Alignment.Center) {
                         BasicText(
-                            translation ?: "No English line here.",
+                            translation ?: if (secondary == null) {
+                                "No subtitles in your peek language. Pick a translation track under ⚙ (while paused)."
+                            } else {
+                                "Nothing here in your peek language."
+                            },
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 color = if (translation != null) {
                                     MaterialTheme.colorScheme.onSurface
@@ -1197,9 +1219,11 @@ private fun CurrentLine(
     }
 }
 
-/** Per-video options, opened from the ⋯ button while paused. */
+/** Per-video options, opened from the cog while paused. */
 @Composable
 private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
+    val audioTracks by session.audioTracks.collectAsState()
+    val audioTrack by session.audioTrack.collectAsState()
     val tracks by session.tracks.collectAsState()
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
@@ -1211,7 +1235,7 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(0.8f),
+            modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(0.9f),
         ) {
             Column(
                 Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
@@ -1219,54 +1243,52 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
             ) {
                 Text("Options", style = MaterialTheme.typography.titleLarge)
 
+                if (audioTracks.isNotEmpty()) {
+                    TrackSelect(
+                        title = "Audio",
+                        current = audioTracks.firstOrNull { it.id == audioTrack }?.label ?: "None",
+                        options = audioTracks.map { track -> track.label to { session.selectAudio(track) } },
+                    )
+                }
+
                 if (tracks.isEmpty()) {
                     Text("No text subtitle tracks in this video.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Text("Subtitles to study", style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tracks.forEach { track ->
-                            FilterChip(
-                                selected = track === primary,
-                                onClick = { session.selectPrimary(track) },
-                                label = { Text(trackLabel(track), maxLines = 1) },
-                            )
-                        }
-                    }
-                    Text("Translation (hold the panel to peek)", style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = secondary == null,
-                            onClick = { session.selectSecondary(null) },
-                            label = { Text("None") },
-                        )
-                        tracks.filter { it !== primary }.forEach { track ->
-                            FilterChip(
-                                selected = track === secondary,
-                                onClick = { session.selectSecondary(track) },
-                                label = { Text(trackLabel(track), maxLines = 1) },
-                            )
-                        }
-                    }
+                    TrackSelect(
+                        title = "Subtitles to study",
+                        current = primary?.let(::trackLabel) ?: "None",
+                        options = tracks.map { track -> trackLabel(track) to { session.selectPrimary(track) } },
+                    )
+                    TrackSelect(
+                        title = "Translation (hold the panel to peek)",
+                        current = secondary?.let(::trackLabel) ?: "None",
+                        options = listOf("None" to { session.selectSecondary(null) }) +
+                            tracks.filter { it !== primary }.map { track -> trackLabel(track) to { session.selectSecondary(track) } },
+                    )
                 }
 
-                Text("Subtitle timing", style = MaterialTheme.typography.titleSmall)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(-1.0 to "−1s", -0.1 to "−0.1s").forEach { (delta, label) ->
-                        FilledTonalButton(onClick = { session.setOffset(offset + delta) }) { Text(label) }
-                    }
+                // the offset and reset on one line, the buttons sharing the next, so neither is squeezed
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Subtitle timing", style = MaterialTheme.typography.titleSmall)
                     Text(
                         when {
                             offset == 0.0 -> "in sync"
                             offset > 0 -> "+%.1fs later".format(offset)
                             else -> "%.1fs earlier".format(-offset)
                         },
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.width(96.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 10.dp).weight(1f),
                     )
-                    listOf(0.1 to "+0.1s", 1.0 to "+1s").forEach { (delta, label) ->
-                        FilledTonalButton(onClick = { session.setOffset(offset + delta) }) { Text(label) }
-                    }
                     if (offset != 0.0) TextButton(onClick = { session.setOffset(0.0) }) { Text("Reset") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(-1.0 to "−1s", -0.1 to "−0.1s", 0.1 to "+0.1s", 1.0 to "+1s").forEach { (delta, label) ->
+                        FilledTonalButton(
+                            onClick = { session.setOffset(offset + delta) },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            modifier = Modifier.weight(1f),
+                        ) { Text(label, maxLines = 1) }
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1278,6 +1300,29 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
                     Switch(checked = autoPause, onCheckedChange = session::setAutoPause)
                 }
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Done") }
+            }
+        }
+    }
+}
+
+/** A track choice: [title], then the [current] one on a button that opens a menu of [options]. */
+@Composable
+private fun TrackSelect(title: String, current: String, options: List<Pair<String, () -> Unit>>) {
+    var open by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Box {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(current, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text("  ▾")
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                options.forEach { (label, select) ->
+                    DropdownMenuItem(
+                        text = { Text(label, fontWeight = if (label == current) FontWeight.SemiBold else null) },
+                        onClick = { select(); open = false },
+                    )
+                }
             }
         }
     }

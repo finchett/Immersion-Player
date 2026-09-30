@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +55,8 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -93,6 +96,7 @@ import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.subs.SubtitleTrack
+import io.github.immersionplayer.ui.Cog
 import io.github.immersionplayer.subs.translationFor
 import io.github.immersionplayer.ui.ActiveLookup
 import io.github.immersionplayer.ui.AnkiStatusText
@@ -103,6 +107,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.Cursor
+import java.io.File
 
 /** Keyboard actions the window forwards to the player. */
 class PlayerKeys {
@@ -112,22 +117,46 @@ class PlayerKeys {
     var onToggleFullscreen: () -> Unit = {}
     /** Makes an Anki card of the word looked up first, when cards are turned on. */
     var onAddCard: () -> Unit = {}
+    /** Opens the next episode, while the end-of-video prompt offers one. */
+    var onPlayNext: (() -> Unit)? = null
 }
 
 @Composable
-fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBack: () -> Unit) {
+fun PlayerScreen(
+    app: DesktopApp,
+    session: PlayerSession,
+    keys: PlayerKeys,
+    onBack: () -> Unit,
+    onOpenVideo: (File) -> Unit,
+) {
     val settings = app.settings
     val scope = rememberCoroutineScope()
 
+    var next by remember { mutableStateOf<File?>(null) }
+    LaunchedEffect(session) { next = withContext(Dispatchers.IO) { runCatching { nextVideo(session.video) }.getOrNull() } }
+
     var subtitleStatus by remember { mutableStateOf<String?>("Reading subtitles…") }
+    // shown in the panel header when a video's picture (PGS) subtitles couldn't be opened
+    var readingNote by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(session) {
         val tracks = withContext(Dispatchers.IO) { runCatching { app.loadSubtitles(session.video) } }
-        tracks.onSuccess { list ->
-            session.setTracks(list)
-            subtitleStatus = if (list.isEmpty()) "No text subtitles found for this video." else null
-        }.onFailure {
+        val text = tracks.getOrElse {
             app.logError("subtitles ${session.video}", it)
             subtitleStatus = "Couldn't read subtitles: ${it.message}"
+            return@LaunchedEffect
+        }
+        session.setTracks(text)
+        subtitleStatus = if (text.isEmpty()) "No text subtitles found for this video." else null
+
+        // picture subtitles come in a moment later: their timing now, their text as they play
+        val pictures = withContext(Dispatchers.IO) { runCatching { app.openPictureTracks(session.video, text) } }
+        pictures.onSuccess { list ->
+            if (list.isEmpty()) return@onSuccess
+            session.setTracks(text + list)
+            if (text.isEmpty()) subtitleStatus = null
+        }.onFailure {
+            app.logError("picture subtitles ${session.video}", it)
+            readingNote = "Couldn't read picture subtitles"
         }
     }
 
@@ -158,8 +187,11 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
 
     // every line has a word defined: the first kanji (or next best) that has an entry
     val lineIndex by session.lineIndex.collectAsState()
-    LaunchedEffect(lineIndex, primary, hasDictionaries) {
-        val cue = primary?.cues?.getOrNull(lineIndex) ?: return@LaunchedEffect
+    val linesRead by session.linesRead.collectAsState()
+    // a picture line's text arrives after the line does; this changes when it does
+    val lineText = remember(primary, lineIndex, linesRead) { primary?.cues?.getOrNull(lineIndex)?.text }
+    LaunchedEffect(lineIndex, lineText, hasDictionaries) {
+        val cue = primary?.cues?.getOrNull(lineIndex)?.takeIf { it.text.isNotEmpty() } ?: return@LaunchedEffect
         if (lookup?.lineIndex == lineIndex && lookup?.text == cue.text) return@LaunchedEffect
         val mine = ++generation
         val text = cue.text
@@ -235,6 +267,8 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
             VideoArea(
                 session,
                 keys,
+                next = next,
+                onPlayNext = { next?.let(onOpenVideo) },
                 Modifier.weight(1f).fillMaxHeight().clip(shape)
                     // ⌘/Ctrl + scroll: up fills the area, down fits the whole picture
                     .onPointerEvent(PointerEventType.Scroll) { event ->
@@ -275,6 +309,7 @@ fun PlayerScreen(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, onBa
                     session = session,
                     keys = keys,
                     status = subtitleStatus,
+                    note = readingNote,
                     lookup = lookup,
                     hasDictionaries = hasDictionaries,
                     setupStatus = setupStatus,
@@ -305,8 +340,14 @@ private const val CONTROLS_TIMEOUT_MS = 2000L
 
 /** The video, with controls that show on mouse movement or while paused and otherwise get out of the way. */
 @Composable
-private fun VideoArea(session: PlayerSession, keys: PlayerKeys, modifier: Modifier) {
+private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onPlayNext: () -> Unit, modifier: Modifier) {
     val paused by session.paused.collectAsState()
+    val ended by session.ended.collectAsState()
+    val offerNext = ended && next != null
+    DisposableEffect(offerNext) {
+        keys.onPlayNext = onPlayNext.takeIf { offerNext }
+        onDispose { keys.onPlayNext = null }
+    }
     var lastMove by remember { mutableLongStateOf(0L) }
     var overControls by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
@@ -332,6 +373,14 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, modifier: Modifi
     ) {
         VideoSurface(session.player, Modifier.fillMaxSize())
         AnimatedVisibility(
+            offerNext,
+            enter = fadeIn(tween(300)),
+            exit = fadeOut(tween(150)),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            next?.let { NextEpisode(it, onPlayNext) }
+        }
+        AnimatedVisibility(
             visible,
             enter = fadeIn(tween(120)),
             exit = fadeOut(tween(400)),
@@ -340,6 +389,41 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, modifier: Modifi
                 .onPointerEvent(PointerEventType.Exit) { overControls = false },
         ) {
             Controls(session)
+        }
+    }
+}
+
+/** Offered over the last frame: the next video in the folder, a click (or Return) away. */
+@Composable
+private fun NextEpisode(video: File, onPlay: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Column(
+        Modifier.padding(24.dp).widthIn(max = 420.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(if (hovered) 0xE6000000 else 0xCC000000))
+            .hoverable(interaction)
+            // consumes the click, so it doesn't reach the video and toggle pause
+            .clickable(interaction, indication = null, onClick = onPlay)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("Next episode", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                video.nameWithoutExtension,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text(
+                "▶",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (hovered) MaterialTheme.colorScheme.primary else Color.White,
+            )
         }
     }
 }
@@ -451,6 +535,7 @@ private fun StudyPanel(
     session: PlayerSession,
     keys: PlayerKeys,
     status: String?,
+    note: String?,
     lookup: ActiveLookup?,
     hasDictionaries: Boolean,
     setupStatus: String?,
@@ -464,18 +549,20 @@ private fun StudyPanel(
     val secondary by session.secondary.collectAsState()
     val lineIndex by session.lineIndex.collectAsState()
     val lineActive by session.lineActive.collectAsState()
+    val linesRead by session.linesRead.collectAsState()
     var mouseHold by remember { mutableStateOf(false) }
 
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val maxLineHeight = maxHeight * 0.4f
             Column(Modifier.fillMaxSize()) {
-                PanelHeader(app, session, onBack)
+                PanelHeader(app, session, note, onBack)
                 CurrentLine(
                     track = primary,
                     secondary = secondary,
                     lineIndex = lineIndex,
                     lineActive = lineActive,
+                    linesRead = linesRead,
                     status = status,
                     lookup = lookup,
                     textSize = app.settings.subtitleSize,
@@ -510,9 +597,12 @@ private fun StudyPanel(
     }
 }
 
-/** Back to the library, what Anki is doing, and the subtitle offset when it isn't zero. */
+/**
+ * Back to the library, what Anki is doing (or [note], while picture subtitles are being read),
+ * the subtitle offset when it isn't zero, and the track menu.
+ */
 @Composable
-private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> Unit) {
+private fun PanelHeader(app: DesktopApp, session: PlayerSession, note: String?, onBack: () -> Unit) {
     val offset by session.offset.collectAsState()
     val ankiStatus by app.anki.status.collectAsState()
     // same height as the other headers, so it lines up with the traffic lights across the window
@@ -521,7 +611,13 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> U
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextAction("‹ Library", onClick = onBack)
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { AnkiStatusText(ankiStatus) }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            if (note != null) {
+                Text(note, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            } else {
+                AnkiStatusText(ankiStatus)
+            }
+        }
         if (offset != 0.0) {
             Text(
                 "%+.1f s".format(offset),
@@ -530,7 +626,60 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, onBack: () -> U
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
+        TrackMenu(session)
     }
+}
+
+/** The cog: corrects the automatic audio and subtitle choices for this video, which remembers them. */
+@Composable
+private fun TrackMenu(session: PlayerSession) {
+    val audioTracks by session.audioTracks.collectAsState()
+    val audioTrack by session.audioTrack.collectAsState()
+    val tracks by session.tracks.collectAsState()
+    val primary by session.primary.collectAsState()
+    val secondary by session.secondary.collectAsState()
+    if (tracks.isEmpty() && audioTracks.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconAction(onClick = { open = true }, modifier = Modifier.padding(start = 4.dp)) { Cog(it) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            @Composable
+            fun item(label: String, selected: Boolean, onClick: () -> Unit) = DropdownMenuItem(
+                text = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { Text(if (selected) "✓" else "", Modifier.width(12.dp)) },
+                onClick = { onClick(); open = false },
+            )
+            @Composable
+            fun divider() = HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            if (audioTracks.isNotEmpty()) {
+                MenuHeading("Audio")
+                audioTracks.forEach { track -> item(track.label, track.id == audioTrack) { session.selectAudio(track) } }
+            }
+            if (tracks.isEmpty()) return@DropdownMenu
+            if (audioTracks.isNotEmpty()) divider()
+            MenuHeading("Subtitles to study")
+            tracks.forEach { track -> item(trackLabel(track), track === primary) { session.selectPrimary(track) } }
+            divider()
+            MenuHeading("Translation (hold to peek)")
+            item("None", secondary == null) { session.selectSecondary(null) }
+            tracks.filter { it !== primary }.forEach { track ->
+                item(trackLabel(track), track === secondary) { session.selectSecondary(track) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuHeading(text: String) = Text(
+    text,
+    style = MaterialTheme.typography.labelMedium,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+)
+
+private fun trackLabel(track: SubtitleTrack): String {
+    val language = track.language?.let { " · $it" }.orEmpty()
+    return "${track.name}$language · ${track.cues.size} lines"
 }
 
 @Composable
@@ -539,6 +688,8 @@ private fun CurrentLine(
     secondary: SubtitleTrack?,
     lineIndex: Int,
     lineActive: Boolean,
+    /** Goes up as picture lines are read, whose text (and translation) then needs showing. */
+    linesRead: Int,
     status: String?,
     lookup: ActiveLookup?,
     textSize: Float,
@@ -558,7 +709,7 @@ private fun CurrentLine(
             )
             return@Box
         }
-        val cue = track.cues.getOrNull(lineIndex)
+        val cue = remember(track, lineIndex, linesRead) { track.cues.getOrNull(lineIndex) }
         if (cue == null) {
             Text("…", color = MaterialTheme.colorScheme.onSurfaceVariant)
             return@Box
@@ -591,7 +742,7 @@ private fun CurrentLine(
             AnimatedVisibility(peeking, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.matchParentSize()) {
                 Box(contentAlignment = Alignment.Center) {
                     BasicText(
-                        translation ?: if (secondary == null) "No subtitles in your peek language." else "Nothing here in your peek language.",
+                        translation ?: if (secondary == null) "No subtitles in your peek language. Pick a translation track under ⚙." else "Nothing here in your peek language.",
                         style = MaterialTheme.typography.bodyLarge.copy(
                             color = if (translation != null) {
                                 MaterialTheme.colorScheme.onSurface

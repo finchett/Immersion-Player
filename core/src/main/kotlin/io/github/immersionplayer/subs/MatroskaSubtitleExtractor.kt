@@ -6,7 +6,8 @@ import java.nio.channels.FileChannel
 import java.util.zip.Inflater
 
 /**
- * Reads the text subtitle tracks (SRT, ASS/SSA, WebVTT) out of a Matroska/WebM file.
+ * Reads the text subtitle tracks (SRT, ASS/SSA, WebVTT) out of a Matroska/WebM file, and with
+ * [extractAll] the image (PGS) tracks too, for OCR.
  *
  * Only element headers are read while walking clusters; audio and video frames are skipped
  * by seeking, so a full episode is scanned without reading most of the file.
@@ -26,6 +27,9 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
         val isTextSubtitle: Boolean
             get() = type == 17L && codecId in TEXT_CODECS
 
+        val isImageSubtitle: Boolean
+            get() = type == 17L && codecId == PGS_CODEC
+
         val displayLanguage: String
             get() = languageBcp47 ?: language
     }
@@ -34,8 +38,17 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
     private var timestampScale = 1_000_000L
     private val tracks = mutableMapOf<Long, TrackInfo>()
     private val cues = mutableMapOf<Long, MutableList<Cue>>()
+    private val pgsBlocks = mutableMapOf<Long, MutableList<PgsBlock>>()
+    private var wantImages = false
 
-    fun extract(): List<SubtitleTrack> {
+    /** The text subtitle tracks. */
+    fun extract(): List<SubtitleTrack> = scan(images = false).first
+
+    /** The text subtitle tracks and the image (PGS) ones, in one pass over the file. */
+    fun extractAll(): Pair<List<SubtitleTrack>, List<ImageSubtitleTrack>> = scan(images = true)
+
+    private fun scan(images: Boolean): Pair<List<SubtitleTrack>, List<ImageSubtitleTrack>> {
+        wantImages = images
         reader.position = 0
         while (reader.position < reader.size) {
             val id = reader.readId() ?: break
@@ -49,7 +62,7 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
             }
         }
 
-        return tracks.values
+        val text = tracks.values
             .filter { it.isTextSubtitle }
             .sortedBy { it.number }
             .map { track ->
@@ -59,7 +72,20 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
                     cues = fillMissingEnds(cues[track.number].orEmpty()).normalized(),
                 )
             }
+        val image = tracks.values
+            .filter { it.isImageSubtitle && images }
+            .sortedBy { it.number }
+            .map { track ->
+                ImageSubtitleTrack(
+                    name = track.name ?: "Track ${track.number}",
+                    language = track.displayLanguage,
+                    blocks = pgsBlocks[track.number].orEmpty().sortedBy { it.start },
+                )
+            }
+        return text to image
     }
+
+    private fun isWanted(track: TrackInfo) = track.isTextSubtitle || (wantImages && track.isImageSubtitle)
 
     private fun parseSegment(end: Long) {
         while (reader.position < end) {
@@ -70,7 +96,7 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
                 ID_INFO -> parseInfo(reader.position + size)
                 ID_TRACKS -> {
                     parseTracks(reader.position + size)
-                    if (tracks.values.none { it.isTextSubtitle }) return
+                    if (tracks.values.none(::isWanted)) return
                 }
                 ID_CLUSTER -> parseCluster(if (size < 0) -1 else reader.position + size)
                 else -> {
@@ -191,7 +217,7 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
         reader.position = start
         val trackNumber = reader.readSize()
         val track = tracks[trackNumber]
-        if (track == null || !track.isTextSubtitle) {
+        if (track == null || !isWanted(track)) {
             reader.position = end
             return
         }
@@ -208,6 +234,10 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
         val scale = timestampScale / 1_000_000_000.0
         val startSeconds = (clusterTimestamp + relativeTimestamp) * scale
         val endSeconds = if (duration != null) startSeconds + duration * scale else Double.NaN
+        if (track.isImageSubtitle) {
+            pgsBlocks.getOrPut(trackNumber) { mutableListOf() }.add(PgsBlock(startSeconds, endSeconds, data))
+            return
+        }
         val raw = String(data, Charsets.UTF_8).replace("\r\n", "\n").replace('\r', '\n')
         val text = when (track.codecId) {
             "S_TEXT/ASS", "S_TEXT/SSA" -> AssParser.parseBlockText(raw)
@@ -335,6 +365,7 @@ class MatroskaSubtitleExtractor(private val channel: FileChannel) {
 
     companion object {
         private val TEXT_CODECS = setOf("S_TEXT/UTF8", "S_TEXT/ASS", "S_TEXT/SSA", "S_TEXT/WEBVTT")
+        private const val PGS_CODEC = "S_HDMV/PGS"
 
         private const val ID_SEGMENT = 0x18538067L
         private const val ID_INFO = 0x1549A966L

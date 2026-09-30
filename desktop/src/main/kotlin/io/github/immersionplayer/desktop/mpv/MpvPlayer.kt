@@ -9,6 +9,7 @@ import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_PROPERTY_CHA
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_SHUTDOWN
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.FORMAT_DOUBLE
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.FORMAT_FLAG
+import io.github.immersionplayer.media.AudioTrack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +43,18 @@ class MpvPlayer {
     private val _paused = MutableStateFlow(true)
     val paused: StateFlow<Boolean> = _paused.asStateFlow()
 
+    private val _ended = MutableStateFlow(false)
+    /** Whether playback has reached the end of the file (and, with keep-open, holds the last frame). */
+    val ended: StateFlow<Boolean> = _ended.asStateFlow()
+
+    private val _audioTracks = MutableStateFlow<List<AudioTrack>>(emptyList())
+    /** The loaded file's audio tracks, read when it loads. */
+    val audioTracks: StateFlow<List<AudioTrack>> = _audioTracks.asStateFlow()
+
+    private val _audioTrack = MutableStateFlow<Int?>(null)
+    /** The [AudioTrack.id] playing, or null for none. */
+    val audioTrack: StateFlow<Int?> = _audioTrack.asStateFlow()
+
     @Volatile private var targetWidth = 0
     @Volatile private var targetHeight = 0
     @Volatile private var running = true
@@ -73,6 +86,7 @@ class MpvPlayer {
         lib.mpv_observe_property(handle, 1, "time-pos", FORMAT_DOUBLE)
         lib.mpv_observe_property(handle, 2, "duration", FORMAT_DOUBLE)
         lib.mpv_observe_property(handle, 3, "pause", FORMAT_FLAG)
+        lib.mpv_observe_property(handle, 4, "eof-reached", FORMAT_FLAG)
 
         Thread(::eventLoop, "mpv-events").apply { isDaemon = true }.start()
         Thread(::renderLoop, "mpv-render").apply { isDaemon = true }.start()
@@ -81,12 +95,20 @@ class MpvPlayer {
     fun load(path: String) {
         _position.value = 0.0
         _duration.value = 0.0
+        _ended.value = false
+        _audioTracks.value = emptyList()
+        _audioTrack.value = null
         command("loadfile", path)
     }
     fun togglePause() = command("cycle", "pause")
     fun setPaused(paused: Boolean) = property("pause", if (paused) "yes" else "no")
     fun seek(seconds: Double) = command("seek", seconds.toString(), "absolute+exact")
     fun seekRelative(seconds: Double) = command("seek", seconds.toString(), "relative+exact")
+
+    fun selectAudio(id: Int) {
+        property("aid", id.toString())
+        _audioTrack.value = id
+    }
 
     /** Size of the area the video is drawn into, in physical pixels. */
     fun setTargetSize(width: Int, height: Int) {
@@ -199,7 +221,12 @@ class MpvPlayer {
                 EVENT_NONE -> Unit
                 EVENT_SHUTDOWN -> return
                 EVENT_PROPERTY_CHANGE -> onProperty(event.getPointer(16))
-                EVENT_FILE_LOADED, EVENT_END_FILE -> wake.release()
+                EVENT_FILE_LOADED -> {
+                    _audioTracks.value = AudioTrack.fromMpv(::propertyString)
+                    _audioTrack.value = propertyString("aid")?.toIntOrNull()
+                    wake.release()
+                }
+                EVENT_END_FILE -> wake.release()
             }
         }
     }
@@ -213,6 +240,7 @@ class MpvPlayer {
             name == "time-pos" && format == FORMAT_DOUBLE -> _position.value = data.getDouble(0)
             name == "duration" && format == FORMAT_DOUBLE -> _duration.value = data.getDouble(0)
             name == "pause" && format == FORMAT_FLAG -> _paused.value = data.getInt(0) != 0
+            name == "eof-reached" && format == FORMAT_FLAG -> _ended.value = data.getInt(0) != 0
         }
     }
 }

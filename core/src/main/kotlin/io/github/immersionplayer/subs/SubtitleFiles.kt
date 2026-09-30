@@ -28,11 +28,20 @@ object SubtitleFiles {
 
     fun language(code: String): Language? = LANGUAGES.firstOrNull { it.code == code }
 
-    /** The language code a tag like "jpn" or "ja-JP" stands for, or the tag itself if unknown. */
+    /** mpv's `alang` for [code]: every tag an audio track in that language might carry. */
+    fun mpvLanguages(code: String): String = (language(code)?.tags ?: setOf(code)).joinToString(",")
+
+    /**
+     * The language code a tag like "jpn" or "ja-JP" stands for, or the tag itself if unknown.
+     * Null for no tag, and for the placeholders files carry instead of one ("und", "mul", ...).
+     */
     fun codeForTag(tag: String?): String? {
-        val lower = tag?.lowercase() ?: return null
+        val lower = tag?.trim()?.lowercase()?.takeUnless { it.isEmpty() || it in NOT_A_LANGUAGE } ?: return null
         return LANGUAGES.firstOrNull { lower in it.tags }?.code ?: lower
     }
+
+    /** ISO 639 codes for "undetermined", "multiple", "no linguistic content" and the like. */
+    private val NOT_A_LANGUAGE = setOf("und", "mul", "mis", "zxx", "unk", "qaa")
 
     /** Whether [track] is in [code], by its text when its tag is clearly wrong (see [LanguageDetector]). */
     fun isLanguage(track: SubtitleTrack, code: String): Boolean =
@@ -94,6 +103,9 @@ class EmbeddedSubtitleCache(private val dir: File) {
         cacheFile.writeText(toJson(tracks))
         return tracks
     }
+
+    /** Where the text read from a picture track is kept; [identity] must name the file version and the track. */
+    fun lineStore(identity: String): LineStore = FileLineStore(File(dir, cacheKey(identity) + ".lines.json"))
 
     private fun cacheKey(value: String): String =
         MessageDigest.getInstance("SHA-1").digest(value.toByteArray())

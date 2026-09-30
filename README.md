@@ -27,7 +27,7 @@ Every action is a gesture. The app lists them once, on first run.
 | Line | tap a word | look it up |
 | Line | drag across the text | look up exactly what you selected |
 | Line | hold | show the English translation |
-| Panel | swipe sideways | previous / next line |
+| Panel | swipe sideways | previous / next line (back from a stop replays the line first) |
 | Panel | tap | play / pause |
 | Panel | double-tap | stop at the end of every line, on or off |
 | Divider | drag | resize the video and the panel |
@@ -40,8 +40,8 @@ Every action is a gesture. The app lists them once, on first run.
 | Key | Does |
 |---|---|
 | Space | play / pause |
-| h / l | previous / next line, then keep playing |
-| j / k | previous / next line, stop at its end |
+| h / l | previous / next line, then keep playing (back from a stop replays the line first) |
+| j / k | previous / next line, stop at its end (likewise) |
 | ; | replay this line, stop at its end |
 | hold i, or hold the line | show the peek language |
 | y / o | seek 5 s back / forward |
@@ -52,6 +52,7 @@ Every action is a gesture. The app lists them once, on first run.
 | Esc | leave full screen, then back to the library |
 | click / drag a word | look it up |
 | a | add the looked-up word to Anki (when turned on) |
+| Return | at the end of a video, play the next one in its folder |
 
 Paused, `l` and `k` carry on playing rather than skipping ahead; press again once it plays to
 jump to the next line. (A swipe on Android always jumps, since a tap there already means play.)
@@ -108,10 +109,17 @@ Other note types get a guess from their field names.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.
-- Tracks are picked by the languages set in settings on both platforms; on Android a track chosen
-  for one video still overrides that for it. Tags are checked against the text:
-  each line votes by script, so a Japanese track tagged `eng` is still found, and an English
-  track with Japanese song lyrics stays English.
+- Picture subtitles (Blu-ray PGS) are read with [Tesseract](https://github.com/tesseract-ocr/tesseract),
+  English and Japanese models bundled. Only tracks in the study or peek language that no text
+  track covers are read. They're usable a second after a video opens: their timing comes from the
+  file, and each line's text is read as it comes up, a few lines ahead, with the rest filled in
+  the background (about 50 ms a line on an M-series Mac). The text is kept, so a second viewing
+  needs no OCR.
+- Tracks are picked by the languages set in settings on both platforms, audio included; a track
+  chosen for one video (the cog in the player) still overrides that for it. Tags are checked
+  against the text: each line votes by script, so a Japanese track tagged `eng` is still found,
+  an English track with Japanese song lyrics stays English, and one tagged `und` is judged by its
+  text alone.
 
 ![The library, with thumbnails and resume positions](docs/library.png)
 
@@ -159,13 +167,13 @@ class — keep the two in step when you update either.
 ### Build: desktop
 
 ```sh
-brew install mpv                          # libmpv, found at run time
+brew install mpv tesseract                # libmpv and libtesseract, found at run time
 ./gradlew :desktop:run
 ./gradlew :desktop:packageMacRelease      # desktop/build/release/*.dmg, libmpv bundled
 ```
 
-Packaging copies Homebrew's libmpv and the libraries it loads into the app and relinks them, so
-the result doesn't need Homebrew. Only macOS on Apple Silicon is packaged; the code has no
+Packaging copies Homebrew's libmpv and libtesseract, and the libraries they load, into the app
+and relinks them, so the result doesn't need Homebrew. Only macOS on Apple Silicon is packaged; the code has no
 macOS-only parts besides the traffic-light placement, but Windows and Linux are untested.
 
 ## Tests
@@ -173,6 +181,7 @@ macOS-only parts besides the traffic-light placement, but Windows and Linux are 
 ```sh
 ./gradlew :core:test
 IMMERSION_TEST_VIDEO=any.mkv ./gradlew :desktop:test   # drives the real player offscreen
+IMMERSION_TEST_PGS=bluray.mkv ./gradlew :desktop:test  # reads a real episode's PGS tracks
 ```
 
 The Matroska test checks extraction against reference files produced by ffmpeg, and skips itself
@@ -198,7 +207,9 @@ adb shell run-as io.github.immersionplayer cat files/last_crash.txt
 
 ```
 core/       plain Kotlin/JVM, shared by every platform
-  subs/        SRT/ASS parsers, Matroska extractor, embedded-track cache
+  subs/        SRT/ASS parsers, Matroska extractor, embedded-track cache, PGS decoding and
+               line-by-line OCR (the engine is each platform's)
+  media/       audio tracks as mpv lists them
   dictionary/  Yomitan importer, SQLite store (behind Sql), deinflector, lookup
   mining/      card model and store for Anki export
   library/     natural sort, video names
@@ -216,7 +227,7 @@ desktop/    Compose Desktop
 
 ## Limitations
 
-- Anki export: card model and store exist, no UI. Nothing leaves the app yet.
+- Picture subtitles: English and Japanese only (the bundled OCR models).
 - Sidecar subtitles can't be found for videos opened from another app (a content URI doesn't say
   what's next to it).
 - Android: arm64 only, phone layouts only.
@@ -240,6 +251,11 @@ modify, sell and redistribute it, provided recipients get the same freedoms and 
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
 - **Shizuku API** (optional, for the shoulder triggers): Apache-2.0.
+- **Tesseract** and its `eng`/`jpn` models from
+  [tessdata_best](https://github.com/tesseract-ocr/tessdata_best) (bundled, for picture
+  subtitles): Apache-2.0. On Android through
+  [Tesseract4Android](https://github.com/adaptech-cz/Tesseract4Android), Apache-2.0; its
+  Leptonica is BSD-2-Clause.
 
 The footage in the screenshots is
 [Build your first WebAuthn app](https://www.youtube.com/watch?v=8ren54IMSf4) by Eiji Kitamura for

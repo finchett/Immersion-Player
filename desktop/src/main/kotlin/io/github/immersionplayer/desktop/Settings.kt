@@ -172,6 +172,10 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun subtitleOffset(path: String): Double = videos.getDouble("${key(path)}.offset", 0.0)
     fun setSubtitleOffset(path: String, seconds: Double) = videos.putDouble("${key(path)}.offset", seconds)
 
+    /** Name of the track picked for a video; "" means "none" (translation only), null means not chosen. */
+    fun trackChoice(path: String, role: String): String? = videos.get("${key(path)}.$role", null)
+    fun setTrackChoice(path: String, role: String, name: String) = videos.put("${key(path)}.$role", name)
+
 
     private fun key(path: String): String =
         MessageDigest.getInstance("SHA-1").digest(path.toByteArray())

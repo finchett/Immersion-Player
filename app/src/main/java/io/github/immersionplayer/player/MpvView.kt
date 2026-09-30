@@ -51,7 +51,8 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         }
     }
 
-    fun initialize(startPosition: Double, fill: Boolean) {
+    /** [audioLanguages] is mpv's `alang`: the audio to prefer, as a comma-separated list of tags. */
+    fun initialize(startPosition: Double, fill: Boolean, audioLanguages: String) {
         // libmpv is a per-process singleton shared with the thumbnail generator
         ThumbnailGenerator.requestAbort()
         MpvOwner.acquire(OWNER)
@@ -72,8 +73,8 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         MPVLib.setOptionString("gpu-shader-cache-dir", context.cacheDir.path)
         MPVLib.setOptionString("icc-cache-dir", context.cacheDir.path)
 
-        // Japanese audio; subtitles are never drawn on the video (the app shows them beside it)
-        MPVLib.setOptionString("alang", "jpn,ja,jp")
+        // audio in the language being studied; subtitles are never drawn on the video (the app shows them beside it)
+        MPVLib.setOptionString("alang", audioLanguages)
         MPVLib.setOptionString("sid", "no")
         MPVLib.setOptionString("osd-level", "0")
         MPVLib.setOptionString("hr-seek", "yes")

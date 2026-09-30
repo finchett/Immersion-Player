@@ -108,6 +108,7 @@ fun main(args: Array<String>) {
                 Key.F -> toggleFullscreen()
                 Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
                 Key.A -> keys.onAddCard()
+                Key.Enter -> keys.onPlayNext?.invoke() ?: return false
                 Key.DirectionLeft -> if (event.isShiftPressed) current.seekBy(-5.0) else current.previousLine()
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
                 Key.Escape -> if (windowState.placement == WindowPlacement.Fullscreen) toggleFullscreen() else closeVideo()
@@ -172,7 +173,9 @@ fun main(args: Array<String>) {
                         label = "player",
                     ) { s ->
                         if (s is Screen.Player) {
-                            sessions[s]?.let { PlayerScreen(app, it, keys, onBack = ::closeVideo) }
+                            sessions[s]?.let {
+                                PlayerScreen(app, it, keys, onBack = ::closeVideo, onOpenVideo = { next -> openVideo(next, s.from) })
+                            }
                             DisposableEffect(s) { onDispose { if (screen != s) sessions.remove(s) } }
                         } else {
                             Browse(

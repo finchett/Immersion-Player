@@ -9,10 +9,13 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import io.github.immersionplayer.Prefs
+import io.github.immersionplayer.media.AudioTrack
 import io.github.immersionplayer.subs.SubtitleTrack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import `is`.xyz.mpv.MPVLib
 
 /** Playback state and line-by-line navigation for one video. */
 class PlayerSession(
@@ -39,6 +42,18 @@ class PlayerSession(
 
     private val _secondary = MutableStateFlow<SubtitleTrack?>(null)
     val secondary: StateFlow<SubtitleTrack?> = _secondary.asStateFlow()
+
+    private val _audioTracks = MutableStateFlow<List<AudioTrack>>(emptyList())
+    /** The video's audio tracks, read when mpv has loaded it. */
+    val audioTracks: StateFlow<List<AudioTrack>> = _audioTracks.asStateFlow()
+
+    private val _audioTrack = MutableStateFlow<Int?>(null)
+    /** The [AudioTrack.id] playing, or null for none. */
+    val audioTrack: StateFlow<Int?> = _audioTrack.asStateFlow()
+
+    private val _linesRead = MutableStateFlow(0)
+    /** Goes up as lines of picture tracks are read, so what shows their text can redraw. */
+    val linesRead: StateFlow<Int> = _linesRead.asStateFlow()
 
     private val _tracks = MutableStateFlow<List<SubtitleTrack>>(emptyList())
     val tracks: StateFlow<List<SubtitleTrack>> = _tracks.asStateFlow()
@@ -95,9 +110,19 @@ class PlayerSession(
         view = null
     }
 
+    /** Stops reading picture tracks. For when the player goes, not just its view (which comes back on rotation). */
+    fun release() {
+        _tracks.value.forEach { it.pictures?.close() }
+    }
+
     /** Loads a video's tracks, restoring the user's earlier choices for this video if any. */
     fun setTracks(all: List<SubtitleTrack>, defaultPrimary: SubtitleTrack?, defaultSecondary: SubtitleTrack?) {
         _tracks.value = all
+        for (track in all) {
+            val pictures = track.pictures ?: continue
+            pictures.onRead = { _linesRead.update { it + 1 } }
+            pictures.start()
+        }
         val savedPrimary = prefs.trackChoice(videoUri, "primary")
         val savedSecondary = prefs.trackChoice(videoUri, "secondary")
         _primary.value = all.firstOrNull { it.name == savedPrimary } ?: defaultPrimary
@@ -118,6 +143,13 @@ class PlayerSession(
     fun selectSecondary(track: SubtitleTrack?) {
         _secondary.value = track
         prefs.setTrackChoice(videoUri, "secondary", track?.name ?: "")
+    }
+
+    fun selectAudio(track: AudioTrack) {
+        if (view == null) return
+        MPVLib.setPropertyString("aid", track.id.toString())
+        _audioTrack.value = track.id
+        prefs.setTrackChoice(videoUri, "audio", track.id.toString())
     }
 
     fun setOffset(seconds: Double) {
@@ -175,8 +207,14 @@ class PlayerSession(
 
     fun previousLine() {
         val index = _lineIndex.value
-        // between lines, "previous" means the line that just finished
-        val target = if (_lineActive.value || index < 0) index - 1 else index
+        val cue = _primary.value?.cues?.getOrNull(index)
+        val target = when {
+            // stopped partway through a line, or at its end: back to its start, to hear it again
+            _paused.value && cue != null && _position.value - _offset.value > cue.start + REPLAY_MARGIN -> index
+            // between lines, "previous" means the line that just finished
+            index >= 0 && !_lineActive.value -> index
+            else -> index - 1
+        }
         playLine(target.coerceAtLeast(0))
     }
 
@@ -201,10 +239,14 @@ class PlayerSession(
         val active = index >= 0 && time < track.cues[index].end
         _lineIndex.value = index
         _lineActive.value = active
+        // picture tracks: read what's on screen (and just after it) before anything else
+        track.pictures?.want(index.coerceAtLeast(0))
+        _secondary.value?.pictures?.wantAt(time)
 
-        if (active && index != lastCopiedLine && prefs.copyLines) {
+        // a picture line's text may not be read yet; it's copied once it is
+        val text = track.cues.getOrNull(index)?.text.orEmpty()
+        if (active && index != lastCopiedLine && prefs.copyLines && text.isNotEmpty()) {
             lastCopiedLine = index
-            val text = track.cues[index].text
             mainHandler.post { copyToClipboard(text) }
         }
 
@@ -222,7 +264,16 @@ class PlayerSession(
         clipboard.setPrimaryClip(ClipData.newPlainText("subtitle", text))
     }
 
-    // MpvView.Listener (called on mpv's event thread)
+    // MpvView.Listener (called on mpv's event thread, except onFileLoaded)
+
+    override fun onFileLoaded() {
+        val tracks = AudioTrack.fromMpv { runCatching { MPVLib.getPropertyString(it) }.getOrNull() }
+        _audioTracks.value = tracks
+        // a track picked for this video beats the language setting
+        val saved = prefs.trackChoice(videoUri, "audio")?.toIntOrNull()
+        if (saved != null && tracks.any { it.id == saved }) MPVLib.setPropertyString("aid", saved.toString())
+        _audioTrack.value = runCatching { MPVLib.getPropertyString("aid")?.toIntOrNull() }.getOrNull()
+    }
 
     override fun onTimePos(seconds: Double) {
         _position.value = seconds
@@ -259,5 +310,7 @@ class PlayerSession(
     companion object {
         /** Pause slightly early so the next line's first syllable isn't heard. */
         private const val END_MARGIN = 0.05
+        /** Paused less than this into a line counts as at its start, where "previous" goes further back. */
+        private const val REPLAY_MARGIN = 0.5
     }
 }

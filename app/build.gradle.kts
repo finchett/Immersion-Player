@@ -75,6 +75,8 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    // OCR for picture (PGS) subtitles; Apache-2.0
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
 
     val composeBom = platform("androidx.compose:compose-bom:2026.04.01")
     implementation(composeBom)

@@ -7,11 +7,15 @@ data class Cue(
     val text: String,
 )
 
-/** A parsed subtitle track, with cues sorted by start time. */
+/**
+ * A parsed subtitle track, with cues sorted by start time. A track read from pictures has
+ * [pictures], and its cues' text fills in as that reads them ("" until then).
+ */
 data class SubtitleTrack(
     val name: String,
     val language: String?,
     val cues: List<Cue>,
+    val pictures: PictureLines? = null,
 ) {
     /**
      * Index of the cue that is showing at [time], or else the last cue that started before it.

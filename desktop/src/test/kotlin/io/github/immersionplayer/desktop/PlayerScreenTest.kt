@@ -85,6 +85,8 @@ class PlayerScreenTest {
         Files.createSymbolicLink(video.toPath(), videoSource!!.absoluteFile.toPath())
         File(dir, "Lesson 01.ja.srt").writeText(ja)
         File(dir, "Lesson 01.en.srt").writeText(en)
+        // the episode after it, for the end-of-video prompt
+        Files.createSymbolicLink(File(dir, "Lesson 02.mkv").toPath(), videoSource.absoluteFile.toPath())
 
         Preferences.userRoot().node(node).removeNode()
         val app = DesktopApp(File(dir, "data").apply { mkdirs() }, File(dir, "cache"), Settings(node))
@@ -123,7 +125,7 @@ class PlayerScreenTest {
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
                     DesktopTheme(AppTheme.Midnight) {
-                        PlayerScreen(app, session, keys, onBack = {})
+                        PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
                     }
                 }
                 // first line plays, and its first kanji word is looked up without a click
@@ -166,6 +168,38 @@ class PlayerScreenTest {
         }
     }
 
+    /** At the end of the video the next one in the folder is offered, by click or Return. */
+    @Test
+    fun offersTheNextEpisodeAtTheEnd() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        fixture(ja = srt(1.0..2.0 to "一つ目の行。"), en = srt(1.0..2.0 to "The first line.")) {
+            val keys = PlayerKeys()
+            var opened: File? = null
+            runDesktopComposeUiTest(width = 1440, height = 860) {
+                setContent {
+                    DesktopTheme(AppTheme.Midnight) {
+                        PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = { opened = it })
+                    }
+                }
+                waitUntil(timeoutMillis = 15_000) { session.duration.value > 0 }
+                assertFalse(shows("Next episode"))
+                assertEquals(null, keys.onPlayNext)
+
+                session.seekTo(session.duration.value - 0.5)
+                waitUntil(timeoutMillis = 15_000) { shows("Next episode") && shows("Lesson 02") }
+                shot("5-next-episode")
+                keys.onPlayNext!!()
+                assertEquals("Lesson 02.mkv", opened?.name)
+
+                // seeking back into the video takes the offer away again
+                opened = null
+                session.seekTo(1.0)
+                waitUntil(timeoutMillis = 15_000) { !shows("Next episode") }
+                assertEquals(null, keys.onPlayNext)
+            }
+        }
+    }
+
     /** Forward from a pause plays on; forward again, still before the next line, jumps to it. */
     @Test
     fun forwardCarriesOnBeforeItSkipsAhead() {
@@ -190,6 +224,77 @@ class PlayerScreenTest {
             session.nextLine()
             waitFor("the second line") { session.lineActive.value }
             assertEquals(1, session.lineIndex.value)
+        }
+    }
+
+    /**
+     * Audio follows the target language rather than the file's default track, and a track picked by
+     * hand wins when the video is opened again. Needs a test video with Japanese and other audio.
+     */
+    @Test
+    fun audioFollowsTheTargetLanguage() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        fixture(ja = srt(1.0..3.0 to "一つ目の行。"), en = srt(1.0..3.0 to "The first line.")) {
+            waitFor("the audio tracks") { session.audioTracks.value.isNotEmpty() }
+            val tracks = session.audioTracks.value
+            val japanese = tracks.firstOrNull { it.language == "jpn" || it.language == "ja" }
+            val other = tracks.firstOrNull { it != japanese }
+            assumeTrue("the test video needs Japanese and other audio", japanese != null && other != null)
+            waitFor("Japanese audio") { session.audioTrack.value == japanese!!.id }
+
+            session.selectAudio(other!!)
+            assertEquals(other.id, session.player.propertyString("aid")?.toIntOrNull())
+            session.close()
+            val again = PlayerSession(app.settings, session.player, session.video)
+            try {
+                waitFor("the picked audio after reopening") { again.audioTrack.value == other.id }
+            } finally {
+                again.close()
+            }
+        }
+    }
+
+    /** A track picked by hand beats the automatic choice, and is still picked when the video's tracks load again. */
+    @Test
+    fun pickedTracksAreRemembered() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        fixture(
+            ja = srt(1.0..3.0 to "一つ目の行。"),
+            en = srt(1.0..3.0 to "The first line."),
+        ) {
+            val tracks = app.loadSubtitles(session.video)
+            session.setTracks(tracks)
+            val japanese = session.primary.value!!
+            val english = session.secondary.value!!
+            assertEquals("ja", japanese.language)
+            assertEquals("en", english.language)
+
+            session.selectPrimary(english)
+            session.selectSecondary(null)
+            session.setTracks(app.loadSubtitles(session.video))
+            assertEquals(english.name, session.primary.value?.name)
+            assertEquals(null, session.secondary.value)
+        }
+    }
+
+    /** Back from a line's stop replays that line; back again, now it plays, goes to the line before. */
+    @Test
+    fun backFromAStopReplaysTheLineFirst() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        fixture(
+            ja = srt(1.0..3.0 to "一つ目の行。", 5.0..7.0 to "二つ目の行。"),
+            en = srt(1.0..3.0 to "The first line.", 5.0..7.0 to "The second line."),
+        ) {
+            session.setTracks(app.loadSubtitles(session.video))
+            session.playLine(1, stopAtEnd = true)
+            waitFor("the second line to stop at its end") { session.paused.value && session.position.value > 6.5 }
+
+            session.previousLine(stopAtEnd = true)
+            waitFor("the second line again") { !session.paused.value && session.lineIndex.value == 1 }
+            assertTrue("replayed from its start, not ${session.position.value}", session.position.value < 5.6)
+
+            session.previousLine(stopAtEnd = true)
+            waitFor("the first line") { session.lineIndex.value == 0 && session.lineActive.value }
         }
     }
 

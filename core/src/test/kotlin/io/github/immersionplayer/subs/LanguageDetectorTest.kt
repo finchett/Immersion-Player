@@ -14,6 +14,15 @@ class LanguageDetectorTest {
     private val chinese = arrayOf("你今天想吃什么？", "我们一起学习吧。", "这是我的朋友。", "他们已经到了北京。")
 
     @Test
+    fun placeholderTagsLeaveItToTheText() {
+        // "und" is what many MKVs carry instead of a language
+        val dialogue = track("jpn", *japanese)
+        val undetermined = track("und", *english)
+        assertEquals("en", SubtitleFiles.effectiveLanguage(undetermined))
+        assertEquals(undetermined, SubtitleFiles.pickSecondary(listOf(dialogue, undetermined), dialogue, "en"))
+    }
+
+    @Test
     fun scriptSettlesNonLatinLanguages() {
         assertEquals("ja", LanguageDetector.detect(track(null, *japanese)))
         assertEquals("zh", LanguageDetector.detect(track(null, *chinese)))
