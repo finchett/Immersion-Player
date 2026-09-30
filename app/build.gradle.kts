@@ -27,8 +27,8 @@ android {
         applicationId = "io.github.immersionplayer"
         minSdk = 30
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
         // on-device tests; run by hand (see androidTest), since connectedAndroidTest uninstalls the app after
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
