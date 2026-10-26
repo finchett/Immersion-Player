@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import android.os.PowerManager
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
@@ -136,6 +137,7 @@ import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.LookupResult
 import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.player.MpvView
+import io.github.immersionplayer.player.PlaybackService
 import io.github.immersionplayer.player.PlayerCommand
 import io.github.immersionplayer.triggers.ShoulderTriggers
 import io.github.immersionplayer.player.PlayerCommands
@@ -275,13 +277,15 @@ fun PlayerScreen(
         PlayerSession(context.applicationContext, app.prefs, video.uri.toString(), video.name ?: "video")
     }
 
-    // pause when the app is backgrounded or the screen turns off, and when headphones disconnect
+    // pause when the app is backgrounded and when headphones disconnect, but keep playing when
+    // the phone is locked (the screen is already off when we're stopped by that)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
+        val power = context.getSystemService(PowerManager::class.java)
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> session.savePosition()
-                Lifecycle.Event.ON_STOP -> session.pause()
+                Lifecycle.Event.ON_STOP -> if (power?.isInteractive != false) session.pause()
                 else -> Unit
             }
         }
@@ -300,6 +304,13 @@ fun PlayerScreen(
             context.unregisterReceiver(noisyReceiver)
         }
     }
+
+    // while playing, a foreground service keeps the app running with the screen off
+    val playing = !session.paused.collectAsState().value
+    LaunchedEffect(playing) {
+        if (playing) PlaybackService.start(context, session.videoName) else PlaybackService.stop(context)
+    }
+    DisposableEffect(session) { onDispose { PlaybackService.stop(context) } }
 
     // shoulder triggers: only while the player is on screen and held in landscape, so presses
     // (and the taps the phone's game service injects alongside them) can't reach other apps

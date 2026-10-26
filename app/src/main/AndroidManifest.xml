@@ -4,6 +4,10 @@
     <!-- Anki cards: AnkiDroid's permission to add notes through its content provider -->
     <uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
 
+    <!-- keep playing with the phone locked -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
     <!-- to tell whether Shizuku (shoulder triggers) and AnkiDroid (Anki cards) are installed -->
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
@@ -39,6 +43,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <service
+            android:name=".player.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <activity
             android:name=".MainActivity"
