@@ -111,7 +111,8 @@ Other note types get a guess from their field names.
   set up, mpv's software renderer draws into it directly (about 5 ms per 1080p frame on Apple
   Silicon). `-Prenderer=sw` forces the software one.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled, in the modes from its mpv
-  instructions (Settings › Appearance › Shaders, or ⌘ + 1–6). They need the GPU renderer.
+  instructions. Set them under Settings › Appearance › Shaders, from the shader button on the
+  video's controls, or with ⌘ + 1–6. They need the GPU renderer.
   Quality is Fast, HQ or Auto (the default). Auto measures the GPU once, the first time Anime4K
   is on: HQ Mode A on a test pattern for a few seconds, untimed, at the screen's full size. If
   that reaches 30 fps it uses HQ, otherwise Fast. The result is kept until the GPU or screen size

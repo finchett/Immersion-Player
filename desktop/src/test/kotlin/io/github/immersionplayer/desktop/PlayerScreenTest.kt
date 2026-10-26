@@ -6,7 +6,11 @@ import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import io.github.immersionplayer.desktop.mpv.MpvPlayer
 import io.github.immersionplayer.dictionary.YomitanImporter
@@ -67,7 +71,8 @@ class PlayerScreenTest {
 
     private fun SemanticsNodeInteractionsProvider.shot(name: String) {
         val dir = shots ?: return
-        ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(dir, "$name.png"))
+        // an open menu is a root of its own, over the window's: the last root is the top one
+        ImageIO.write(onAllNodes(isRoot()).onLast().captureToImage().toAwtImage(), "png", File(dir, "$name.png"))
     }
 
     private fun SemanticsNodeInteractionsProvider.shows(text: String) =
@@ -196,6 +201,37 @@ class PlayerScreenTest {
                 session.seekTo(1.0)
                 waitUntil(timeoutMillis = 15_000) { !shows("Next episode") }
                 assertEquals(null, keys.onPlayNext)
+            }
+        }
+    }
+
+    /** The shader button on the video's controls sets Anime4K, which mpv then runs. */
+    @Test
+    fun shaderMenuSetsAnime4K() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        fixture(ja = srt(1.0..2.0 to "一つ目の行。"), en = srt(1.0..2.0 to "The first line.")) {
+            assumeTrue("needs OpenGL", session.player.runsShaders)
+            // Fast, so the menu doesn't set off a benchmark
+            app.settings.updateAnime4kQuality(Anime4K.Quality.FAST)
+            val keys = PlayerKeys()
+            runDesktopComposeUiTest(width = 1440, height = 860) {
+                setContent {
+                    DesktopTheme(AppTheme.Midnight) {
+                        PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
+                    }
+                }
+                waitUntil(timeoutMillis = 15_000) { session.duration.value > 0 }
+                // paused, the controls stay up
+                session.pause()
+                waitUntil(timeoutMillis = 5_000) { onAllNodesWithContentDescription("Shaders").fetchSemanticsNodes().isNotEmpty() }
+                onNodeWithContentDescription("Shaders").performClick()
+                waitUntil(timeoutMillis = 5_000) { shows("Mode B") }
+                shot("6-shader-menu")
+                onNodeWithText("Mode B").performClick()
+                assertEquals(Anime4K.Mode.B, app.settings.anime4kMode)
+                waitUntil(timeoutMillis = 5_000) {
+                    session.player.propertyString("glsl-shaders").orEmpty().contains("Anime4K_Restore_CNN_Soft_M.glsl")
+                }
             }
         }
     }

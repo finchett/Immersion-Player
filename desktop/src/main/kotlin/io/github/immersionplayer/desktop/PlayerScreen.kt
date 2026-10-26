@@ -22,6 +22,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
@@ -281,6 +284,7 @@ fun PlayerScreen(
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
         Row(Modifier.fillMaxSize()) {
             VideoArea(
+                app,
                 session,
                 keys,
                 next = next,
@@ -357,7 +361,7 @@ private const val NOTICE_MS = 1500L
 
 /** The video, with controls that show on mouse movement or while paused and otherwise get out of the way. */
 @Composable
-private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onPlayNext: () -> Unit, modifier: Modifier) {
+private fun VideoArea(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, next: File?, onPlayNext: () -> Unit, modifier: Modifier) {
     val paused by session.paused.collectAsState()
     val ended by session.ended.collectAsState()
     val offerNext = ended && next != null
@@ -367,13 +371,15 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onP
     }
     var lastMove by remember { mutableLongStateOf(0L) }
     var overControls by remember { mutableStateOf(false) }
+    // a menu opened from the controls keeps them up: the pointer is over the menu, not them
+    var menuOpen by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
     LaunchedEffect(lastMove) {
         moving = lastMove > 0
         delay(CONTROLS_TIMEOUT_MS)
         moving = false
     }
-    val visible = paused || moving || overControls
+    val visible = paused || moving || overControls || menuOpen
     LaunchedEffect(visible) { keys.chromeVisible = visible }
     DisposableEffect(Unit) { onDispose { keys.chromeVisible = true } }
     Box(
@@ -427,7 +433,7 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onP
                 .onPointerEvent(PointerEventType.Enter) { overControls = true }
                 .onPointerEvent(PointerEventType.Exit) { overControls = false },
         ) {
-            Controls(session)
+            Controls(app, session, onMenu = { menuOpen = it })
         }
     }
 }
@@ -476,7 +482,7 @@ private val HiddenCursor = PointerIcon(
 )
 
 @Composable
-private fun Controls(session: PlayerSession) {
+private fun Controls(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
     val position by session.position.collectAsState()
     val duration by session.duration.collectAsState()
     val paused by session.paused.collectAsState()
@@ -509,7 +515,84 @@ private fun Controls(session: PlayerSession) {
                 style = MaterialTheme.typography.labelMedium,
                 color = white.copy(alpha = 0.85f),
             )
+            Spacer(Modifier.weight(1f))
+            ShaderMenu(app, session, onMenu)
         }
+    }
+}
+
+/** Anime4K's mode and quality, the same settings as Settings › Appearance › Shaders. */
+@Composable
+private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
+    val settings = app.settings
+    val benchmarking by app.benchmarking.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    fun show(value: Boolean) {
+        open = value
+        onMenu(value)
+    }
+    Box {
+        val interaction = remember { MutableInteractionSource() }
+        val hovered by interaction.collectIsHoveredAsState()
+        Box(
+            Modifier.clip(RoundedCornerShape(6.dp))
+                .background(if (hovered || open) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+                .hoverable(interaction)
+                .clickable(interaction, indication = null) { show(true) }
+                .pointerHoverIcon(PointerIcon.Hand)
+                .semantics { contentDescription = "Shaders" }
+                .padding(5.dp),
+        ) {
+            ShaderIcon(if (settings.anime4kMode != null) MaterialTheme.colorScheme.primary else Color.White)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { show(false) }) {
+            @Composable
+            fun item(label: String, selected: Boolean, onClick: () -> Unit) = DropdownMenuItem(
+                text = { Text(label, maxLines = 1) },
+                leadingIcon = { Text(if (selected) "✓" else "", Modifier.width(12.dp)) },
+                onClick = { onClick(); show(false) },
+            )
+            MenuHeading("Anime4K")
+            if (!session.player.runsShaders) MenuHeading("Needs OpenGL, which isn't available here")
+            item("Off", settings.anime4kMode == null) { settings.updateAnime4kMode(null) }
+            Anime4K.Mode.entries.forEach { mode ->
+                item(mode.label, settings.anime4kMode == mode) { settings.updateAnime4kMode(mode) }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            MenuHeading("Quality")
+            Anime4K.Quality.entries.forEach { quality ->
+                val label = if (quality != Anime4K.Quality.AUTO) quality.label else {
+                    val benchmark = settings.anime4kBenchmark
+                    when {
+                        benchmarking -> "Auto (measuring…)"
+                        benchmark == null -> "Auto"
+                        else -> "Auto (${if (benchmark.hq) "HQ" else "Fast"} on this Mac)"
+                    }
+                }
+                item(label, settings.anime4kQuality == quality) { settings.updateAnime4kQuality(quality) }
+            }
+        }
+    }
+}
+
+/** Placeholder for the shader button's icon, until the real one is drawn: a four-point sparkle. */
+@Composable
+private fun ShaderIcon(color: Color, diameter: Dp = 14.dp) {
+    Canvas(Modifier.size(diameter)) {
+        val r = size.minDimension / 2
+        val waist = r * 0.22f
+        val path = Path().apply {
+            moveTo(center.x, center.y - r)
+            lineTo(center.x + waist, center.y - waist)
+            lineTo(center.x + r, center.y)
+            lineTo(center.x + waist, center.y + waist)
+            lineTo(center.x, center.y + r)
+            lineTo(center.x - waist, center.y + waist)
+            lineTo(center.x - r, center.y)
+            lineTo(center.x - waist, center.y - waist)
+            close()
+        }
+        drawPath(path, color)
     }
 }
 
