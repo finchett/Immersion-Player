@@ -232,6 +232,9 @@ class PlayerScreenTest {
                 onNodeWithContentDescription("Shaders").performClick()
                 waitUntil(timeoutMillis = 5_000) { shows("Best") }
                 assertFalse("modes start folded away", shows("Mode B"))
+                // Auto says which of Fast and Best it went with
+                val autoPick = if (Anime4K.fast(Anime4K.Preset.AUTO, Anime4K.hardware)) "Fast" else "Best"
+                assertTrue(shows("Auto · $autoPick"))
                 shot("6-shader-menu")
                 onNodeWithText("Fast").performClick()
                 assertEquals(Anime4K.Preset.FAST, app.settings.anime4kPreset)

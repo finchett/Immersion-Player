@@ -85,6 +85,9 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -547,15 +550,29 @@ private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean
         }
         DropdownMenu(expanded = open, onDismissRequest = { show(false) }) {
             @Composable
-            fun item(label: String, selected: Boolean, onClick: () -> Unit) = DropdownMenuItem(
-                text = { Text(label, maxLines = 1) },
+            /** [note], if any, follows the label muted: what the item stands for, not its name. */
+            fun item(label: String, selected: Boolean, note: String? = null, onClick: () -> Unit) = DropdownMenuItem(
+                text = {
+                    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+                    Text(
+                        buildAnnotatedString {
+                            append(label)
+                            if (note != null) withStyle(SpanStyle(color = muted)) { append(" · $note") }
+                        },
+                        maxLines = 1,
+                    )
+                },
                 leadingIcon = { Text(if (selected) "✓" else "", Modifier.width(12.dp)) },
                 onClick = { onClick(); show(false) },
             )
             MenuHeading("Anime4K")
             if (!session.player.runsShaders) MenuHeading("Needs OpenGL, which isn't available here")
             Anime4K.Preset.entries.forEach { preset ->
-                item(preset.label, settings.anime4kPreset == preset) { settings.updateAnime4kPreset(preset) }
+                // Auto says which of Fast and Best it went with
+                val note = if (preset == Anime4K.Preset.AUTO) {
+                    if (Anime4K.fast(preset, Anime4K.hardware)) Anime4K.Preset.FAST.label else Anime4K.Preset.BEST.label
+                } else null
+                item(preset.label, settings.anime4kPreset == preset, note) { settings.updateAnime4kPreset(preset) }
             }
             HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
             DropdownMenuItem(

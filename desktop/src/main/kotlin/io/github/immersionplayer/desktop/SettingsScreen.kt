@@ -460,7 +460,7 @@ private class AnkiCollection(val noteTypes: List<String>, val decks: List<String
 
 private fun presetDetail(preset: Anime4K.Preset): String = when (preset) {
     Anime4K.Preset.OFF -> "Sharpens and upscales anime on the GPU"
-    Anime4K.Preset.AUTO -> "Fast or Best, whichever suits your GPU"
+    Anime4K.Preset.AUTO -> "Using ${if (Anime4K.fast(preset, Anime4K.hardware)) "Fast" else "Best"}"
     Anime4K.Preset.FAST -> "Lighter networks, which most GPUs keep up with"
     Anime4K.Preset.BEST -> "Anime4K's largest networks; needs a powerful GPU"
 }

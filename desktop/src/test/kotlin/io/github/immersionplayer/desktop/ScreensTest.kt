@@ -138,6 +138,12 @@ class ScreensTest {
                 waitForIdle()
                 assertTrue(onAllNodesWithText("Rounded corners").fetchSemanticsNodes().isNotEmpty())
                 shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "settings-dark.png")) }
+
+                // Anime4K at Auto says which preset it's using
+                settings.updateAnime4kPreset(Anime4K.Preset.AUTO)
+                val using = if (Anime4K.fast(Anime4K.Preset.AUTO, Anime4K.hardware)) "Using Fast" else "Using Best"
+                waitUntil(timeoutMillis = 5_000) { onAllNodesWithText(using).fetchSemanticsNodes().isNotEmpty() }
+                shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "settings-anime4k-auto.png")) }
             }
         } finally {
             Preferences.userRoot().node(node).removeNode()
