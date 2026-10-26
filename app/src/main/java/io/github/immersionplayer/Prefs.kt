@@ -65,6 +65,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("video_fill", false)
         set(value) = prefs.edit { putBoolean("video_fill", value) }
 
+    /** Hide the study panel so the video has the whole screen (subtitles then go on the video). */
+    var panelHidden: Boolean
+        get() = prefs.getBoolean("panel_hidden", false)
+        set(value) = prefs.edit { putBoolean("panel_hidden", value) }
+
     /** Whether the first-run gesture guide has been dismissed. */
     var gestureGuideSeen: Boolean
         get() = prefs.getBoolean("gesture_guide_seen", false)

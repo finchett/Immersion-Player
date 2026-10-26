@@ -103,6 +103,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
@@ -358,6 +360,7 @@ fun PlayerScreen(
 
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
+    val panelHidden by session.panelHidden.collectAsState()
 
     var lookup by remember { mutableStateOf<ActiveLookup?>(null) }
     var hasDictionaries by remember { mutableStateOf(true) }
@@ -446,6 +449,8 @@ fun PlayerScreen(
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
+                    showSubtitles = panelHidden,
+                    subtitleSize = app.prefs.subtitleSize,
                     modifier = modifier,
                 )
             }
@@ -462,7 +467,9 @@ fun PlayerScreen(
                     modifier = modifier,
                 )
             }
-            if (landscape) {
+            if (panelHidden) {
+                videoArea(Modifier.fillMaxSize().padding(gap))
+            } else if (landscape) {
                 val totalWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
                 val zonePx = with(LocalDensity.current) { RESIZE_ZONE_WIDTH.toPx() }
                 Box(Modifier.fillMaxSize()) {
@@ -563,6 +570,8 @@ private fun VideoArea(
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
+    showSubtitles: Boolean,
+    subtitleSize: Float,
     modifier: Modifier,
 ) {
     val ended by session.ended.collectAsState()
@@ -769,6 +778,9 @@ private fun VideoArea(
                 },
         )
 
+        // with the study panel hidden, the line goes on the video
+        if (showSubtitles) VideoSubtitle(session, subtitleSize, Modifier.align(Alignment.BottomCenter))
+
         // play/pause flash in the middle
         AnimatedVisibility(showFlash, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
             Box(
@@ -939,6 +951,31 @@ private fun VideoArea(
             }
         }
     }
+}
+
+/** The line being spoken, over the bottom of the video. Picture lines show once they're read. */
+@Composable
+private fun VideoSubtitle(session: PlayerSession, textSize: Float, modifier: Modifier) {
+    val primary by session.primary.collectAsState()
+    val lineIndex by session.lineIndex.collectAsState()
+    val lineActive by session.lineActive.collectAsState()
+    val linesRead by session.linesRead.collectAsState()
+    val text = remember(primary, lineIndex, linesRead) { primary?.cues?.getOrNull(lineIndex)?.text.orEmpty() }
+    if (!lineActive || text.isEmpty()) return
+    Text(
+        text,
+        color = Color.White,
+        fontSize = textSize.sp,
+        lineHeight = (textSize * 1.3f).sp,
+        textAlign = TextAlign.Center,
+        style = MaterialTheme.typography.bodyLarge.copy(
+            shadow = Shadow(Color.Black, offset = Offset(0f, 2f), blurRadius = 6f),
+        ),
+        modifier = modifier
+            .padding(start = 24.dp, end = 24.dp, bottom = 28.dp)
+            .background(Color(0x66000000), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    )
 }
 
 /**
@@ -1230,6 +1267,7 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
     val offset by session.offset.collectAsState()
     val fill by session.fill.collectAsState()
     val autoPause by session.autoPause.collectAsState()
+    val panelHidden by session.panelHidden.collectAsState()
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
@@ -1294,6 +1332,10 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Fill the video area (or pinch)", Modifier.weight(1f))
                     Switch(checked = fill, onCheckedChange = session::setFill)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Video only: hide the study panel and show subtitles on the video", Modifier.weight(1f))
+                    Switch(checked = panelHidden, onCheckedChange = session::setPanelHidden)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Stop at the end of each line (or double-tap the panel)", Modifier.weight(1f))

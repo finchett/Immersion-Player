@@ -80,6 +80,10 @@ class PlayerSession(
     private val _fill = MutableStateFlow(prefs.videoFill)
     val fill: StateFlow<Boolean> = _fill.asStateFlow()
 
+    private val _panelHidden = MutableStateFlow(prefs.panelHidden)
+    /** Video only: no study panel, subtitles drawn on the video. */
+    val panelHidden: StateFlow<Boolean> = _panelHidden.asStateFlow()
+
     // pause when another app (or a call) takes the audio; we don't auto-resume
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
@@ -169,6 +173,11 @@ class PlayerSession(
         _fill.value = fill
         prefs.videoFill = fill
         view?.setFill(fill)
+    }
+
+    fun setPanelHidden(hidden: Boolean) {
+        _panelHidden.value = hidden
+        prefs.panelHidden = hidden
     }
 
     fun togglePause() {
