@@ -265,10 +265,6 @@ fun PlayerScreen(
         }
         session.player.setShaders(shaders)
     }
-    // Auto plays Fast until the GPU has been measured, then switches if Best keeps up
-    LaunchedEffect(settings.anime4kPreset) {
-        withContext(Dispatchers.IO) { app.benchmarkShadersIfNeeded() }
-    }
 
     val rounded = settings.roundedCorners
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -527,7 +523,6 @@ private fun Controls(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) 
 @Composable
 private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
     val settings = app.settings
-    val benchmarking by app.benchmarking.collectAsState()
     val videoHeight by session.player.videoHeight.collectAsState()
     var open by remember { mutableStateOf(false) }
     // the modes stay folded away unless one has been picked
@@ -560,15 +555,7 @@ private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean
             MenuHeading("Anime4K")
             if (!session.player.runsShaders) MenuHeading("Needs OpenGL, which isn't available here")
             Anime4K.Preset.entries.forEach { preset ->
-                val label = if (preset != Anime4K.Preset.AUTO) preset.label else {
-                    val benchmark = settings.anime4kBenchmark
-                    when {
-                        benchmarking -> "Auto (measuring…)"
-                        benchmark == null -> "Auto"
-                        else -> "Auto (${if (benchmark.best) "Best" else "Fast"} on this Mac)"
-                    }
-                }
-                item(label, settings.anime4kPreset == preset) { settings.updateAnime4kPreset(preset) }
+                item(preset.label, settings.anime4kPreset == preset) { settings.updateAnime4kPreset(preset) }
             }
             HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
             DropdownMenuItem(

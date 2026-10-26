@@ -14,11 +14,8 @@ import io.github.immersionplayer.ui.AnkiCards
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import io.github.immersionplayer.desktop.mpv.OffscreenGl
-import java.awt.GraphicsEnvironment
 import java.io.File
 import java.io.RandomAccessFile
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Shown in settings; a packaged build carries the same number in its bundle (build.gradle.kts). */
 const val APP_VERSION = "0.4.0"
@@ -43,40 +40,6 @@ class DesktopApp(
     private val _setupStatus = MutableStateFlow<String?>(null)
     /** Progress while a bundled dictionary is being installed, else null. */
     val setupStatus: StateFlow<String?> = _setupStatus.asStateFlow()
-
-    private val _benchmarking = MutableStateFlow(false)
-    /** Whether the GPU is being measured for Anime4K's Auto preset. */
-    val benchmarking: StateFlow<Boolean> = _benchmarking.asStateFlow()
-    private val benchmarkRunning = AtomicBoolean(false)
-
-    /**
-     * Measures the GPU for Anime4K's Auto preset, when Anime4K is on at Auto and there's no
-     * benchmark yet for this GPU at this screen size. Slow (seconds); call off the UI thread.
-     */
-    fun benchmarkShadersIfNeeded() {
-        if (settings.anime4kPreset != Anime4K.Preset.AUTO) return
-        if (!benchmarkRunning.compareAndSet(false, true)) return
-        try {
-            val gpu = OffscreenGl.gpuName() ?: return
-            val (width, height) = screenPixels()
-            val last = settings.anime4kBenchmark
-            if (last != null && last.gpu == gpu && last.width == width && last.height == height) return
-            _benchmarking.value = true
-            Anime4K.benchmark(width, height)?.let(settings::updateAnime4kBenchmark)
-        } catch (e: Throwable) {
-            logError("shader benchmark", e)
-        } finally {
-            _benchmarking.value = false
-            benchmarkRunning.set(false)
-        }
-    }
-
-    /** The main screen in physical pixels: the most a full-screen video has to fill. */
-    private fun screenPixels(): Pair<Int, Int> = runCatching {
-        val config = GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration
-        val scale = config.defaultTransform.scaleX
-        (config.bounds.width * scale).toInt() to (config.bounds.height * scale).toInt()
-    }.getOrDefault(1920 to 1080)
 
     fun logError(context: String, error: Throwable) {
         runCatching {

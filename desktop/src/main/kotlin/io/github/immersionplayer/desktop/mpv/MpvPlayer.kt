@@ -34,7 +34,7 @@ import java.util.concurrent.Semaphore
  * draws straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces
  * the software one.
  */
-class MpvPlayer(options: Map<String, String> = emptyMap()) {
+class MpvPlayer {
     private val lib = MpvLib.INSTANCE
     private val handle: Pointer = lib.mpv_create() ?: error("mpv_create failed")
     // both made on the render thread, which GL requires to be the one that uses them
@@ -44,9 +44,6 @@ class MpvPlayer(options: Map<String, String> = emptyMap()) {
 
     /** Whether mpv renders on the GPU, so [setShaders] has an effect. */
     val runsShaders: Boolean get() = gl != null
-
-    /** The GPU mpv renders on, or null with the software renderer. */
-    val gpu: String? get() = gl?.renderer
 
     data class Frame(val bitmap: Bitmap, val serial: Long)
 
@@ -94,7 +91,6 @@ class MpvPlayer(options: Map<String, String> = emptyMap()) {
         option("sub-auto", "no")
         option("sid", "no") // the app draws subtitles itself
         option("terminal", "no")
-        options.forEach { (name, value) -> option(name, value) }
         // extra options for experiments: -Dmpv.options=name=value,name=value
         System.getProperty("mpv.options")?.split(',')?.filter { '=' in it }?.forEach {
             option(it.substringBefore('='), it.substringAfter('='))

@@ -1,6 +1,5 @@
 package io.github.immersionplayer.desktop
 
-import io.github.immersionplayer.desktop.mpv.MpvPlayer
 import java.io.File
 
 /**
@@ -23,7 +22,7 @@ object Anime4K {
 
     enum class Preset(val label: String) {
         OFF("Off"),
-        /** Best if a benchmark says this GPU keeps up with it, else Fast. */
+        /** Best if this Mac's GPU should keep up with it, else Fast: see [Hardware]. */
         AUTO("Auto"),
         /** The smaller networks: what most GPUs keep up with. */
         FAST("Fast"),
@@ -31,33 +30,68 @@ object Anime4K {
         BEST("Best"),
     }
 
-    /** What [benchmark] found: Best Mode A's frame rate on [gpu], drawing [width] × [height] pixels. */
-    data class Benchmark(val gpu: String, val width: Int, val height: Int, val bestFps: Double) {
-        /** Whether Best keeps up: video is 24 fps, and playback needs room besides the shaders. */
-        val best: Boolean get() = bestFps >= BEST_MIN_FPS
+    /**
+     * What Auto goes by: the Apple Silicon chip ("Apple M1 Pro") and its GPU's core count, when
+     * macOS says. From these comes a rough estimate of the GPU's compute, enough to tell whether
+     * Best keeps up without anyone having to try it.
+     */
+    data class Hardware(val chip: String, val gpuCores: Int?) {
+        /** Rough FP32 TFLOPS: cores × each generation's rate per core. Null for non-Apple GPUs. */
+        val teraflops: Double? get() {
+            val match = APPLE_CHIP.matchEntire(chip.trim()) ?: return null
+            val generation = match.groupValues[1].toInt()
+            val cores = gpuCores ?: TYPICAL_CORES.getValue(match.groupValues[2].trim())
+            // M1 2.6 TFLOPS from 8 cores, M2 3.6 from 10, M3 and M4 about 4.1–4.3 from 10;
+            // later chips get M4's rate, which undersells them, if anything
+            val perCore = when (generation) {
+                1 -> 0.33
+                2 -> 0.36
+                3 -> 0.41
+                else -> 0.43
+            }
+            return cores * perCore
+        }
 
-        fun encode() = "$gpu|$width|$height|$bestFps"
+        /** Whether Best should keep up here; Fast if the GPU is unknown or not Apple's. */
+        val best: Boolean get() = (teraflops ?: 0.0) >= BEST_MIN_TERAFLOPS
 
         companion object {
-            fun decode(value: String): Benchmark? {
-                val parts = value.split('|')
-                if (parts.size != 4) return null
-                return Benchmark(
-                    parts[0],
-                    parts[1].toIntOrNull() ?: return null,
-                    parts[2].toIntOrNull() ?: return null,
-                    parts[3].toDoubleOrNull() ?: return null,
-                )
+            private val APPLE_CHIP = Regex("""Apple M(\d+)( Pro| Max| Ultra)?""")
+            private val TYPICAL_CORES = mapOf("" to 8, "Pro" to 16, "Max" to 32, "Ultra" to 64)
+
+            /** Reads them from the GPU's entry in the I/O Registry; null off macOS, or if it fails. */
+            fun detect(): Hardware? = runCatching {
+                if (!System.getProperty("os.name").lowercase().contains("mac")) return null
+                val process = ProcessBuilder("ioreg", "-rc", "AGXAccelerator", "-d", "1").redirectErrorStream(true).start()
+                val out = process.inputStream.bufferedReader().use { it.readText() }
+                process.waitFor()
+                fromRegistry(out)
+            }.getOrNull()
+
+            /** Parses `ioreg -rc AGXAccelerator` output: its "model" and "gpu-core-count". */
+            fun fromRegistry(out: String): Hardware? {
+                val chip = Regex(""""model" = "([^"]+)"""").find(out)?.groupValues?.get(1) ?: return null
+                val cores = Regex(""""gpu-core-count" = (\d+)""").find(out)?.groupValues?.get(1)?.toIntOrNull()
+                return Hardware(chip, cores)
             }
         }
     }
 
-    const val BEST_MIN_FPS = 30.0
+    /**
+     * Best needs about this much. On an M1 Pro (14 cores, about 4.6 TFLOPS) Best Mode A drew 1080p
+     * at 11 fps; 24 fps video, with room for decoding and drawing the rest of the window, wants
+     * about 30, so about 2.6 times that GPU. That puts Max chips with the larger GPUs (M2 Max
+     * 38-core and up) and the Ultras on Best, and every other Mac on Fast.
+     */
+    const val BEST_MIN_TERAFLOPS = 12.0
 
-    /** Whether [preset] means the lighter networks. Auto is Fast until a benchmark says Best keeps up. */
-    fun fast(preset: Preset, benchmark: Benchmark?): Boolean = when (preset) {
+    /** This Mac's, read once; null off macOS or where macOS doesn't say. */
+    val hardware: Hardware? by lazy { Hardware.detect() }
+
+    /** Whether [preset] means the lighter networks. Auto is Best only on [hardware] it should keep up on. */
+    fun fast(preset: Preset, hardware: Hardware?): Boolean = when (preset) {
         Preset.BEST -> false
-        Preset.AUTO -> benchmark?.best != true
+        Preset.AUTO -> hardware?.best != true
         Preset.OFF, Preset.FAST -> true
     }
 
@@ -66,36 +100,6 @@ object Anime4K {
         height <= 0 || height >= 900 -> Mode.A
         height >= 600 -> Mode.B
         else -> Mode.C
-    }
-
-    /**
-     * Plays a test pattern through Best Mode A as fast as this GPU can draw it at [width] × [height]
-     * (the screen, so full screen keeps up too) and counts the frames. About five seconds; null
-     * where mpv can't run shaders. Call off the UI thread.
-     */
-    fun benchmark(width: Int, height: Int): Benchmark? {
-        val player = MpvPlayer(mapOf("untimed" to "yes", "audio" to "no"))
-        try {
-            val gpu = player.gpu ?: return null
-            player.setShaders(shaders(Mode.A, fast = false))
-            player.setTargetSize(width, height)
-            player.load("av://lavfi:testsrc2=size=1920x1080:rate=24")
-            player.setPaused(false)
-            val deadline = System.nanoTime() + 10_000_000_000L
-            while (player.frame.value == null) {
-                if (System.nanoTime() > deadline) return null
-                Thread.sleep(50)
-            }
-            // the first frames wait on the shaders compiling
-            Thread.sleep(1000)
-            val startSerial = player.frame.value!!.serial
-            val start = System.nanoTime()
-            Thread.sleep(3000)
-            val frames = player.frame.value!!.serial - startSerial
-            return Benchmark(gpu, width, height, frames / ((System.nanoTime() - start) / 1e9))
-        } finally {
-            player.destroy()
-        }
     }
 
     /** The shader files of [mode], in the order mpv runs them. [fast] uses the lighter networks. */

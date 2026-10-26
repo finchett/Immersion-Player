@@ -228,7 +228,7 @@ class PlayerScreenTest {
                 session.pause()
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithContentDescription("Shaders").fetchSemanticsNodes().isNotEmpty() }
 
-                // Fast (not Auto, so no benchmark runs): the mode for this video, lighter networks
+                // Fast: the mode for this video, lighter networks
                 onNodeWithContentDescription("Shaders").performClick()
                 waitUntil(timeoutMillis = 5_000) { shows("Best") }
                 assertFalse("modes start folded away", shows("Mode B"))

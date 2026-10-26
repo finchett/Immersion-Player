@@ -366,8 +366,7 @@ private fun AppearancePane(app: DesktopApp) {
     Section("Shaders") {
         Card {
             val preset = settings.anime4kPreset
-            val benchmarking by app.benchmarking.collectAsState()
-            SettingRow("Anime4K", presetDetail(preset, settings.anime4kBenchmark, benchmarking)) {
+            SettingRow("Anime4K", presetDetail(preset)) {
                 Select(
                     text = preset.label,
                     options = Anime4K.Preset.entries.map { it.label },
@@ -394,10 +393,6 @@ private fun AppearancePane(app: DesktopApp) {
                 }
             }
         }
-    }
-    // Auto measures the GPU the first time it's needed: here, once it's picked
-    LaunchedEffect(settings.anime4kPreset) {
-        withContext(Dispatchers.IO) { app.benchmarkShadersIfNeeded() }
     }
     Section("Subtitles") {
         Card {
@@ -463,19 +458,12 @@ private fun AppearancePane(app: DesktopApp) {
 /** What AnkiConnect reported: the collection's note types and decks. */
 private class AnkiCollection(val noteTypes: List<String>, val decks: List<String>)
 
-/** What the preset means on this Mac: for Auto, what the benchmark settled on. */
-private fun presetDetail(preset: Anime4K.Preset, benchmark: Anime4K.Benchmark?, benchmarking: Boolean): String =
-    when (preset) {
-        Anime4K.Preset.OFF -> "Sharpens and upscales anime on the GPU"
-        Anime4K.Preset.FAST -> "Lighter networks, which most Macs keep up with"
-        Anime4K.Preset.BEST -> "Anime4K's largest networks; needs a fast GPU"
-        Anime4K.Preset.AUTO -> when {
-            benchmarking -> "Measuring this Mac's GPU…"
-            benchmark == null -> "Best or Fast, whichever this Mac keeps up with"
-            benchmark.best -> "Best on this Mac: %.0f fps full screen".format(benchmark.bestFps)
-            else -> "Fast on this Mac: Best ran at %.0f fps full screen".format(benchmark.bestFps)
-        }
-    }
+private fun presetDetail(preset: Anime4K.Preset): String = when (preset) {
+    Anime4K.Preset.OFF -> "Sharpens and upscales anime on the GPU"
+    Anime4K.Preset.AUTO -> "Fast or Best, whichever suits your GPU"
+    Anime4K.Preset.FAST -> "Lighter networks, which most GPUs keep up with"
+    Anime4K.Preset.BEST -> "Anime4K's largest networks; needs a Max or Ultra chip"
+}
 
 @Composable
 private fun AnkiPane(app: DesktopApp) {

@@ -114,10 +114,11 @@ Other note types get a guess from their field names.
   Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
   Auto, Fast or Best. They need the GPU renderer.
   - Fast runs Anime4K's smaller networks, and Best its largest (its own HQ setup).
-  - Auto measures the GPU once, the first time it's on: Best Mode A on a test pattern for a few
-    seconds, untimed, at the screen's full size. If that reaches 30 fps it uses Best, otherwise
-    Fast. The result is kept until the GPU or screen size changes. On an M1 Pro, Best runs at
-    about 6 fps full screen, so Auto picks Fast, which holds 24 fps at 3K.
+  - Auto guesses from the hardware, with nothing to measure: the chip and its GPU core count
+    (from the I/O Registry) give a rough TFLOPS figure, and Best needs about 12. On an M1 Pro,
+    about 4.6 TFLOPS, Best drew 1080p at 11 fps where it needs about 30. So the larger Max GPUs
+    (M2 Max 38-core and up) and the Ultras get Best, and every other Mac gets Fast, including
+    Intel ones.
   - The mode follows the video's resolution, as Anime4K's instructions suggest: A for 1080p, B
     for 720p, C for 480p. Under Advanced, or with ⌘ + 1–6, you can pick any of its six modes
     instead.
