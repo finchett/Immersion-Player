@@ -112,13 +112,15 @@ Other note types get a guess from their field names.
   Silicon). `-Prenderer=sw` forces the software one.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
   Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
-  Auto, Fast or Best. They need the GPU renderer.
+  Auto, Fast or Best. They need the GPU renderer, so for now they run on macOS only; Windows and
+  Linux use the software renderer, which can't run shaders.
   - Fast runs Anime4K's smaller networks, and Best its largest (its own HQ setup).
-  - Auto guesses from the hardware, with nothing to measure: the chip and its GPU core count
-    (from the I/O Registry) give a rough TFLOPS figure, and Best needs about 12. On an M1 Pro,
-    about 4.6 TFLOPS, Best drew 1080p at 11 fps where it needs about 30. So the larger Max GPUs
-    (M2 Max 38-core and up) and the Ultras get Best, and every other Mac gets Fast, including
-    Intel ones.
+  - Auto makes an educated guess from the GPU's name, as its OpenGL driver reports it, so nobody
+    has to work out what their machine can run. For NVIDIA, AMD and Intel it follows Anime4K's
+    own guidance: Best from about a GTX 1080, RTX 2060, RX 590, Vega 56, RX 5600 or 6600, or
+    Arc A580; Fast below that and for integrated graphics. Apple GPUs are judged by their core
+    count against about 12 TFLOPS, roughly that same bar, so the larger Max GPUs (M2 Max 38-core
+    and up) and the Ultras get Best. Anything it doesn't recognise gets Fast.
   - The mode follows the video's resolution, as Anime4K's instructions suggest: A for 1080p, B
     for 720p, C for 480p. Under Advanced, or with ⌘ + 1–6, you can pick any of its six modes
     instead.

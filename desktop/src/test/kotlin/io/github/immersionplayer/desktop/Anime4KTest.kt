@@ -35,27 +35,63 @@ class Anime4KTest {
         assertFalse(Anime4K.fast(Anime4K.Preset.BEST, m1Pro))
     }
 
-    @Test fun bestOnlyOnTheBigGpus() {
-        fun best(chip: String, cores: Int?) = Anime4K.Hardware(chip, cores).best
-        // ordinary chips, Pros, and the smaller Max GPUs: Fast
+    /** Driver names as each OS reports them, against what Auto should pick. */
+    @Test fun bestOnlyOnPowerfulGpus() {
+        fun best(gpu: String, cores: Int? = null) = Anime4K.Hardware(gpu, cores).best
+        // Apple: ordinary chips, Pros and the smaller Max GPUs get Fast
         assertFalse(best("Apple M1", 8))
         assertFalse(best("Apple M3 Pro", 18))
         assertFalse(best("Apple M4 Pro", 20))
         assertFalse(best("Apple M1 Max", 32))
         assertFalse(best("Apple M2 Max", 30))
-        // the larger Max GPUs and the Ultras: Best
+        // the larger Max GPUs and the Ultras get Best
         assertTrue(best("Apple M2 Max", 38))
         assertTrue(best("Apple M3 Max", 40))
         assertTrue(best("Apple M4 Max", 32))
         assertTrue(best("Apple M1 Ultra", 48))
-        // core count unknown: the tier's usual one
-        assertFalse(best("Apple M2 Pro", null))
-        assertTrue(best("Apple M3 Ultra", null))
-        // a later chip than this knows of is judged at M4's rate
+        // core count unknown: the tier's usual one; a later chip is judged at M4's rate
+        assertFalse(best("Apple M2 Pro"))
+        assertTrue(best("Apple M3 Ultra"))
         assertTrue(best("Apple M7 Max", 40))
-        // not Apple Silicon (Intel Macs): Fast
-        assertFalse(best("Intel(R) Iris(TM) Plus Graphics", null))
-        assertFalse(best("AMD Radeon Pro 5500M", null))
+
+        // NVIDIA, as Windows and Linux drivers name it; Anime4K's split is GTX 1060 / GTX 1080
+        assertFalse(best("NVIDIA GeForce GTX 980/PCIe/SSE2"))
+        assertFalse(best("NVIDIA GeForce GTX 1060 6GB/PCIe/SSE2"))
+        assertFalse(best("NVIDIA GeForce GTX 1660 SUPER/PCIe/SSE2"))
+        assertTrue(best("NVIDIA GeForce GTX 1080 Ti/PCIe/SSE2"))
+        assertFalse(best("NVIDIA GeForce RTX 3050 Laptop GPU/PCIe/SSE2"))
+        assertTrue(best("NVIDIA GeForce RTX 2070 SUPER/PCIe/SSE2"))
+        assertTrue(best("NVIDIA GeForce RTX 3060/PCIe/SSE2"))
+        assertTrue(best("NVIDIA GeForce RTX 4090/PCIe/SSE2"))
+        assertTrue(best("NVIDIA TITAN RTX/PCIe/SSE2"))
+        assertTrue(best("Quadro RTX 4000/PCIe/SSE2"))
+        assertFalse(best("NVIDIA RTX 2000 Ada Generation/PCIe/SSE2"))
+        assertTrue(best("NVIDIA RTX A5000/PCIe/SSE2"))
+
+        // AMD: RX 570 / RX 590, 5700 XT and 6600 XT up, Vega 56
+        assertFalse(best("AMD Radeon RX 570 Series"))
+        assertTrue(best("Radeon RX 590 Series"))
+        assertFalse(best("AMD Radeon RX 6500 XT (radeonsi, navi24, LLVM 15.0.7, DRM 3.49, 6.1.0)"))
+        assertTrue(best("AMD Radeon RX 5700 XT"))
+        assertTrue(best("AMD Radeon RX 6600 XT (radeonsi, navi23, LLVM 15.0.7, DRM 3.49, 6.1.0)"))
+        assertTrue(best("AMD Radeon RX 7800 XT"))
+        assertTrue(best("AMD Radeon RX 9070 XT"))
+        assertTrue(best("Radeon RX Vega 56"))
+        assertTrue(best("AMD Radeon Pro Vega 56 OpenGL Engine"))
+        assertFalse(best("AMD Radeon Pro 5500M OpenGL Engine"))
+        assertFalse(best("AMD Radeon 780M (radeonsi, gfx1103_r1, LLVM 17.0.6, DRM 3.57, 6.8.0)"))
+
+        // Intel: integrated graphics get Fast, the bigger Arc cards Best
+        assertFalse(best("Intel(R) Iris(TM) Plus Graphics OpenGL Engine"))
+        assertFalse(best("Mesa Intel(R) UHD Graphics 620 (KBL GT2)"))
+        assertFalse(best("Intel(R) Arc(TM) Graphics"))
+        assertFalse(best("Intel(R) Arc(TM) A380 Graphics"))
+        assertTrue(best("Intel(R) Arc(TM) A770 Graphics"))
+        assertTrue(best("Intel(R) Arc(TM) B580 Graphics"))
+
+        // anything else: Fast
+        assertFalse(best("llvmpipe (LLVM 15.0.7, 256 bits)"))
+        assertFalse(best("unknown"))
     }
 
     @Test fun modeFollowsTheVideosResolution() {
@@ -67,7 +103,7 @@ class Anime4KTest {
         assertEquals(Anime4K.Mode.C, Anime4K.modeFor(576))
     }
 
-    @Test fun readsTheIoRegistry() {
+    @Test fun readsAppleGpuCoresFromTheIoRegistry() {
         val out = """
             +-o AGXAcceleratorG13X  <class AGXAcceleratorG13X, id 0x1000003d0>
                 {
@@ -75,16 +111,16 @@ class Anime4KTest {
                   "gpu-core-count" = 14
                 }
         """
-        assertEquals(Anime4K.Hardware("Apple M1 Pro", 14), Anime4K.Hardware.fromRegistry(out))
-        assertEquals(null, Anime4K.Hardware.fromRegistry("nothing here"))
+        assertEquals(14, Anime4K.Hardware.coresFromRegistry(out))
+        assertEquals(null, Anime4K.Hardware.coresFromRegistry("nothing here"))
     }
 
-    /** The real lookup, on whatever Mac runs the tests. */
+    /** The real lookup: asks this machine's GPU driver, where shaders run (macOS for now). */
     @Test fun detectsThisMachine() {
         assumeTrue(Platform.isMac())
         val hardware = Anime4K.Hardware.detect()
         println("hardware: $hardware")
         assertNotNull(hardware)
-        assertTrue(hardware!!.chip, hardware.chip.isNotBlank())
+        assertTrue(hardware!!.gpu, hardware.gpu.isNotBlank() && hardware.gpu != "unknown")
     }
 }
