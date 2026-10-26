@@ -22,9 +22,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
@@ -589,27 +587,6 @@ private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean
                 }
             }
         }
-    }
-}
-
-/** Placeholder for the shader button's icon, until the real one is drawn: a four-point sparkle. */
-@Composable
-private fun ShaderIcon(color: Color, diameter: Dp = 14.dp) {
-    Canvas(Modifier.size(diameter)) {
-        val r = size.minDimension / 2
-        val waist = r * 0.22f
-        val path = Path().apply {
-            moveTo(center.x, center.y - r)
-            lineTo(center.x + waist, center.y - waist)
-            lineTo(center.x + r, center.y)
-            lineTo(center.x + waist, center.y + waist)
-            lineTo(center.x, center.y + r)
-            lineTo(center.x - waist, center.y + waist)
-            lineTo(center.x - r, center.y)
-            lineTo(center.x - waist, center.y - waist)
-            close()
-        }
-        drawPath(path, color)
     }
 }
 
