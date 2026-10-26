@@ -358,7 +358,10 @@ private class EglContext(private val display: Pointer, private val surface: Poin
             if (!egl.eglBindAPI(OPENGL_API)) return null
             val config = PointerByReference()
             val count = IntByReference()
-            val attributes = intArrayOf(RENDERABLE_TYPE, OPENGL_BIT, RED_SIZE, 8, GREEN_SIZE, 8, BLUE_SIZE, 8, NONE)
+            // pbuffer configs: left out, EGL asks for window ones, which a display-less EGL has none of
+            val attributes = intArrayOf(
+                SURFACE_TYPE, PBUFFER_BIT, RENDERABLE_TYPE, OPENGL_BIT, RED_SIZE, 8, GREEN_SIZE, 8, BLUE_SIZE, 8, NONE,
+            )
             if (!egl.eglChooseConfig(display, attributes, config, 1, count) || count.value < 1) return null
             val context = egl.eglCreateContext(display, config.value, null, intArrayOf(NONE)) ?: return null
             val surface = egl.eglCreatePbufferSurface(display, config.value, intArrayOf(WIDTH, 1, HEIGHT, 1, NONE))
@@ -374,6 +377,8 @@ private class EglContext(private val display: Pointer, private val surface: Poin
         private const val RED_SIZE = 0x3024
         private const val GREEN_SIZE = 0x3023
         private const val BLUE_SIZE = 0x3022
+        private const val SURFACE_TYPE = 0x3033
+        private const val PBUFFER_BIT = 0x0001
         private const val RENDERABLE_TYPE = 0x3040
         private const val OPENGL_BIT = 0x0008
         private const val OPENGL_API = 0x30A2

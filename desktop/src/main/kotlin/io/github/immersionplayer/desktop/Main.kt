@@ -236,7 +236,9 @@ private fun bench(path: String, width: Int) {
         val png = org.jetbrains.skia.Image.makeFromBitmap(bitmap).encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)!!
         File(out).writeBytes(png.bytes)
     }
-    println("target ${width}x${width * 9 / 16}: %.1f fps".format(frames / 10.0))
+    val renderer = if (player.runsShaders) "OpenGL" else "software"
+    val auto = Anime4K.hardware?.let { "${it.gpu}, Auto picks ${if (it.best) "Best" else "Fast"}" } ?: "no GPU name"
+    println("target ${width}x${width * 9 / 16}: %.1f fps, $renderer renderer ($auto)".format(frames / 10.0))
     player.destroy()
     exitProcess(0)
 }
