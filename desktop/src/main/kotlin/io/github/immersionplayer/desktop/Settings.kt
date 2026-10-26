@@ -65,6 +65,12 @@ class Settings(node: String = "io/github/immersionplayer") {
     /** Crop the video to fill its area (mpv panscan) instead of letterboxing. */
     var videoFill by mutableStateOf(prefs.getBoolean("video_fill", false))
         private set
+    /** Anime4K's shaders on the video, in this mode, or null for none. */
+    var anime4kMode by mutableStateOf(Anime4K.Mode.entries.firstOrNull { it.name == prefs.get("anime4k_mode", null) })
+        private set
+    /** Anime4K's lighter networks, which most Macs keep up with; HQ when off. */
+    var anime4kFast by mutableStateOf(prefs.getBoolean("anime4k_fast", true))
+        private set
     /** Video and panel as separate rounded cards with a gap between them. */
     var roundedCorners by mutableStateOf(prefs.getBoolean("rounded_corners", false))
         private set
@@ -141,6 +147,11 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun updatePauseOnLookup(value: Boolean) { pauseOnLookup = value; prefs.putBoolean("pause_on_lookup", value) }
     fun updateCopyLines(value: Boolean) { copyLines = value; prefs.putBoolean("copy_lines", value) }
     fun updateVideoFill(value: Boolean) { videoFill = value; prefs.putBoolean("video_fill", value) }
+    fun updateAnime4kMode(value: Anime4K.Mode?) {
+        anime4kMode = value
+        if (value == null) prefs.remove("anime4k_mode") else prefs.put("anime4k_mode", value.name)
+    }
+    fun updateAnime4kFast(value: Boolean) { anime4kFast = value; prefs.putBoolean("anime4k_fast", value) }
     fun updateRoundedCorners(value: Boolean) { roundedCorners = value; prefs.putBoolean("rounded_corners", value) }
     fun updateTargetLanguage(code: String) { targetLanguage = code; prefs.put("target_language", code) }
     fun updatePeekLanguage(code: String?) { peekLanguage = code; prefs.put("peek_language", code ?: "") }

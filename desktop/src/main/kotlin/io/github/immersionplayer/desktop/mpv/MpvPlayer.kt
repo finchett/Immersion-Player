@@ -1,5 +1,6 @@
 package io.github.immersionplayer.desktop.mpv
 
+import com.sun.jna.CallbackReference
 import com.sun.jna.Memory
 import com.sun.jna.Pointer
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_END_FILE
@@ -17,16 +18,31 @@ import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Pixmap
+import java.io.File
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Semaphore
 
 /**
- * libmpv with the software render API: mpv draws each frame straight into the pixel memory of a
- * Skia bitmap, which Compose then draws. Works the same on every OS, with no GL context to share.
+ * libmpv drawing each frame into the pixel memory of a Skia bitmap, which Compose then draws.
+ *
+ * On macOS mpv uses its GPU renderer in an OpenGL context of the player's own ([OffscreenGl]),
+ * and each frame is read back into the bitmap: that's what runs GLSL shaders such as Anime4K.
+ * Elsewhere, or if that context can't be made, it falls back to the software render API, which
+ * draws straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces
+ * the software one.
  */
 class MpvPlayer {
     private val lib = MpvLib.INSTANCE
     private val handle: Pointer = lib.mpv_create() ?: error("mpv_create failed")
-    private val renderContext: Pointer
+    // both made on the render thread, which GL requires to be the one that uses them
+    private lateinit var renderContext: Pointer
+    private var gl: OffscreenGl? = null
+    private val renderThread: Thread
+
+    /** Whether mpv renders on the GPU, so [setShaders] has an effect. */
+    val runsShaders: Boolean get() = gl != null
 
     data class Frame(val bitmap: Bitmap, val serial: Long)
 
@@ -61,6 +77,7 @@ class MpvPlayer {
     private val wake = Semaphore(0)
     // kept referenced so JNA doesn't free the callback while mpv holds it
     private val updateCallback = MpvLib.UpdateCallback { wake.release() }
+    private val getProcAddress = MpvLib.GetProcAddress { _, name -> gl?.procAddress(name) }
 
     init {
         option("vo", "libmpv")
@@ -75,22 +92,71 @@ class MpvPlayer {
         }
         check(lib.mpv_initialize(handle) >= 0) { "mpv_initialize failed" }
 
-        val sw = Memory(3).apply { setString(0, "sw") }
-        val params = renderParams(MpvLib.RENDER_PARAM_API_TYPE to sw)
-        val out = arrayOfNulls<Pointer>(1)
-        val result = lib.mpv_render_context_create(out, handle, params)
-        check(result >= 0) { "mpv_render_context_create: ${lib.mpv_error_string(result)}" }
-        renderContext = out[0]!!
-        lib.mpv_render_context_set_update_callback(renderContext, updateCallback, null)
-
         lib.mpv_observe_property(handle, 1, "time-pos", FORMAT_DOUBLE)
         lib.mpv_observe_property(handle, 2, "duration", FORMAT_DOUBLE)
         lib.mpv_observe_property(handle, 3, "pause", FORMAT_FLAG)
         lib.mpv_observe_property(handle, 4, "eof-reached", FORMAT_FLAG)
 
         Thread(::eventLoop, "mpv-events").apply { isDaemon = true }.start()
-        Thread(::renderLoop, "mpv-render").apply { isDaemon = true }.start()
+        val created = CompletableFuture<Unit>()
+        renderThread = Thread({
+            try {
+                createRenderContext()
+                created.complete(Unit)
+            } catch (e: Throwable) {
+                created.completeExceptionally(e)
+                return@Thread
+            }
+            renderLoop()
+            lib.mpv_render_context_set_update_callback(renderContext, null, null)
+            lib.mpv_render_context_free(renderContext)
+            gl?.destroy()
+        }, "mpv-render").apply { isDaemon = true }
+        renderThread.start()
+        try {
+            created.get()
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
     }
+
+    private fun createRenderContext() {
+        if (System.getProperty("immersion.renderer") != "sw") {
+            OffscreenGl.create()?.let { context ->
+                gl = context
+                val initParams = Memory(16).apply {
+                    setPointer(0, CallbackReference.getFunctionPointer(getProcAddress))
+                    setPointer(8, null)
+                }
+                val created = createRenderContext(
+                    MpvLib.RENDER_PARAM_API_TYPE to cString("opengl"),
+                    MpvLib.RENDER_PARAM_OPENGL_INIT_PARAMS to initParams,
+                )
+                if (created == null) {
+                    gl = null
+                    context.destroy()
+                }
+            }
+        }
+        if (gl == null) {
+            createRenderContext(MpvLib.RENDER_PARAM_API_TYPE to cString("sw"))
+                ?: error("mpv_render_context_create failed")
+        }
+        lib.mpv_render_context_set_update_callback(renderContext, updateCallback, null)
+    }
+
+    /** Sets [renderContext] and returns it, or returns null if mpv refuses the [params]. */
+    private fun createRenderContext(vararg params: Pair<Int, Pointer>): Pointer? {
+        val out = arrayOfNulls<Pointer>(1)
+        val result = lib.mpv_render_context_create(out, handle, renderParams(*params))
+        if (result < 0) {
+            System.err.println("mpv_render_context_create: ${lib.mpv_error_string(result)}")
+            return null
+        }
+        return out[0]!!.also { renderContext = it }
+    }
+
+    private fun cString(value: String) = Memory(value.length + 1L).apply { setString(0, value) }
 
     fun load(path: String) {
         _position.value = 0.0
@@ -104,6 +170,11 @@ class MpvPlayer {
     fun setPaused(paused: Boolean) = property("pause", if (paused) "yes" else "no")
     fun seek(seconds: Double) = command("seek", seconds.toString(), "absolute+exact")
     fun seekRelative(seconds: Double) = command("seek", seconds.toString(), "relative+exact")
+
+    /** GLSL shaders for mpv's GPU renderer to run, in order; empty for none. */
+    fun setShaders(shaders: List<File>) {
+        property("glsl-shaders", shaders.joinToString(File.pathSeparator) { it.path })
+    }
 
     fun selectAudio(id: Int) {
         property("aid", id.toString())
@@ -139,8 +210,8 @@ class MpvPlayer {
     fun destroy() {
         running = false
         wake.release()
-        lib.mpv_render_context_set_update_callback(renderContext, null, null)
-        lib.mpv_render_context_free(renderContext)
+        // the render thread frees the render context (and GL) on its way out
+        renderThread.join()
         lib.mpv_terminate_destroy(handle)
     }
 
@@ -151,7 +222,8 @@ class MpvPlayer {
     private var serial = 0L
     private val size = Memory(8)
     private val stride = Memory(8)
-    private val format = Memory(5).apply { setString(0, "rgb0") }
+    private val format = cString("rgb0")
+    private val fbo = Memory(16)
 
     private fun renderLoop() {
         var renderedSize = 0 to 0
@@ -173,6 +245,27 @@ class MpvPlayer {
     private fun renderFrame(width: Int, height: Int) {
         val bitmap = bufferFor(back, width, height)
         val pixmap = bitmap.peekPixels() ?: return
+        val gl = gl
+        if (gl != null) {
+            // mpv_opengl_fbo: { int fbo; int w, h; int internal_format; }
+            fbo.setInt(0, gl.framebuffer(width, height))
+            fbo.setInt(4, width)
+            fbo.setInt(8, height)
+            fbo.setInt(12, 0)
+            // not flipped: mpv then draws the top row at y = 0, which glReadPixels returns first,
+            // the order Skia has rows in
+            val params = renderParams(MpvLib.RENDER_PARAM_OPENGL_FBO to fbo)
+            lib.mpv_render_context_render(renderContext, params)
+            gl.read(Pointer(pixmap.addr), pixmap.rowBytes)
+        } else {
+            renderSoftware(pixmap, width, height)
+        }
+        bitmap.notifyPixelsChanged()
+        _frame.value = Frame(bitmap, ++serial)
+        back = 1 - back
+    }
+
+    private fun renderSoftware(pixmap: Pixmap, width: Int, height: Int) {
         size.setInt(0, width)
         size.setInt(4, height)
         stride.setLong(0, pixmap.rowBytes.toLong())
@@ -182,11 +275,8 @@ class MpvPlayer {
             MpvLib.RENDER_PARAM_SW_STRIDE to stride,
             MpvLib.RENDER_PARAM_SW_POINTER to Pointer(pixmap.addr),
         )
-        // blocks until the frame's display time, which is what paces playback
+        // blocks until the frame's display time, which is what paces playback (with GL too)
         lib.mpv_render_context_render(renderContext, params)
-        bitmap.notifyPixelsChanged()
-        _frame.value = Frame(bitmap, ++serial)
-        back = 1 - back
     }
 
     private fun bufferFor(index: Int, width: Int, height: Int): Bitmap {
@@ -194,8 +284,10 @@ class MpvPlayer {
         if (existing != null && existing.width == width && existing.height == height) return existing
         // "rgb0" is R,G,B then a byte mpv leaves as garbage (usually 0), which is Skia's RGB_888X.
         // Calling it BGRA_8888 would make that byte alpha and the video transparent.
+        // GL is read back as BGRA, with mpv's (opaque) alpha.
+        val colorType = if (gl != null) ColorType.BGRA_8888 else ColorType.RGB_888X
         val bitmap = Bitmap()
-        bitmap.allocPixels(ImageInfo(width, height, ColorType.RGB_888X, ColorAlphaType.OPAQUE))
+        bitmap.allocPixels(ImageInfo(width, height, colorType, ColorAlphaType.OPAQUE))
         buffers[index] = bitmap
         return bitmap
     }

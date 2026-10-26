@@ -361,6 +361,26 @@ private fun AppearancePane(app: DesktopApp) {
             )
             RowDivider()
             ToggleRow("Rounded corners", null, settings.roundedCorners, settings::updateRoundedCorners)
+            RowDivider()
+            val mode = settings.anime4kMode
+            SettingRow("Anime4K", mode?.detail ?: "Sharpens and upscales anime on the GPU") {
+                Select(
+                    text = mode?.label ?: "Off",
+                    options = listOf("Off") + Anime4K.Mode.entries.map { it.label },
+                    onSelect = { settings.updateAnime4kMode(Anime4K.Mode.entries.getOrNull(it - 1)) },
+                )
+            }
+            if (mode != null) {
+                RowDivider()
+                SettingRow("Anime4K quality", "HQ needs a fast GPU; Fast keeps up on most Macs") {
+                    val fast = settings.anime4kFast
+                    Select(
+                        text = if (fast) "Fast" else "HQ",
+                        options = listOf("Fast", "HQ"),
+                        onSelect = { settings.updateAnime4kFast(it == 0) },
+                    )
+                }
+            }
         }
     }
     Section("Subtitles") {
@@ -650,6 +670,8 @@ val KEYS = listOf(
     KeyHelp(listOf("U"), "Stop at the end of every line, on or off"),
     KeyHelp(listOf("F"), "Full screen", "or double-click"),
     KeyHelp(listOf("Z"), "Fill the area, or fit the whole picture", "or ⌘ + scroll"),
+    KeyHelp(listOf("⌘", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", "or Ctrl"),
+    KeyHelp(listOf("⌘", "0"), "Anime4K off", "or Ctrl"),
     KeyHelp(listOf("Esc"), "Leave full screen, then back to the library"),
     KeyHelp(listOf("A"), "Add the looked-up word to Anki", "when Anki cards are on"),
     KeyHelp(emptyList(), "Look up a word", "click or drag it"),

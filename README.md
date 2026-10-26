@@ -49,6 +49,8 @@ Every action is a gesture. The app lists them once, on first run.
 | u | stop at the end of every line, on or off |
 | z, or ⌘ + scroll | fill the area, or fit the whole picture |
 | f, or double-click | full screen |
+| ⌘ (or Ctrl) + 1–6 | Anime4K mode A, B, C, A+A, B+B, C+A |
+| ⌘ (or Ctrl) + 0 | Anime4K off |
 | Esc | leave full screen, then back to the library |
 | click / drag a word | look it up |
 | a | add the looked-up word to Anki (when turned on) |
@@ -104,8 +106,13 @@ Other note types get a guess from their field names.
 - libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt binaries.
   Needed because much of what you'll play is 10-bit H.264, which Android's hardware decoders
   don't support and its software decoder refuses — a `MediaCodec` player shows a black rectangle.
-- Desktop uses the same libmpv through its software renderer, drawing into the Compose window:
-  about 5 ms per 1080p frame on Apple Silicon.
+- Desktop uses the same libmpv. On macOS it runs mpv's GPU renderer in an offscreen OpenGL
+  context and reads each frame back into the Compose window; elsewhere, or if OpenGL can't be
+  set up, mpv's software renderer draws into it directly (about 5 ms per 1080p frame on Apple
+  Silicon). `-Prenderer=sw` forces the software one.
+- [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled, in the modes from its mpv
+  instructions (Settings › Appearance, or ⌘ + 1–6). They need the GPU renderer. Fast is the
+  default: on an M1 Pro it holds 24 fps at 3K, while HQ Mode A manages about 11 fps at 1080p.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.
@@ -250,6 +257,8 @@ modify, sell and redistribute it, provided recipients get the same freedoms and 
   x264 and x265.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
+- **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public
+  domain. See `desktop/src/main/resources/anime4k/LICENSE`.
 - **Shizuku API** (optional, for the shoulder triggers): Apache-2.0.
 - **Tesseract** and its `eng`/`jpn` models from
   [tessdata_best](https://github.com/tesseract-ocr/tessdata_best) (bundled, for picture

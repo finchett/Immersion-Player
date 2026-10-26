@@ -119,7 +119,12 @@ class PlayerKeys {
     var onAddCard: () -> Unit = {}
     /** Opens the next episode, while the end-of-video prompt offers one. */
     var onPlayNext: (() -> Unit)? = null
+    /** What a key just changed, said briefly over the video. */
+    var notice by mutableStateOf<Notice?>(null)
 }
+
+/** A [PlayerKeys.notice]. Each is its own object, so saying the same thing twice shows it again. */
+class Notice(val text: String)
 
 @Composable
 fun PlayerScreen(
@@ -249,6 +254,13 @@ fun PlayerScreen(
         session.player.property("panscan", if (settings.videoFill) "1.0" else "0.0")
     }
 
+    LaunchedEffect(settings.anime4kMode, settings.anime4kFast) {
+        val shaders = withContext(Dispatchers.IO) {
+            settings.anime4kMode?.let { Anime4K.shaders(it, settings.anime4kFast) }.orEmpty()
+        }
+        session.player.setShaders(shaders)
+    }
+
     val rounded = settings.roundedCorners
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val gutter = when {
@@ -337,6 +349,7 @@ fun PlayerScreen(
 
 /** How long the controls stay after the mouse stops moving over the video. */
 private const val CONTROLS_TIMEOUT_MS = 2000L
+private const val NOTICE_MS = 1500L
 
 /** The video, with controls that show on mouse movement or while paused and otherwise get out of the way. */
 @Composable
@@ -372,6 +385,28 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onP
             },
     ) {
         VideoSurface(session.player, Modifier.fillMaxSize())
+        val notice = keys.notice
+        var showNotice by remember { mutableStateOf(false) }
+        LaunchedEffect(notice) {
+            if (notice == null) return@LaunchedEffect
+            showNotice = true
+            delay(NOTICE_MS)
+            showNotice = false
+        }
+        AnimatedVisibility(
+            showNotice,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(400)),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
+        ) {
+            Text(
+                notice?.text.orEmpty(),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xCC000000))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
         AnimatedVisibility(
             offerNext,
             enter = fadeIn(tween(300)),
