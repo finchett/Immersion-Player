@@ -106,14 +106,15 @@ Other note types get a guess from their field names.
 - libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt binaries.
   Needed because much of what you'll play is 10-bit H.264, which Android's hardware decoders
   don't support and its software decoder refuses — a `MediaCodec` player shows a black rectangle.
-- Desktop uses the same libmpv. On macOS it runs mpv's GPU renderer in an offscreen OpenGL
-  context and reads each frame back into the Compose window; elsewhere, or if OpenGL can't be
-  set up, mpv's software renderer draws into it directly (about 5 ms per 1080p frame on Apple
-  Silicon). `-Prenderer=sw` forces the software one.
+- Desktop uses the same libmpv. It runs mpv's GPU renderer in an offscreen OpenGL context (CGL
+  on macOS, WGL on Windows, EGL on Linux) and reads each frame back into the Compose window. If
+  OpenGL can't be set up, mpv's software renderer draws into it directly (about 5 ms per 1080p
+  frame on Apple Silicon). `-Prenderer=sw` forces the software one. Only the macOS path has
+  been run so far.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
   Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
-  Auto, Fast or Best. They need the GPU renderer, so for now they run on macOS only; Windows and
-  Linux use the software renderer, which can't run shaders.
+  Auto, Fast or Best. They need the GPU renderer, so they're unavailable where it falls back to
+  software.
   - Fast runs Anime4K's smaller networks, and Best its largest (its own HQ setup).
   - Auto makes an educated guess from the GPU's name, as its OpenGL driver reports it, so nobody
     has to work out what their machine can run. For NVIDIA, AMD and Intel it follows Anime4K's

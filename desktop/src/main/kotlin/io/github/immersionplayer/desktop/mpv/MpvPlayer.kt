@@ -28,11 +28,11 @@ import java.util.concurrent.Semaphore
 /**
  * libmpv drawing each frame into the pixel memory of a Skia bitmap, which Compose then draws.
  *
- * On macOS mpv uses its GPU renderer in an OpenGL context of the player's own ([OffscreenGl]),
- * and each frame is read back into the bitmap: that's what runs GLSL shaders such as Anime4K.
- * Elsewhere, or if that context can't be made, it falls back to the software render API, which
- * draws straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces
- * the software one.
+ * mpv uses its GPU renderer in an OpenGL context of the player's own ([OffscreenGl]: CGL, WGL or
+ * EGL), and each frame is read back into the bitmap: that's what runs GLSL shaders such as
+ * Anime4K. If that context can't be made, it falls back to the software render API, which draws
+ * straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces the
+ * software one.
  */
 class MpvPlayer {
     private val lib = MpvLib.INSTANCE
