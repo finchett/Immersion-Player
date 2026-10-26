@@ -16,6 +16,9 @@ import com.sun.jna.ptr.PointerByReference
  * Everything here has to run on the one thread the context was made current on.
  */
 internal class OffscreenGl private constructor(private val context: Pointer) {
+    /** The GPU's name as the driver gives it, such as "Apple M1 Pro". */
+    val renderer: String = gl.glGetString(GL_RENDERER) ?: "unknown"
+
     private var fbo = 0
     private var texture = 0
     var width = 0
@@ -79,6 +82,11 @@ internal class OffscreenGl private constructor(private val context: Pointer) {
         private val cgl by lazy { Native.load("OpenGL", Cgl::class.java) }
         private val gl by lazy { Native.load("OpenGL", Gl::class.java) }
 
+        /** The GPU's name ([renderer]), or null where there's no CGL. Makes a context just to ask. */
+        fun gpuName(): String? = create()?.let { context ->
+            try { context.renderer } finally { context.destroy() }
+        }
+
         /** A context made current on the calling thread, or null where there's no CGL. */
         fun create(): OffscreenGl? {
             if (!Platform.isMac()) return null
@@ -117,6 +125,7 @@ internal class OffscreenGl private constructor(private val context: Pointer) {
         private const val GL3_2_CORE = 0x3200
         private const val GL4_CORE = 0x4100
 
+        private const val GL_RENDERER = 0x1F01
         private const val GL_TEXTURE_2D = 0x0DE1
         private const val GL_TEXTURE_MAG_FILTER = 0x2800
         private const val GL_TEXTURE_MIN_FILTER = 0x2801
@@ -143,6 +152,7 @@ private interface Cgl : Library {
 
 @Suppress("FunctionName")
 private interface Gl : Library {
+    fun glGetString(name: Int): String?
     fun glGenTextures(n: Int, ids: IntArray)
     fun glDeleteTextures(n: Int, ids: IntArray)
     fun glBindTexture(target: Int, texture: Int)

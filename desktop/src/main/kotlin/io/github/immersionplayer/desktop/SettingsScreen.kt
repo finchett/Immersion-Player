@@ -361,7 +361,10 @@ private fun AppearancePane(app: DesktopApp) {
             )
             RowDivider()
             ToggleRow("Rounded corners", null, settings.roundedCorners, settings::updateRoundedCorners)
-            RowDivider()
+        }
+    }
+    Section("Shaders") {
+        Card {
             val mode = settings.anime4kMode
             SettingRow("Anime4K", mode?.detail ?: "Sharpens and upscales anime on the GPU") {
                 Select(
@@ -370,18 +373,21 @@ private fun AppearancePane(app: DesktopApp) {
                     onSelect = { settings.updateAnime4kMode(Anime4K.Mode.entries.getOrNull(it - 1)) },
                 )
             }
-            if (mode != null) {
-                RowDivider()
-                SettingRow("Anime4K quality", "HQ needs a fast GPU; Fast keeps up on most Macs") {
-                    val fast = settings.anime4kFast
-                    Select(
-                        text = if (fast) "Fast" else "HQ",
-                        options = listOf("Fast", "HQ"),
-                        onSelect = { settings.updateAnime4kFast(it == 0) },
-                    )
-                }
+            RowDivider()
+            val quality = settings.anime4kQuality
+            val benchmarking by app.benchmarking.collectAsState()
+            SettingRow("Quality", qualityDetail(quality, settings.anime4kBenchmark, benchmarking)) {
+                Select(
+                    text = quality.label,
+                    options = Anime4K.Quality.entries.map { it.label },
+                    onSelect = { settings.updateAnime4kQuality(Anime4K.Quality.entries[it]) },
+                )
             }
         }
+    }
+    // Auto measures the GPU the first time it's needed: here, once a mode is picked
+    LaunchedEffect(settings.anime4kMode, settings.anime4kQuality) {
+        withContext(Dispatchers.IO) { app.benchmarkShadersIfNeeded() }
     }
     Section("Subtitles") {
         Card {
@@ -446,6 +452,19 @@ private fun AppearancePane(app: DesktopApp) {
 
 /** What AnkiConnect reported: the collection's note types and decks. */
 private class AnkiCollection(val noteTypes: List<String>, val decks: List<String>)
+
+/** What the quality setting means on this Mac: for Auto, what the benchmark settled on. */
+private fun qualityDetail(quality: Anime4K.Quality, benchmark: Anime4K.Benchmark?, benchmarking: Boolean): String =
+    when (quality) {
+        Anime4K.Quality.FAST -> "Smaller networks, which most Macs keep up with"
+        Anime4K.Quality.HQ -> "The largest networks; needs a fast GPU"
+        Anime4K.Quality.AUTO -> when {
+            benchmarking -> "Measuring this Mac's GPU…"
+            benchmark == null -> "HQ or Fast, measured on this Mac when Anime4K is first on"
+            benchmark.hq -> "HQ on this Mac: %.0f fps full screen".format(benchmark.hqFps)
+            else -> "Fast on this Mac: HQ ran at %.0f fps full screen".format(benchmark.hqFps)
+        }
+    }
 
 @Composable
 private fun AnkiPane(app: DesktopApp) {

@@ -111,8 +111,12 @@ Other note types get a guess from their field names.
   set up, mpv's software renderer draws into it directly (about 5 ms per 1080p frame on Apple
   Silicon). `-Prenderer=sw` forces the software one.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled, in the modes from its mpv
-  instructions (Settings › Appearance, or ⌘ + 1–6). They need the GPU renderer. Fast is the
-  default: on an M1 Pro it holds 24 fps at 3K, while HQ Mode A manages about 11 fps at 1080p.
+  instructions (Settings › Appearance › Shaders, or ⌘ + 1–6). They need the GPU renderer.
+  Quality is Fast, HQ or Auto (the default). Auto measures the GPU once, the first time Anime4K
+  is on: HQ Mode A on a test pattern for a few seconds, untimed, at the screen's full size. If
+  that reaches 30 fps it uses HQ, otherwise Fast. The result is kept until the GPU or screen size
+  changes. On an M1 Pro, HQ runs at about 6 fps full screen, so Auto picks Fast, which holds
+  24 fps at 3K.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.

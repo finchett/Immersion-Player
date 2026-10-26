@@ -104,7 +104,10 @@ fun main(args: Array<String>) {
                     when {
                         mode == null -> "Anime4K off"
                         !current.player.runsShaders -> "Anime4K needs OpenGL, which isn't available here"
-                        else -> "Anime4K ${mode.label} · ${if (app.settings.anime4kFast) "Fast" else "HQ"}"
+                        else -> {
+                            val auto = if (app.settings.anime4kQuality == Anime4K.Quality.AUTO) " (auto)" else ""
+                            "Anime4K ${mode.label} · ${if (app.settings.anime4kFast) "Fast" else "HQ"}$auto"
+                        }
                     },
                 )
                 return true

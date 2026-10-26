@@ -260,6 +260,10 @@ fun PlayerScreen(
         }
         session.player.setShaders(shaders)
     }
+    // Auto quality plays Fast until the GPU has been measured, then switches if HQ keeps up
+    LaunchedEffect(settings.anime4kMode, settings.anime4kQuality) {
+        withContext(Dispatchers.IO) { app.benchmarkShadersIfNeeded() }
+    }
 
     val rounded = settings.roundedCorners
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
