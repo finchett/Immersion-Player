@@ -49,6 +49,8 @@ Every action is a gesture. The app lists them once, on first run.
 | u | stop at the end of every line, on or off |
 | z, or ⌘ + scroll | fill the area, or fit the whole picture |
 | f, or double-click | full screen |
+| ⌘ (or Ctrl) + 1–6 | Anime4K mode A, B, C, A+A, B+B, C+A (turns it on at Auto if it's off) |
+| ⌘ (or Ctrl) + 0 | Anime4K off |
 | Esc | leave full screen, then back to the library |
 | click / drag a word | look it up |
 | a | add the looked-up word to Anki (when turned on) |
@@ -104,8 +106,25 @@ Other note types get a guess from their field names.
 - libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt binaries.
   Needed because much of what you'll play is 10-bit H.264, which Android's hardware decoders
   don't support and its software decoder refuses — a `MediaCodec` player shows a black rectangle.
-- Desktop uses the same libmpv through its software renderer, drawing into the Compose window:
-  about 5 ms per 1080p frame on Apple Silicon.
+- Desktop uses the same libmpv. It runs mpv's GPU renderer in an offscreen OpenGL context (CGL
+  on macOS, WGL on Windows, EGL on Linux) and reads each frame back into the Compose window. If
+  OpenGL can't be set up, mpv's software renderer draws into it directly (about 5 ms per 1080p
+  frame on Apple Silicon). `-Prenderer=sw` forces the software one. The macOS and Linux paths
+  have been run (Linux in a container, on Mesa's software rasteriser); Windows hasn't yet.
+- [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
+  Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
+  Auto, Fast or Best. They need the GPU renderer, so they're unavailable where it falls back to
+  software.
+  - Fast runs Anime4K's smaller networks, and Best its largest (its own HQ setup).
+  - Auto makes an educated guess from the GPU's name, as its OpenGL driver reports it, so nobody
+    has to work out what their machine can run. For NVIDIA, AMD and Intel it follows Anime4K's
+    own guidance: Best from about a GTX 1080, RTX 2060, RX 590, Vega 56, RX 5600 or 6600, or
+    Arc A580; Fast below that and for integrated graphics. Apple GPUs are judged by their core
+    count against about 12 TFLOPS, roughly that same bar, so the larger Max GPUs (M2 Max 38-core
+    and up) and the Ultras get Best. Anything it doesn't recognise gets Fast.
+  - The mode follows the video's resolution, as Anime4K's instructions suggest: A for 1080p, B
+    for 720p, C for 480p. Under Advanced, or with ⌘ + 1–6, you can pick any of its six modes
+    instead.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.
@@ -250,6 +269,8 @@ modify, sell and redistribute it, provided recipients get the same freedoms and 
   x264 and x265.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
+- **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public
+  domain. See `desktop/src/main/resources/anime4k/LICENSE`.
 - **Shizuku API** (optional, for the shoulder triggers): Apache-2.0.
 - **Tesseract** and its `eng`/`jpn` models from
   [tessdata_best](https://github.com/tesseract-ocr/tessdata_best) (bundled, for picture

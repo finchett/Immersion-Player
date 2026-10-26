@@ -363,6 +363,37 @@ private fun AppearancePane(app: DesktopApp) {
             ToggleRow("Rounded corners", null, settings.roundedCorners, settings::updateRoundedCorners)
         }
     }
+    Section("Shaders") {
+        Card {
+            val preset = settings.anime4kPreset
+            SettingRow("Anime4K", presetDetail(preset)) {
+                Select(
+                    text = preset.label,
+                    options = Anime4K.Preset.entries.map { it.label },
+                    onSelect = { settings.updateAnime4kPreset(Anime4K.Preset.entries[it]) },
+                )
+            }
+            RowDivider()
+            // the modes stay folded away unless one has been picked
+            var advanced by remember { mutableStateOf(settings.anime4kMode != null) }
+            Box(Modifier.clickable { advanced = !advanced }.pointerHoverIcon(PointerIcon.Hand)) {
+                SettingRow("Advanced") {
+                    Text(if (advanced) "▾" else "▸", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (advanced) {
+                RowDivider()
+                val mode = settings.anime4kMode
+                SettingRow("Mode", mode?.detail ?: "A, B or C, from each video's resolution") {
+                    Select(
+                        text = mode?.label ?: "By video",
+                        options = listOf("By video") + Anime4K.Mode.entries.map { it.label },
+                        onSelect = { settings.updateAnime4kMode(Anime4K.Mode.entries.getOrNull(it - 1)) },
+                    )
+                }
+            }
+        }
+    }
     Section("Subtitles") {
         Card {
             Row(
@@ -426,6 +457,13 @@ private fun AppearancePane(app: DesktopApp) {
 
 /** What AnkiConnect reported: the collection's note types and decks. */
 private class AnkiCollection(val noteTypes: List<String>, val decks: List<String>)
+
+private fun presetDetail(preset: Anime4K.Preset): String = when (preset) {
+    Anime4K.Preset.OFF -> "Sharpens and upscales anime on the GPU"
+    Anime4K.Preset.AUTO -> "Using ${if (Anime4K.fast(preset, Anime4K.hardware)) "Fast" else "Best"}"
+    Anime4K.Preset.FAST -> "Lighter networks, which most GPUs keep up with"
+    Anime4K.Preset.BEST -> "Anime4K's largest networks; needs a powerful GPU"
+}
 
 @Composable
 private fun AnkiPane(app: DesktopApp) {
@@ -650,6 +688,8 @@ val KEYS = listOf(
     KeyHelp(listOf("U"), "Stop at the end of every line, on or off"),
     KeyHelp(listOf("F"), "Full screen", "or double-click"),
     KeyHelp(listOf("Z"), "Fill the area, or fit the whole picture", "or ⌘ + scroll"),
+    KeyHelp(listOf("⌘", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", "or Ctrl; turns it on"),
+    KeyHelp(listOf("⌘", "0"), "Anime4K off", "or Ctrl"),
     KeyHelp(listOf("Esc"), "Leave full screen, then back to the library"),
     KeyHelp(listOf("A"), "Add the looked-up word to Anki", "when Anki cards are on"),
     KeyHelp(emptyList(), "Look up a word", "click or drag it"),

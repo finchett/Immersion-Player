@@ -24,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
@@ -93,6 +95,30 @@ fun main(args: Array<String>) {
                 return true
             }
             if (event.type != KeyEventType.KeyDown) return false
+            // ⌘/Ctrl + 1–6: Anime4K's modes, on the keys its mpv instructions use (turning it on at
+            // Auto if it's off); 0 turns it off
+            val anime4k = ANIME4K_KEYS.indexOf(event.key)
+            if (anime4k >= 0 && (event.isMetaPressed || event.isCtrlPressed)) {
+                val settings = app.settings
+                val mode = Anime4K.Mode.entries.getOrNull(anime4k - 1)
+                if (mode == null) {
+                    settings.updateAnime4kPreset(Anime4K.Preset.OFF)
+                } else {
+                    settings.updateAnime4kMode(mode)
+                    if (settings.anime4kPreset == Anime4K.Preset.OFF) settings.updateAnime4kPreset(Anime4K.Preset.AUTO)
+                }
+                keys.notice = Notice(
+                    when {
+                        mode == null -> "Anime4K off"
+                        !current.player.runsShaders -> "Anime4K needs OpenGL, which isn't available here"
+                        else -> {
+                            val auto = if (settings.anime4kPreset == Anime4K.Preset.AUTO) " (auto)" else ""
+                            "Anime4K ${mode.label} · ${if (settings.anime4kFast) "Fast" else "Best"}$auto"
+                        }
+                    },
+                )
+                return true
+            }
             when (event.key) {
                 Key.Spacebar -> current.togglePause()
                 Key.H -> current.previousLine()
@@ -192,6 +218,8 @@ fun main(args: Array<String>) {
     }
 }
 
+private val ANIME4K_KEYS = listOf(Key.Zero, Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six)
+
 /** Plays [path] for 10 s at a fixed target width and prints the frame rate. For tuning the renderer. */
 private fun bench(path: String, width: Int) {
     val player = MpvPlayer()
@@ -208,7 +236,9 @@ private fun bench(path: String, width: Int) {
         val png = org.jetbrains.skia.Image.makeFromBitmap(bitmap).encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)!!
         File(out).writeBytes(png.bytes)
     }
-    println("target ${width}x${width * 9 / 16}: %.1f fps".format(frames / 10.0))
+    val renderer = if (player.runsShaders) "OpenGL" else "software"
+    val auto = Anime4K.hardware?.let { "${it.gpu}, Auto picks ${if (it.best) "Best" else "Fast"}" } ?: "no GPU name"
+    println("target ${width}x${width * 9 / 16}: %.1f fps, $renderer renderer ($auto)".format(frames / 10.0))
     player.destroy()
     exitProcess(0)
 }

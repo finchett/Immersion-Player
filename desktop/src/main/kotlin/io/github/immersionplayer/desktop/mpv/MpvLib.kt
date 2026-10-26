@@ -34,9 +34,15 @@ interface MpvLib : Library {
         fun invoke(data: Pointer?)
     }
 
+    /** mpv_opengl_init_params.get_proc_address */
+    fun interface GetProcAddress : Callback {
+        fun invoke(context: Pointer?, name: String): Pointer?
+    }
+
     companion object {
         const val FORMAT_STRING = 1
         const val FORMAT_FLAG = 3
+        const val FORMAT_INT64 = 4
         const val FORMAT_DOUBLE = 5
 
         const val EVENT_NONE = 0
@@ -47,6 +53,8 @@ interface MpvLib : Library {
 
         const val RENDER_PARAM_INVALID = 0
         const val RENDER_PARAM_API_TYPE = 1
+        const val RENDER_PARAM_OPENGL_INIT_PARAMS = 2
+        const val RENDER_PARAM_OPENGL_FBO = 3
         const val RENDER_PARAM_SW_SIZE = 17
         const val RENDER_PARAM_SW_FORMAT = 18
         const val RENDER_PARAM_SW_STRIDE = 19

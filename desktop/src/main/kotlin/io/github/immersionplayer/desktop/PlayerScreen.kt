@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
@@ -82,6 +83,9 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -119,7 +123,12 @@ class PlayerKeys {
     var onAddCard: () -> Unit = {}
     /** Opens the next episode, while the end-of-video prompt offers one. */
     var onPlayNext: (() -> Unit)? = null
+    /** What a key just changed, said briefly over the video. */
+    var notice by mutableStateOf<Notice?>(null)
 }
+
+/** A [PlayerKeys.notice]. Each is its own object, so saying the same thing twice shows it again. */
+class Notice(val text: String)
 
 @Composable
 fun PlayerScreen(
@@ -249,6 +258,15 @@ fun PlayerScreen(
         session.player.property("panscan", if (settings.videoFill) "1.0" else "0.0")
     }
 
+    val videoHeight by session.player.videoHeight.collectAsState()
+    val anime4kMode = settings.anime4kMode ?: Anime4K.modeFor(videoHeight)
+    LaunchedEffect(settings.anime4kPreset, anime4kMode, settings.anime4kFast) {
+        val shaders = withContext(Dispatchers.IO) {
+            if (settings.anime4kPreset == Anime4K.Preset.OFF) emptyList() else Anime4K.shaders(anime4kMode, settings.anime4kFast)
+        }
+        session.player.setShaders(shaders)
+    }
+
     val rounded = settings.roundedCorners
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val gutter = when {
@@ -265,6 +283,7 @@ fun PlayerScreen(
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
         Row(Modifier.fillMaxSize()) {
             VideoArea(
+                app,
                 session,
                 keys,
                 next = next,
@@ -337,10 +356,11 @@ fun PlayerScreen(
 
 /** How long the controls stay after the mouse stops moving over the video. */
 private const val CONTROLS_TIMEOUT_MS = 2000L
+private const val NOTICE_MS = 1500L
 
 /** The video, with controls that show on mouse movement or while paused and otherwise get out of the way. */
 @Composable
-private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onPlayNext: () -> Unit, modifier: Modifier) {
+private fun VideoArea(app: DesktopApp, session: PlayerSession, keys: PlayerKeys, next: File?, onPlayNext: () -> Unit, modifier: Modifier) {
     val paused by session.paused.collectAsState()
     val ended by session.ended.collectAsState()
     val offerNext = ended && next != null
@@ -350,13 +370,15 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onP
     }
     var lastMove by remember { mutableLongStateOf(0L) }
     var overControls by remember { mutableStateOf(false) }
+    // a menu opened from the controls keeps them up: the pointer is over the menu, not them
+    var menuOpen by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
     LaunchedEffect(lastMove) {
         moving = lastMove > 0
         delay(CONTROLS_TIMEOUT_MS)
         moving = false
     }
-    val visible = paused || moving || overControls
+    val visible = paused || moving || overControls || menuOpen
     LaunchedEffect(visible) { keys.chromeVisible = visible }
     DisposableEffect(Unit) { onDispose { keys.chromeVisible = true } }
     Box(
@@ -372,6 +394,28 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onP
             },
     ) {
         VideoSurface(session.player, Modifier.fillMaxSize())
+        val notice = keys.notice
+        var showNotice by remember { mutableStateOf(false) }
+        LaunchedEffect(notice) {
+            if (notice == null) return@LaunchedEffect
+            showNotice = true
+            delay(NOTICE_MS)
+            showNotice = false
+        }
+        AnimatedVisibility(
+            showNotice,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(400)),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
+        ) {
+            Text(
+                notice?.text.orEmpty(),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xCC000000))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
         AnimatedVisibility(
             offerNext,
             enter = fadeIn(tween(300)),
@@ -388,7 +432,7 @@ private fun VideoArea(session: PlayerSession, keys: PlayerKeys, next: File?, onP
                 .onPointerEvent(PointerEventType.Enter) { overControls = true }
                 .onPointerEvent(PointerEventType.Exit) { overControls = false },
         ) {
-            Controls(session)
+            Controls(app, session, onMenu = { menuOpen = it })
         }
     }
 }
@@ -437,7 +481,7 @@ private val HiddenCursor = PointerIcon(
 )
 
 @Composable
-private fun Controls(session: PlayerSession) {
+private fun Controls(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
     val position by session.position.collectAsState()
     val duration by session.duration.collectAsState()
     val paused by session.paused.collectAsState()
@@ -470,6 +514,78 @@ private fun Controls(session: PlayerSession) {
                 style = MaterialTheme.typography.labelMedium,
                 color = white.copy(alpha = 0.85f),
             )
+            Spacer(Modifier.weight(1f))
+            ShaderMenu(app, session, onMenu)
+        }
+    }
+}
+
+/** Anime4K's preset, and its mode under Advanced: the same settings as Settings › Appearance › Shaders. */
+@Composable
+private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
+    val settings = app.settings
+    val videoHeight by session.player.videoHeight.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    // the modes stay folded away unless one has been picked
+    var advanced by remember { mutableStateOf(false) }
+    fun show(value: Boolean) {
+        open = value
+        onMenu(value)
+    }
+    Box {
+        val interaction = remember { MutableInteractionSource() }
+        val hovered by interaction.collectIsHoveredAsState()
+        Box(
+            Modifier.clip(RoundedCornerShape(6.dp))
+                .background(if (hovered || open) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+                .hoverable(interaction)
+                .clickable(interaction, indication = null) { show(true) }
+                .pointerHoverIcon(PointerIcon.Hand)
+                .semantics { contentDescription = "Shaders" }
+                .padding(5.dp),
+        ) {
+            ShaderIcon(if (settings.anime4kPreset != Anime4K.Preset.OFF) MaterialTheme.colorScheme.primary else Color.White)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { show(false) }) {
+            @Composable
+            /** [note], if any, follows the label muted: what the item stands for, not its name. */
+            fun item(label: String, selected: Boolean, note: String? = null, onClick: () -> Unit) = DropdownMenuItem(
+                text = {
+                    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+                    Text(
+                        buildAnnotatedString {
+                            append(label)
+                            if (note != null) withStyle(SpanStyle(color = muted)) { append(" · $note") }
+                        },
+                        maxLines = 1,
+                    )
+                },
+                leadingIcon = { Text(if (selected) "✓" else "", Modifier.width(12.dp)) },
+                onClick = { onClick(); show(false) },
+            )
+            MenuHeading("Anime4K")
+            if (!session.player.runsShaders) MenuHeading("Needs OpenGL, which isn't available here")
+            Anime4K.Preset.entries.forEach { preset ->
+                // Auto says which of Fast and Best it went with
+                val note = if (preset == Anime4K.Preset.AUTO) {
+                    if (Anime4K.fast(preset, Anime4K.hardware)) Anime4K.Preset.FAST.label else Anime4K.Preset.BEST.label
+                } else null
+                item(preset.label, settings.anime4kPreset == preset, note) { settings.updateAnime4kPreset(preset) }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            DropdownMenuItem(
+                text = { Text("Advanced", maxLines = 1) },
+                leadingIcon = { Text(if (advanced || settings.anime4kMode != null) "▾" else "▸", Modifier.width(12.dp)) },
+                // opens in place, so the menu stays up
+                onClick = { advanced = !advanced },
+            )
+            if (advanced || settings.anime4kMode != null) {
+                MenuHeading("Mode")
+                item("By video (${Anime4K.modeFor(videoHeight).label})", settings.anime4kMode == null) { settings.updateAnime4kMode(null) }
+                Anime4K.Mode.entries.forEach { mode ->
+                    item(mode.label, settings.anime4kMode == mode) { settings.updateAnime4kMode(mode) }
+                }
+            }
         }
     }
 }
