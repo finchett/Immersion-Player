@@ -365,28 +365,38 @@ private fun AppearancePane(app: DesktopApp) {
     }
     Section("Shaders") {
         Card {
-            val mode = settings.anime4kMode
-            SettingRow("Anime4K", mode?.detail ?: "Sharpens and upscales anime on the GPU") {
+            val preset = settings.anime4kPreset
+            val benchmarking by app.benchmarking.collectAsState()
+            SettingRow("Anime4K", presetDetail(preset, settings.anime4kBenchmark, benchmarking)) {
                 Select(
-                    text = mode?.label ?: "Off",
-                    options = listOf("Off") + Anime4K.Mode.entries.map { it.label },
-                    onSelect = { settings.updateAnime4kMode(Anime4K.Mode.entries.getOrNull(it - 1)) },
+                    text = preset.label,
+                    options = Anime4K.Preset.entries.map { it.label },
+                    onSelect = { settings.updateAnime4kPreset(Anime4K.Preset.entries[it]) },
                 )
             }
             RowDivider()
-            val quality = settings.anime4kQuality
-            val benchmarking by app.benchmarking.collectAsState()
-            SettingRow("Quality", qualityDetail(quality, settings.anime4kBenchmark, benchmarking)) {
-                Select(
-                    text = quality.label,
-                    options = Anime4K.Quality.entries.map { it.label },
-                    onSelect = { settings.updateAnime4kQuality(Anime4K.Quality.entries[it]) },
-                )
+            // the modes stay folded away unless one has been picked
+            var advanced by remember { mutableStateOf(settings.anime4kMode != null) }
+            Box(Modifier.clickable { advanced = !advanced }.pointerHoverIcon(PointerIcon.Hand)) {
+                SettingRow("Advanced") {
+                    Text(if (advanced) "▾" else "▸", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (advanced) {
+                RowDivider()
+                val mode = settings.anime4kMode
+                SettingRow("Mode", mode?.detail ?: "A, B or C, from each video's resolution") {
+                    Select(
+                        text = mode?.label ?: "By video",
+                        options = listOf("By video") + Anime4K.Mode.entries.map { it.label },
+                        onSelect = { settings.updateAnime4kMode(Anime4K.Mode.entries.getOrNull(it - 1)) },
+                    )
+                }
             }
         }
     }
-    // Auto measures the GPU the first time it's needed: here, once a mode is picked
-    LaunchedEffect(settings.anime4kMode, settings.anime4kQuality) {
+    // Auto measures the GPU the first time it's needed: here, once it's picked
+    LaunchedEffect(settings.anime4kPreset) {
         withContext(Dispatchers.IO) { app.benchmarkShadersIfNeeded() }
     }
     Section("Subtitles") {
@@ -453,16 +463,17 @@ private fun AppearancePane(app: DesktopApp) {
 /** What AnkiConnect reported: the collection's note types and decks. */
 private class AnkiCollection(val noteTypes: List<String>, val decks: List<String>)
 
-/** What the quality setting means on this Mac: for Auto, what the benchmark settled on. */
-private fun qualityDetail(quality: Anime4K.Quality, benchmark: Anime4K.Benchmark?, benchmarking: Boolean): String =
-    when (quality) {
-        Anime4K.Quality.FAST -> "Smaller networks, which most Macs keep up with"
-        Anime4K.Quality.HQ -> "The largest networks; needs a fast GPU"
-        Anime4K.Quality.AUTO -> when {
+/** What the preset means on this Mac: for Auto, what the benchmark settled on. */
+private fun presetDetail(preset: Anime4K.Preset, benchmark: Anime4K.Benchmark?, benchmarking: Boolean): String =
+    when (preset) {
+        Anime4K.Preset.OFF -> "Sharpens and upscales anime on the GPU"
+        Anime4K.Preset.FAST -> "Lighter networks, which most Macs keep up with"
+        Anime4K.Preset.BEST -> "Anime4K's largest networks; needs a fast GPU"
+        Anime4K.Preset.AUTO -> when {
             benchmarking -> "Measuring this Mac's GPU…"
-            benchmark == null -> "HQ or Fast, measured on this Mac when Anime4K is first on"
-            benchmark.hq -> "HQ on this Mac: %.0f fps full screen".format(benchmark.hqFps)
-            else -> "Fast on this Mac: HQ ran at %.0f fps full screen".format(benchmark.hqFps)
+            benchmark == null -> "Best or Fast, whichever this Mac keeps up with"
+            benchmark.best -> "Best on this Mac: %.0f fps full screen".format(benchmark.bestFps)
+            else -> "Fast on this Mac: Best ran at %.0f fps full screen".format(benchmark.bestFps)
         }
     }
 
@@ -689,7 +700,7 @@ val KEYS = listOf(
     KeyHelp(listOf("U"), "Stop at the end of every line, on or off"),
     KeyHelp(listOf("F"), "Full screen", "or double-click"),
     KeyHelp(listOf("Z"), "Fill the area, or fit the whole picture", "or ⌘ + scroll"),
-    KeyHelp(listOf("⌘", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", "or Ctrl"),
+    KeyHelp(listOf("⌘", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", "or Ctrl; turns it on"),
     KeyHelp(listOf("⌘", "0"), "Anime4K off", "or Ctrl"),
     KeyHelp(listOf("Esc"), "Leave full screen, then back to the library"),
     KeyHelp(listOf("A"), "Add the looked-up word to Anki", "when Anki cards are on"),

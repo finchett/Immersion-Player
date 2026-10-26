@@ -205,33 +205,52 @@ class PlayerScreenTest {
         }
     }
 
-    /** The shader button on the video's controls sets Anime4K, which mpv then runs. */
+    /**
+     * The shader button on the video's controls turns Anime4K on at a preset, in the mode the
+     * video's resolution suggests; Advanced picks a mode instead. mpv runs what's chosen.
+     */
     @Test
     fun shaderMenuSetsAnime4K() {
         assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
         fixture(ja = srt(1.0..2.0 to "一つ目の行。"), en = srt(1.0..2.0 to "The first line.")) {
             assumeTrue("needs OpenGL", session.player.runsShaders)
-            // Fast, so the menu doesn't set off a benchmark
-            app.settings.updateAnime4kQuality(Anime4K.Quality.FAST)
             val keys = PlayerKeys()
+            fun shaders() = session.player.propertyString("glsl-shaders").orEmpty()
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
                     DesktopTheme(AppTheme.Midnight) {
                         PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
                     }
                 }
-                waitUntil(timeoutMillis = 15_000) { session.duration.value > 0 }
+                waitUntil(timeoutMillis = 15_000) { session.player.videoHeight.value > 0 }
+                val byVideo = Anime4K.modeFor(session.player.videoHeight.value)
                 // paused, the controls stay up
                 session.pause()
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithContentDescription("Shaders").fetchSemanticsNodes().isNotEmpty() }
+
+                // Fast (not Auto, so no benchmark runs): the mode for this video, lighter networks
                 onNodeWithContentDescription("Shaders").performClick()
-                waitUntil(timeoutMillis = 5_000) { shows("Mode B") }
+                waitUntil(timeoutMillis = 5_000) { shows("Best") }
+                assertFalse("modes start folded away", shows("Mode B"))
                 shot("6-shader-menu")
+                onNodeWithText("Fast").performClick()
+                assertEquals(Anime4K.Preset.FAST, app.settings.anime4kPreset)
+                val expected = Anime4K.shaders(byVideo, fast = true).map { it.name }
+                waitUntil(timeoutMillis = 5_000) { expected.all { it in shaders() } }
+
+                // Advanced: Mode B instead of following the video
+                onNodeWithContentDescription("Shaders").performClick()
+                onNodeWithText("Advanced").performClick()
+                waitUntil(timeoutMillis = 5_000) { shows("Mode B") && shows("By video") }
+                shot("6-shader-advanced")
                 onNodeWithText("Mode B").performClick()
                 assertEquals(Anime4K.Mode.B, app.settings.anime4kMode)
-                waitUntil(timeoutMillis = 5_000) {
-                    session.player.propertyString("glsl-shaders").orEmpty().contains("Anime4K_Restore_CNN_Soft_M.glsl")
-                }
+                waitUntil(timeoutMillis = 5_000) { "Anime4K_Restore_CNN_Soft_M.glsl" in shaders() }
+
+                // Off clears them
+                onNodeWithContentDescription("Shaders").performClick()
+                onNodeWithText("Off").performClick()
+                waitUntil(timeoutMillis = 5_000) { shaders().isEmpty() }
             }
         }
     }

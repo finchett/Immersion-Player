@@ -24,15 +24,24 @@ class Anime4KTest {
         assertEquals(fast.map { "Anime4K_$it.glsl" }, Anime4K.shaders(Anime4K.Mode.A, fast = true).map { it.name })
     }
 
-    @Test fun autoIsFastUntilABenchmarkSaysHqKeepsUp() {
+    @Test fun autoIsFastUntilABenchmarkSaysBestKeepsUp() {
         val slow = Anime4K.Benchmark("Apple M1 Pro", 3024, 1964, 6.5)
-        val quick = slow.copy(hqFps = 45.0)
-        assertTrue(Anime4K.fast(Anime4K.Quality.AUTO, null))
-        assertTrue(Anime4K.fast(Anime4K.Quality.AUTO, slow))
-        assertFalse(Anime4K.fast(Anime4K.Quality.AUTO, quick))
+        val quick = slow.copy(bestFps = 45.0)
+        assertTrue(Anime4K.fast(Anime4K.Preset.AUTO, null))
+        assertTrue(Anime4K.fast(Anime4K.Preset.AUTO, slow))
+        assertFalse(Anime4K.fast(Anime4K.Preset.AUTO, quick))
         // a fixed choice ignores the benchmark
-        assertTrue(Anime4K.fast(Anime4K.Quality.FAST, quick))
-        assertFalse(Anime4K.fast(Anime4K.Quality.HQ, slow))
+        assertTrue(Anime4K.fast(Anime4K.Preset.FAST, quick))
+        assertFalse(Anime4K.fast(Anime4K.Preset.BEST, slow))
+    }
+
+    @Test fun modeFollowsTheVideosResolution() {
+        assertEquals(Anime4K.Mode.A, Anime4K.modeFor(0))
+        assertEquals(Anime4K.Mode.A, Anime4K.modeFor(1080))
+        assertEquals(Anime4K.Mode.A, Anime4K.modeFor(2160))
+        assertEquals(Anime4K.Mode.B, Anime4K.modeFor(720))
+        assertEquals(Anime4K.Mode.C, Anime4K.modeFor(480))
+        assertEquals(Anime4K.Mode.C, Anime4K.modeFor(576))
     }
 
     @Test fun benchmarkSurvivesBeingStored() {
@@ -48,6 +57,6 @@ class Anime4KTest {
         assertNotNull(benchmark)
         println("benchmark: $benchmark")
         assertTrue(benchmark!!.gpu, benchmark.gpu.isNotBlank() && benchmark.gpu != "unknown")
-        assertTrue("${benchmark.hqFps} fps", benchmark.hqFps > 1)
+        assertTrue("${benchmark.bestFps} fps", benchmark.bestFps > 1)
     }
 }

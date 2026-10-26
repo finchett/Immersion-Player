@@ -95,18 +95,25 @@ fun main(args: Array<String>) {
                 return true
             }
             if (event.type != KeyEventType.KeyDown) return false
-            // ⌘/Ctrl + 1–6: Anime4K's modes, on the keys its mpv instructions use; 0 turns it off
+            // ⌘/Ctrl + 1–6: Anime4K's modes, on the keys its mpv instructions use (turning it on at
+            // Auto if it's off); 0 turns it off
             val anime4k = ANIME4K_KEYS.indexOf(event.key)
             if (anime4k >= 0 && (event.isMetaPressed || event.isCtrlPressed)) {
+                val settings = app.settings
                 val mode = Anime4K.Mode.entries.getOrNull(anime4k - 1)
-                app.settings.updateAnime4kMode(mode)
+                if (mode == null) {
+                    settings.updateAnime4kPreset(Anime4K.Preset.OFF)
+                } else {
+                    settings.updateAnime4kMode(mode)
+                    if (settings.anime4kPreset == Anime4K.Preset.OFF) settings.updateAnime4kPreset(Anime4K.Preset.AUTO)
+                }
                 keys.notice = Notice(
                     when {
                         mode == null -> "Anime4K off"
                         !current.player.runsShaders -> "Anime4K needs OpenGL, which isn't available here"
                         else -> {
-                            val auto = if (app.settings.anime4kQuality == Anime4K.Quality.AUTO) " (auto)" else ""
-                            "Anime4K ${mode.label} · ${if (app.settings.anime4kFast) "Fast" else "HQ"}$auto"
+                            val auto = if (settings.anime4kPreset == Anime4K.Preset.AUTO) " (auto)" else ""
+                            "Anime4K ${mode.label} · ${if (settings.anime4kFast) "Fast" else "Best"}$auto"
                         }
                     },
                 )

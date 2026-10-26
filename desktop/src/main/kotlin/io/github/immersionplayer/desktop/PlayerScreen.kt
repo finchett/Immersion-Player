@@ -257,14 +257,16 @@ fun PlayerScreen(
         session.player.property("panscan", if (settings.videoFill) "1.0" else "0.0")
     }
 
-    LaunchedEffect(settings.anime4kMode, settings.anime4kFast) {
+    val videoHeight by session.player.videoHeight.collectAsState()
+    val anime4kMode = settings.anime4kMode ?: Anime4K.modeFor(videoHeight)
+    LaunchedEffect(settings.anime4kPreset, anime4kMode, settings.anime4kFast) {
         val shaders = withContext(Dispatchers.IO) {
-            settings.anime4kMode?.let { Anime4K.shaders(it, settings.anime4kFast) }.orEmpty()
+            if (settings.anime4kPreset == Anime4K.Preset.OFF) emptyList() else Anime4K.shaders(anime4kMode, settings.anime4kFast)
         }
         session.player.setShaders(shaders)
     }
-    // Auto quality plays Fast until the GPU has been measured, then switches if HQ keeps up
-    LaunchedEffect(settings.anime4kMode, settings.anime4kQuality) {
+    // Auto plays Fast until the GPU has been measured, then switches if Best keeps up
+    LaunchedEffect(settings.anime4kPreset) {
         withContext(Dispatchers.IO) { app.benchmarkShadersIfNeeded() }
     }
 
@@ -521,12 +523,15 @@ private fun Controls(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) 
     }
 }
 
-/** Anime4K's mode and quality, the same settings as Settings › Appearance › Shaders. */
+/** Anime4K's preset, and its mode under Advanced: the same settings as Settings › Appearance › Shaders. */
 @Composable
 private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
     val settings = app.settings
     val benchmarking by app.benchmarking.collectAsState()
+    val videoHeight by session.player.videoHeight.collectAsState()
     var open by remember { mutableStateOf(false) }
+    // the modes stay folded away unless one has been picked
+    var advanced by remember { mutableStateOf(false) }
     fun show(value: Boolean) {
         open = value
         onMenu(value)
@@ -543,7 +548,7 @@ private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean
                 .semantics { contentDescription = "Shaders" }
                 .padding(5.dp),
         ) {
-            ShaderIcon(if (settings.anime4kMode != null) MaterialTheme.colorScheme.primary else Color.White)
+            ShaderIcon(if (settings.anime4kPreset != Anime4K.Preset.OFF) MaterialTheme.colorScheme.primary else Color.White)
         }
         DropdownMenu(expanded = open, onDismissRequest = { show(false) }) {
             @Composable
@@ -554,22 +559,30 @@ private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean
             )
             MenuHeading("Anime4K")
             if (!session.player.runsShaders) MenuHeading("Needs OpenGL, which isn't available here")
-            item("Off", settings.anime4kMode == null) { settings.updateAnime4kMode(null) }
-            Anime4K.Mode.entries.forEach { mode ->
-                item(mode.label, settings.anime4kMode == mode) { settings.updateAnime4kMode(mode) }
-            }
-            HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            MenuHeading("Quality")
-            Anime4K.Quality.entries.forEach { quality ->
-                val label = if (quality != Anime4K.Quality.AUTO) quality.label else {
+            Anime4K.Preset.entries.forEach { preset ->
+                val label = if (preset != Anime4K.Preset.AUTO) preset.label else {
                     val benchmark = settings.anime4kBenchmark
                     when {
                         benchmarking -> "Auto (measuring…)"
                         benchmark == null -> "Auto"
-                        else -> "Auto (${if (benchmark.hq) "HQ" else "Fast"} on this Mac)"
+                        else -> "Auto (${if (benchmark.best) "Best" else "Fast"} on this Mac)"
                     }
                 }
-                item(label, settings.anime4kQuality == quality) { settings.updateAnime4kQuality(quality) }
+                item(label, settings.anime4kPreset == preset) { settings.updateAnime4kPreset(preset) }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            DropdownMenuItem(
+                text = { Text("Advanced", maxLines = 1) },
+                leadingIcon = { Text(if (advanced || settings.anime4kMode != null) "▾" else "▸", Modifier.width(12.dp)) },
+                // opens in place, so the menu stays up
+                onClick = { advanced = !advanced },
+            )
+            if (advanced || settings.anime4kMode != null) {
+                MenuHeading("Mode")
+                item("By video (${Anime4K.modeFor(videoHeight).label})", settings.anime4kMode == null) { settings.updateAnime4kMode(null) }
+                Anime4K.Mode.entries.forEach { mode ->
+                    item(mode.label, settings.anime4kMode == mode) { settings.updateAnime4kMode(mode) }
+                }
             }
         }
     }

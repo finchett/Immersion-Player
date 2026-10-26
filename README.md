@@ -49,7 +49,7 @@ Every action is a gesture. The app lists them once, on first run.
 | u | stop at the end of every line, on or off |
 | z, or ⌘ + scroll | fill the area, or fit the whole picture |
 | f, or double-click | full screen |
-| ⌘ (or Ctrl) + 1–6 | Anime4K mode A, B, C, A+A, B+B, C+A |
+| ⌘ (or Ctrl) + 1–6 | Anime4K mode A, B, C, A+A, B+B, C+A (turns it on at Auto if it's off) |
 | ⌘ (or Ctrl) + 0 | Anime4K off |
 | Esc | leave full screen, then back to the library |
 | click / drag a word | look it up |
@@ -110,14 +110,17 @@ Other note types get a guess from their field names.
   context and reads each frame back into the Compose window; elsewhere, or if OpenGL can't be
   set up, mpv's software renderer draws into it directly (about 5 ms per 1080p frame on Apple
   Silicon). `-Prenderer=sw` forces the software one.
-- [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled, in the modes from its mpv
-  instructions. Set them under Settings › Appearance › Shaders, from the shader button on the
-  video's controls, or with ⌘ + 1–6. They need the GPU renderer.
-  Quality is Fast, HQ or Auto (the default). Auto measures the GPU once, the first time Anime4K
-  is on: HQ Mode A on a test pattern for a few seconds, untimed, at the screen's full size. If
-  that reaches 30 fps it uses HQ, otherwise Fast. The result is kept until the GPU or screen size
-  changes. On an M1 Pro, HQ runs at about 6 fps full screen, so Auto picks Fast, which holds
-  24 fps at 3K.
+- [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
+  Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
+  Auto, Fast or Best. They need the GPU renderer.
+  - Fast runs Anime4K's smaller networks, and Best its largest (its own HQ setup).
+  - Auto measures the GPU once, the first time it's on: Best Mode A on a test pattern for a few
+    seconds, untimed, at the screen's full size. If that reaches 30 fps it uses Best, otherwise
+    Fast. The result is kept until the GPU or screen size changes. On an M1 Pro, Best runs at
+    about 6 fps full screen, so Auto picks Fast, which holds 24 fps at 3K.
+  - The mode follows the video's resolution, as Anime4K's instructions suggest: A for 1080p, B
+    for 720p, C for 480p. Under Advanced, or with ⌘ + 1–6, you can pick any of its six modes
+    instead.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.

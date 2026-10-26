@@ -65,18 +65,19 @@ class Settings(node: String = "io/github/immersionplayer") {
     /** Crop the video to fill its area (mpv panscan) instead of letterboxing. */
     var videoFill by mutableStateOf(prefs.getBoolean("video_fill", false))
         private set
-    /** Anime4K's shaders on the video, in this mode, or null for none. */
-    var anime4kMode by mutableStateOf(Anime4K.Mode.entries.firstOrNull { it.name == prefs.get("anime4k_mode", null) })
-        private set
-    var anime4kQuality by mutableStateOf(
-        Anime4K.Quality.entries.firstOrNull { it.name == prefs.get("anime4k_quality", null) } ?: Anime4K.Quality.AUTO,
+    /** Anime4K on the video, and how heavy. */
+    var anime4kPreset by mutableStateOf(
+        Anime4K.Preset.entries.firstOrNull { it.name == prefs.get("anime4k_preset", null) } ?: Anime4K.Preset.OFF,
     )
+        private set
+    /** Advanced: Anime4K's mode, or null to follow each video's resolution. */
+    var anime4kMode by mutableStateOf(Anime4K.Mode.entries.firstOrNull { it.name == prefs.get("anime4k_advanced_mode", null) })
         private set
     /** The last GPU benchmark, which settles Auto quality; null until one has run. */
     var anime4kBenchmark by mutableStateOf(prefs.get("anime4k_benchmark", null)?.let(Anime4K.Benchmark::decode))
         private set
     /** Whether Anime4K runs its lighter networks, with Auto settled. */
-    val anime4kFast: Boolean get() = Anime4K.fast(anime4kQuality, anime4kBenchmark)
+    val anime4kFast: Boolean get() = Anime4K.fast(anime4kPreset, anime4kBenchmark)
     /** Video and panel as separate rounded cards with a gap between them. */
     var roundedCorners by mutableStateOf(prefs.getBoolean("rounded_corners", false))
         private set
@@ -153,11 +154,11 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun updatePauseOnLookup(value: Boolean) { pauseOnLookup = value; prefs.putBoolean("pause_on_lookup", value) }
     fun updateCopyLines(value: Boolean) { copyLines = value; prefs.putBoolean("copy_lines", value) }
     fun updateVideoFill(value: Boolean) { videoFill = value; prefs.putBoolean("video_fill", value) }
+    fun updateAnime4kPreset(value: Anime4K.Preset) { anime4kPreset = value; prefs.put("anime4k_preset", value.name) }
     fun updateAnime4kMode(value: Anime4K.Mode?) {
         anime4kMode = value
-        if (value == null) prefs.remove("anime4k_mode") else prefs.put("anime4k_mode", value.name)
+        if (value == null) prefs.remove("anime4k_advanced_mode") else prefs.put("anime4k_advanced_mode", value.name)
     }
-    fun updateAnime4kQuality(value: Anime4K.Quality) { anime4kQuality = value; prefs.put("anime4k_quality", value.name) }
     fun updateAnime4kBenchmark(value: Anime4K.Benchmark) { anime4kBenchmark = value; prefs.put("anime4k_benchmark", value.encode()) }
     fun updateRoundedCorners(value: Boolean) { roundedCorners = value; prefs.putBoolean("rounded_corners", value) }
     fun updateTargetLanguage(code: String) { targetLanguage = code; prefs.put("target_language", code) }

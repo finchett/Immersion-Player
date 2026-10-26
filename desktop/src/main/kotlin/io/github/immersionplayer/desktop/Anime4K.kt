@@ -7,6 +7,9 @@ import java.io.File
  * Anime4K's GLSL shaders (https://github.com/bloc97/Anime4K), bundled under resources/anime4k,
  * in the modes its mpv instructions set up on Ctrl+1–6. Each mode suits a source resolution:
  * A for 1080p, B for 720p, C for 480p; the doubled ones restore twice, sharper but heavier.
+ *
+ * What people choose is a [Preset]: how heavy a network to run, or off. The mode follows the
+ * video's resolution unless one is picked under Advanced.
  */
 object Anime4K {
     enum class Mode(val label: String, val detail: String) {
@@ -18,21 +21,22 @@ object Anime4K {
         CA("Mode C+A", "Mode C, then restored as A"),
     }
 
-    enum class Quality(val label: String) {
-        /** HQ if a benchmark says this GPU keeps up with it, else Fast. */
+    enum class Preset(val label: String) {
+        OFF("Off"),
+        /** Best if a benchmark says this GPU keeps up with it, else Fast. */
         AUTO("Auto"),
         /** The smaller networks: what most GPUs keep up with. */
         FAST("Fast"),
-        /** The largest networks, as in Anime4K's own HQ setup. */
-        HQ("HQ"),
+        /** The largest networks, Anime4K's own HQ setup. */
+        BEST("Best"),
     }
 
-    /** What [benchmark] found: HQ Mode A's frame rate on [gpu], drawing [width] × [height] pixels. */
-    data class Benchmark(val gpu: String, val width: Int, val height: Int, val hqFps: Double) {
-        /** Whether HQ keeps up: video is 24 fps, and playback needs room besides the shaders. */
-        val hq: Boolean get() = hqFps >= HQ_MIN_FPS
+    /** What [benchmark] found: Best Mode A's frame rate on [gpu], drawing [width] × [height] pixels. */
+    data class Benchmark(val gpu: String, val width: Int, val height: Int, val bestFps: Double) {
+        /** Whether Best keeps up: video is 24 fps, and playback needs room besides the shaders. */
+        val best: Boolean get() = bestFps >= BEST_MIN_FPS
 
-        fun encode() = "$gpu|$width|$height|$hqFps"
+        fun encode() = "$gpu|$width|$height|$bestFps"
 
         companion object {
             fun decode(value: String): Benchmark? {
@@ -48,17 +52,24 @@ object Anime4K {
         }
     }
 
-    const val HQ_MIN_FPS = 30.0
+    const val BEST_MIN_FPS = 30.0
 
-    /** Whether [quality] means the lighter networks. Auto is Fast until a benchmark says HQ keeps up. */
-    fun fast(quality: Quality, benchmark: Benchmark?): Boolean = when (quality) {
-        Quality.FAST -> true
-        Quality.HQ -> false
-        Quality.AUTO -> benchmark?.hq != true
+    /** Whether [preset] means the lighter networks. Auto is Fast until a benchmark says Best keeps up. */
+    fun fast(preset: Preset, benchmark: Benchmark?): Boolean = when (preset) {
+        Preset.BEST -> false
+        Preset.AUTO -> benchmark?.best != true
+        Preset.OFF, Preset.FAST -> true
+    }
+
+    /** The mode Anime4K suggests for a video [height] pixels tall; A while the height isn't known. */
+    fun modeFor(height: Int): Mode = when {
+        height <= 0 || height >= 900 -> Mode.A
+        height >= 600 -> Mode.B
+        else -> Mode.C
     }
 
     /**
-     * Plays a test pattern through HQ Mode A as fast as this GPU can draw it at [width] × [height]
+     * Plays a test pattern through Best Mode A as fast as this GPU can draw it at [width] × [height]
      * (the screen, so full screen keeps up too) and counts the frames. About five seconds; null
      * where mpv can't run shaders. Call off the UI thread.
      */

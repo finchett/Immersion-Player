@@ -10,6 +10,7 @@ import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_PROPERTY_CHA
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_SHUTDOWN
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.FORMAT_DOUBLE
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.FORMAT_FLAG
+import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.FORMAT_INT64
 import io.github.immersionplayer.media.AudioTrack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +67,10 @@ class MpvPlayer(options: Map<String, String> = emptyMap()) {
     /** Whether playback has reached the end of the file (and, with keep-open, holds the last frame). */
     val ended: StateFlow<Boolean> = _ended.asStateFlow()
 
+    private val _videoHeight = MutableStateFlow(0)
+    /** The video's height in pixels as decoded, or 0 until it's known. */
+    val videoHeight: StateFlow<Int> = _videoHeight.asStateFlow()
+
     private val _audioTracks = MutableStateFlow<List<AudioTrack>>(emptyList())
     /** The loaded file's audio tracks, read when it loads. */
     val audioTracks: StateFlow<List<AudioTrack>> = _audioTracks.asStateFlow()
@@ -100,6 +105,7 @@ class MpvPlayer(options: Map<String, String> = emptyMap()) {
         lib.mpv_observe_property(handle, 2, "duration", FORMAT_DOUBLE)
         lib.mpv_observe_property(handle, 3, "pause", FORMAT_FLAG)
         lib.mpv_observe_property(handle, 4, "eof-reached", FORMAT_FLAG)
+        lib.mpv_observe_property(handle, 5, "height", FORMAT_INT64)
 
         Thread(::eventLoop, "mpv-events").apply { isDaemon = true }.start()
         val created = CompletableFuture<Unit>()
@@ -337,6 +343,7 @@ class MpvPlayer(options: Map<String, String> = emptyMap()) {
             name == "duration" && format == FORMAT_DOUBLE -> _duration.value = data.getDouble(0)
             name == "pause" && format == FORMAT_FLAG -> _paused.value = data.getInt(0) != 0
             name == "eof-reached" && format == FORMAT_FLAG -> _ended.value = data.getInt(0) != 0
+            name == "height" && format == FORMAT_INT64 -> _videoHeight.value = data.getLong(0).toInt()
         }
     }
 }

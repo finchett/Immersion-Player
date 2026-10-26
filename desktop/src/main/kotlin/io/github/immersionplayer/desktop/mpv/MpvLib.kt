@@ -42,6 +42,7 @@ interface MpvLib : Library {
     companion object {
         const val FORMAT_STRING = 1
         const val FORMAT_FLAG = 3
+        const val FORMAT_INT64 = 4
         const val FORMAT_DOUBLE = 5
 
         const val EVENT_NONE = 0

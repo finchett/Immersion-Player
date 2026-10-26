@@ -45,16 +45,16 @@ class DesktopApp(
     val setupStatus: StateFlow<String?> = _setupStatus.asStateFlow()
 
     private val _benchmarking = MutableStateFlow(false)
-    /** Whether the GPU is being measured for Anime4K's Auto quality. */
+    /** Whether the GPU is being measured for Anime4K's Auto preset. */
     val benchmarking: StateFlow<Boolean> = _benchmarking.asStateFlow()
     private val benchmarkRunning = AtomicBoolean(false)
 
     /**
-     * Measures the GPU for Anime4K's Auto quality, when Anime4K is on at Auto and there's no
+     * Measures the GPU for Anime4K's Auto preset, when Anime4K is on at Auto and there's no
      * benchmark yet for this GPU at this screen size. Slow (seconds); call off the UI thread.
      */
     fun benchmarkShadersIfNeeded() {
-        if (settings.anime4kMode == null || settings.anime4kQuality != Anime4K.Quality.AUTO) return
+        if (settings.anime4kPreset != Anime4K.Preset.AUTO) return
         if (!benchmarkRunning.compareAndSet(false, true)) return
         try {
             val gpu = OffscreenGl.gpuName() ?: return
