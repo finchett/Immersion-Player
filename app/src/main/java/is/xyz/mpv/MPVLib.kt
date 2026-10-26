@@ -1,4 +1,4 @@
-// Vendored unchanged from mpv-android (MIT), tag 2026-09-17 (fdf74f6).
+// Vendored unchanged from mpv-android (MIT, see LICENSE beside it), tag 2026-09-17 (fdf74f6).
 // Must stay in package is.xyz.mpv: the prebuilt libplayer.so JNI glue binds to this class.
 package `is`.xyz.mpv
 

@@ -57,7 +57,7 @@ compose.desktop {
             packageName = "Immersion Player"
             packageVersion = "0.4.0"
             description = "Japanese video player with a built-in dictionary"
-            copyright = "GPL-3.0-or-later"
+            copyright = "MPL-2.0"
             modules("java.instrument", "java.prefs", "java.sql", "jdk.unsupported")
             // libmpv and its libraries, bundled per OS by bundleLibmpv
             appResourcesRootDir.set(layout.buildDirectory.dir("native"))
