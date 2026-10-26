@@ -2,7 +2,7 @@
 
 **A Japanese video player where the subtitle line is the interface.**
 
-[![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
+[![Licence: MPL-2.0](https://img.shields.io/badge/licence-MPL--2.0-blue)](LICENSE)
 ![Android 11+](https://img.shields.io/badge/Android-11%2B-3ddc84)
 ![arm64-v8a](https://img.shields.io/badge/abi-arm64--v8a-lightgrey)
 ![macOS 12+](https://img.shields.io/badge/macOS-12%2B%20Apple%20Silicon-lightgrey)
@@ -255,16 +255,22 @@ desktop/    Compose Desktop
 
 ## Licence
 
-Immersion Player is free software under the **GNU General Public License v3.0 or later**
-(see [LICENSE](LICENSE)). That follows from the mpv and FFmpeg binaries it bundles. You may use,
-modify, sell and redistribute it, provided recipients get the same freedoms and the source.
+Immersion Player's own code is under the **Mozilla Public License 2.0** (see [LICENSE](LICENSE)).
+You may use, modify, sell and redistribute it, and combine it with other code under other
+licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
+up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
+
+The mpv and FFmpeg it bundles are, for now, GPL builds, so the Android and macOS apps as built
+today are distributed under the GPL as a whole, which MPL-2.0 allows. LGPL builds of both are
+planned for every platform, after which the apps are MPL-2.0 with LGPL libraries.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
   [rikaitan-import](https://github.com/Ajatt-Tools/rikaitan-import).
-- **mpv-android** (`MPVLib.kt`, JNI glue): MIT.
+- **mpv-android** (`MPVLib.kt`, JNI glue): MIT, © Ilya Zhuravlev and sfan5; see
+  `app/src/main/java/is/xyz/mpv/LICENSE`.
 - **libmpv and FFmpeg** (prebuilt, fetched by `scripts/fetch-libmpv.sh`): GPL-2.0+/LGPL-2.1+ as
-  built by mpv-android. These are why this app is GPL.
+  built by mpv-android.
 - **libmpv, FFmpeg and their libraries** (macOS build, copied from Homebrew): GPL, including
   x264 and x265.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
