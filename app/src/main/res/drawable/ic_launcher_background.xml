@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The icon's light grey square, lit from the top left. Drawn in the 1024 px design's
+<!-- The icon's light square, lit from the top left. Drawn in the 1024 px design's
      coordinates scaled onto the 72 dp visible area, so the gradients match desktop/icons/icon.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
@@ -10,8 +10,8 @@
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient android:type="linear" android:startX="18" android:startY="18" android:endX="75.586" android:endY="90">
-                <item android:offset="0" android:color="#FFFAFAFA" />
-                <item android:offset="1" android:color="#FFDDDDDD" />
+                <item android:offset="0" android:color="#FFF0F8F1" />
+                <item android:offset="1" android:color="#FFC0DCCB" />
             </gradient>
         </aapt:attr>
     </path>
