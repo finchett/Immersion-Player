@@ -65,12 +65,17 @@ object MacTrafficLights {
     /**
      * Centres the first light [center] points in from the top and left, and shows or fades them.
      * No-op off macOS.
+     *
+     * A new title makes AppKit put the lights back where it wants them, so [title] is set here
+     * first, in the same turn as the move; AWT setting the same title again changes nothing.
      */
-    fun apply(visible: Boolean, center: Double) {
+    fun apply(visible: Boolean, center: Double, title: String) {
         if (!isMac) return
         onMain {
             val result = runCatching {
                 val window = appWindow() ?: return@onMain
+                val nsTitle = msgSend.invokePointer(arrayOf(cls("NSString"), sel("stringWithUTF8String:"), title))
+                sendVoid(window, "setTitle:", nsTitle)
                 val responds = sendLong(window, "respondsToSelector:", sel("_cornerRadius")) and 0xFF
                 if (responds != 0L) {
                     val radius = msgSend.invokeDouble(arrayOf(window, sel("_cornerRadius")))
