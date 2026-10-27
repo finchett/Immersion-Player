@@ -101,3 +101,7 @@ enum class AppTheme(val label: String, val scheme: ColorScheme) {
         ),
     ),
 }
+
+/** The themes "System" follows, by the device's light or dark setting. */
+val SystemDark = AppTheme.Jade
+val SystemLight = AppTheme.Celadon

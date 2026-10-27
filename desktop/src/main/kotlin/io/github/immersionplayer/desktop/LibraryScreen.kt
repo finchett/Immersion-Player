@@ -2,16 +2,10 @@ package io.github.immersionplayer.desktop
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +51,7 @@ import io.github.immersionplayer.library.NaturalOrder
 import io.github.immersionplayer.library.Titles
 import io.github.immersionplayer.library.isVideoName
 import io.github.immersionplayer.ui.Cog
+import io.github.immersionplayer.ui.FolderMark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -307,29 +302,6 @@ private fun count(n: Int, noun: String) = when (n) {
     0 -> null
     1 -> "1 $noun"
     else -> "$n ${noun}s"
-}
-
-/** A folder without a video to show: a plain folder outline in the empty frame. */
-@Composable
-private fun FolderMark(color: Color) {
-    Canvas(Modifier.size(44.dp, 34.dp)) {
-        val stroke = Stroke(width = 1.6.dp.toPx())
-        val tab = Path().apply {
-            moveTo(0f, size.height * 0.22f)
-            lineTo(0f, size.height * 0.08f)
-            quadraticTo(0f, 0f, size.width * 0.06f, 0f)
-            lineTo(size.width * 0.34f, 0f)
-            lineTo(size.width * 0.44f, size.height * 0.14f)
-        }
-        drawPath(tab, color, style = stroke)
-        drawRoundRect(
-            color,
-            topLeft = Offset(0f, size.height * 0.14f),
-            size = Size(size.width, size.height * 0.86f),
-            cornerRadius = CornerRadius(4.dp.toPx()),
-            style = stroke,
-        )
-    }
 }
 
 /** A frame from [video]: where you left off, or a fifth of the way in if unwatched. */

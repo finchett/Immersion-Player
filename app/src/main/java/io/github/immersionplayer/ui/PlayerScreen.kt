@@ -331,7 +331,7 @@ fun PlayerScreen(
     // while playing, a foreground service keeps the app running with the screen off
     val playing = !session.paused.collectAsState().value
     LaunchedEffect(playing) {
-        if (playing) PlaybackService.start(context, session.videoName) else PlaybackService.stop(context)
+        if (playing) PlaybackService.start(context, session.title) else PlaybackService.stop(context)
     }
     DisposableEffect(session) { onDispose { PlaybackService.stop(context) } }
 
@@ -1484,7 +1484,7 @@ private fun minedWord(session: PlayerSession, lookup: ActiveLookup, entry: TermE
         wordLength = entry.sourceLength,
         entry = entry,
         translation = session.secondary.value?.translationFor(cue.start, cue.end),
-        videoName = session.videoName.substringBeforeLast('.'),
+        videoName = session.title,
         start = cue.start + offset,
         end = cue.end + offset,
     )

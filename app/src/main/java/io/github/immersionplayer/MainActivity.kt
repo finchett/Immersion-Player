@@ -15,7 +15,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.isSystemInDarkTheme
-import io.github.immersionplayer.ui.AppTheme
+import io.github.immersionplayer.ui.SystemDark
+import io.github.immersionplayer.ui.SystemLight
 import io.github.immersionplayer.ui.Motion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
@@ -50,7 +51,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleViewIntent(intent)
         setContent {
             val theme = app.appearance.theme
-                ?: if (isSystemInDarkTheme()) AppTheme.Midnight else AppTheme.Paper
+                ?: if (isSystemInDarkTheme()) SystemDark else SystemLight
             MaterialTheme(colorScheme = theme.scheme) {
                 BackHandler(enabled = screen != Screen.Library) { screen = Screen.Library }
                 LaunchedEffect(pendingScreen) {

@@ -75,6 +75,8 @@ import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
 import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.ui.AppTheme
+import io.github.immersionplayer.ui.SystemDark
+import io.github.immersionplayer.ui.SystemLight
 import io.github.immersionplayer.ui.NoteTypeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

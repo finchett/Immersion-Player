@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.immersionplayer.ui.AppTheme
 import io.github.immersionplayer.ui.Cog
+import io.github.immersionplayer.ui.SystemDark
+import io.github.immersionplayer.ui.SystemLight
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 
@@ -76,10 +78,6 @@ val HeaderStart: Dp
 /** Height of a header row whose middle lines up with the traffic lights. */
 val HeaderHeight: Dp
     @Composable get() = if (LocalTrafficLights.current) LocalCorners.current.lightCenter * 2 else 40.dp
-
-/** The themes "System" follows. */
-val SystemDark = AppTheme.Jade
-val SystemLight = AppTheme.Celadon
 
 /**
  * The app themes, retuned for a desktop: a denser type scale sized for reading at arm's length

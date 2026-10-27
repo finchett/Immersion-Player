@@ -51,6 +51,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("episode_numbers", true)
         set(value) = prefs.edit { putBoolean("episode_numbers", value) }
 
+    /** Show and folder names without release tags, and episodes as "Episode 1" (see Titles). */
+    var tidyNames: Boolean
+        get() = prefs.getBoolean("tidy_names", true)
+        set(value) = prefs.edit { putBoolean("tidy_names", value) }
+
     /** The study panel dragged off screen: the video takes it all, for just watching. */
     var panelHidden: Boolean
         get() = prefs.getBoolean("panel_hidden", false)

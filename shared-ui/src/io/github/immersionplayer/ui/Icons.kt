@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
@@ -30,5 +31,28 @@ fun Cog(color: Color, diameter: Dp = 14.dp) {
                 )
             }
         }
+    }
+}
+
+/** A folder without a video to show: a plain folder outline in the empty frame. */
+@Composable
+fun FolderMark(color: Color) {
+    Canvas(Modifier.size(44.dp, 34.dp)) {
+        val stroke = Stroke(width = 1.6.dp.toPx())
+        val tab = Path().apply {
+            moveTo(0f, size.height * 0.22f)
+            lineTo(0f, size.height * 0.08f)
+            quadraticTo(0f, 0f, size.width * 0.06f, 0f)
+            lineTo(size.width * 0.34f, 0f)
+            lineTo(size.width * 0.44f, size.height * 0.14f)
+        }
+        drawPath(tab, color, style = stroke)
+        drawRoundRect(
+            color,
+            topLeft = Offset(0f, size.height * 0.14f),
+            size = Size(size.width, size.height * 0.86f),
+            cornerRadius = CornerRadius(4.dp.toPx()),
+            style = stroke,
+        )
     }
 }

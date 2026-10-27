@@ -8,6 +8,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import io.github.immersionplayer.library.Titles
 import io.github.immersionplayer.Prefs
 import io.github.immersionplayer.media.AudioTrack
 import io.github.immersionplayer.subs.SubtitleTrack
@@ -24,6 +25,9 @@ class PlayerSession(
     val videoUri: String,
     val videoName: String,
 ) : MpvView.Listener {
+    /** The video's name as the library shows it, for Anki cards and the notification. */
+    val title: String
+        get() = if (prefs.tidyNames) Titles.clean(videoName) else videoName.substringBeforeLast('.')
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var view: MpvView? = null
