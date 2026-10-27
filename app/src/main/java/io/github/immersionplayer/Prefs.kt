@@ -46,6 +46,16 @@ class Prefs(context: Context) {
         get() = prefs.getString("library_path", null)
         set(value) = prefs.edit { putString("library_path", value) }
 
+    /** Each video's place in its folder, on its card in the library. */
+    var episodeNumbers: Boolean
+        get() = prefs.getBoolean("episode_numbers", true)
+        set(value) = prefs.edit { putBoolean("episode_numbers", value) }
+
+    /** The study panel dragged off screen: the video takes it all, for just watching. */
+    var panelHidden: Boolean
+        get() = prefs.getBoolean("panel_hidden", false)
+        set(value) = prefs.edit { putBoolean("panel_hidden", value) }
+
     /** Pause when the current line ends (mpvacious "play up to next"). */
     var autoPause: Boolean
         get() = prefs.getBoolean("auto_pause", false)

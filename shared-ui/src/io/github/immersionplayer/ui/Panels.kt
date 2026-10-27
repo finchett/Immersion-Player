@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -51,6 +53,7 @@ import io.github.immersionplayer.dictionary.TermEntry
 /**
  * Text where tapping a character reports its index and dragging selects a range.
  * A long press reports hold start/end instead. With [autoSize], shrinks to fit its bounds.
+ * [onHover], for a mouse, reports the character under the pointer as it changes (null off them).
  */
 @Composable
 fun TappableText(
@@ -63,7 +66,9 @@ fun TappableText(
     onHold: ((Boolean) -> Unit)? = null,
     onSelect: ((start: Int, end: Int) -> Unit)? = null,
     onTapOutside: (() -> Unit)? = null,
+    onHover: ((Int?) -> Unit)? = null,
 ) {
+    val hover by rememberUpdatedState(onHover)
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var selection by remember(text) { mutableStateOf<IntRange?>(null) }
     var holding by remember { mutableStateOf(false) }
@@ -106,6 +111,25 @@ fun TappableText(
                         if (index != null) onTap(index) else onTapOutside?.invoke()
                     },
                 )
+            }
+            .pointerInput(text, onHover != null) {
+                if (hover == null) return@pointerInput
+                awaitPointerEventScope {
+                    var last: Int? = null
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val index = when (event.type) {
+                            PointerEventType.Exit -> null
+                            PointerEventType.Enter, PointerEventType.Move ->
+                                layout?.let { characterAt(it, event.changes.first().position, text.length) }
+                            else -> continue
+                        }
+                        if (index != last) {
+                            last = index
+                            hover?.invoke(index)
+                        }
+                    }
+                }
             }
             .pointerInput(text, onSelect) {
                 if (onSelect == null) return@pointerInput

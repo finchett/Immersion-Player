@@ -30,7 +30,7 @@ Every action is a gesture. The app lists them once, on first run.
 | Panel | swipe sideways | previous / next line (back from a stop replays the line first) |
 | Panel | tap | play / pause |
 | Panel | double-tap | stop at the end of every line, on or off |
-| Divider | drag | resize the video and the panel |
+| Divider | drag | resize the video and the panel; held sideways, past the screen's edge the panel goes and the video takes it all, with plain subtitles, for just watching (back, or the swipe in from a side, brings the panel back; so does dragging in from the middle of that edge). Upright the panel always stays |
 | Shoulder triggers | press | previous / next line (RedMagic, see below) |
 
 ![Portrait mode, with the same line shown as Japanese and then held to reveal the English](docs/portrait.png)
@@ -46,12 +46,13 @@ Every action is a gesture. The app lists them once, on first run.
 | hold i, or hold the line | show the peek language |
 | y / o | seek 5 s back / forward |
 | n / m | shift subtitles 0.1 s earlier / later |
-| u | stop at the end of every line, on or off |
+| u | stop at the end of every line, on or off (also the button under the panel) |
+| s | put the panel away, or bring it back: the line goes over the video, where pointing at a word looks it up, and the controls keep out of sight until the pointer reaches the top, a side, or the strip under the line |
 | z, or ⌘ + scroll | fill the area, or fit the whole picture |
 | f, or double-click | full screen |
 | ⌘ (or Ctrl) + 1–6 | Anime4K mode A, B, C, A+A, B+B, C+A (turns it on at Auto if it's off) |
 | ⌘ (or Ctrl) + 0 | Anime4K off |
-| Esc | leave full screen, then back to the library |
+| Esc | close a lookup over the video, leave full screen, then back to the library |
 | click / drag a word | look it up |
 | a | add the looked-up word to Anki (when turned on) |
 | Return | at the end of a video, play the next one in its folder |

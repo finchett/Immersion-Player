@@ -23,6 +23,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +43,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.library.NaturalOrder
-import io.github.immersionplayer.library.episodeNumber
 import io.github.immersionplayer.library.isVideoName
 import io.github.immersionplayer.ui.Cog
 import kotlinx.coroutines.Dispatchers
@@ -170,11 +170,12 @@ private fun FolderContents(app: DesktopApp, folder: File, onOpenFolder: (File) -
                 onClick = { onOpenFolder(item.dir) },
             )
         }
-        items(shown.videos, key = { it.path }) { video ->
+        // numbered by place in the folder: names carry too many other numbers (1080p, 10bit) to guess from
+        itemsIndexed(shown.videos, key = { _, video -> video.path }) { index, video ->
             Card(
                 app = app,
                 thumbnailOf = video,
-                badge = episodeNumber(video.name),
+                badge = if (app.settings.episodeNumbers) "${index + 1}" else null,
                 progress = remember(video) { app.settings.progress(video.absolutePath) },
                 title = video.nameWithoutExtension,
                 subtitle = null,

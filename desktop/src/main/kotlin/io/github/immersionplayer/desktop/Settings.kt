@@ -62,6 +62,15 @@ class Settings(node: String = "io/github/immersionplayer") {
         private set
     var libraryRoot by mutableStateOf(prefs.get("library_root", null))
         private set
+    /** Each video's place in its folder, on its thumbnail. */
+    var episodeNumbers by mutableStateOf(prefs.getBoolean("episode_numbers", true))
+        private set
+    /**
+     * The study panel put away (Full): the video takes the window, the line goes over it, and the
+     * controls keep out of sight until the pointer reaches an edge.
+     */
+    var panelHidden by mutableStateOf(prefs.getBoolean("panel_hidden", false))
+        private set
     /** Crop the video to fill its area (mpv panscan) instead of letterboxing. */
     var videoFill by mutableStateOf(prefs.getBoolean("video_fill", false))
         private set
@@ -150,6 +159,8 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun updateAutoPause(value: Boolean) { autoPause = value; prefs.putBoolean("auto_pause", value) }
     fun updatePauseOnLookup(value: Boolean) { pauseOnLookup = value; prefs.putBoolean("pause_on_lookup", value) }
     fun updateCopyLines(value: Boolean) { copyLines = value; prefs.putBoolean("copy_lines", value) }
+    fun updateEpisodeNumbers(value: Boolean) { episodeNumbers = value; prefs.putBoolean("episode_numbers", value) }
+    fun updatePanelHidden(value: Boolean) { panelHidden = value; prefs.putBoolean("panel_hidden", value) }
     fun updateVideoFill(value: Boolean) { videoFill = value; prefs.putBoolean("video_fill", value) }
     fun updateAnime4kPreset(value: Anime4K.Preset) { anime4kPreset = value; prefs.put("anime4k_preset", value.name) }
     fun updateAnime4kMode(value: Anime4K.Mode?) {

@@ -9,8 +9,13 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import io.github.immersionplayer.desktop.mpv.MpvPlayer
 import io.github.immersionplayer.dictionary.YomitanImporter
@@ -74,6 +79,9 @@ class PlayerScreenTest {
         // an open menu is a root of its own, over the window's: the last root is the top one
         ImageIO.write(onAllNodes(isRoot()).onLast().captureToImage().toAwtImage(), "png", File(dir, "$name.png"))
     }
+
+    /** The window itself: a tooltip or menu open over it is a root of its own. */
+    private fun SemanticsNodeInteractionsProvider.window() = onAllNodes(isRoot()).onFirst()
 
     private fun SemanticsNodeInteractionsProvider.shows(text: String) =
         onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
@@ -380,6 +388,173 @@ class PlayerScreenTest {
             session.nextLine()
             waitFor("playback past the end of the third line") { session.position.value > 6.4 }
             assertFalse("kept playing past the third line", session.paused.value)
+        }
+    }
+
+    /**
+     * The stop button under the panel shows whether lines stop, a stop leaves the controls hidden,
+     * and with the panel put away the line goes over the video, where pointing at a word looks it up.
+     */
+    @Test
+    fun panelControlsAndTheLineOverTheVideo() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        fixture(
+            ja = srt(1.0..3.0 to "今日は何を食べたい？", 4.0..6.0 to "勉強しましょう。"),
+            en = srt(1.0..3.0 to "What do you want to eat today?", 4.0..6.0 to "Let's study."),
+        ) {
+            YomitanImporter(app.database).import("test.zip", {}) { dictionaryZip().inputStream() }
+            val keys = PlayerKeys()
+            runDesktopComposeUiTest(width = 1440, height = 860) {
+                setContent {
+                    DesktopTheme(AppTheme.Midnight) {
+                        PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
+                    }
+                }
+                fun stopButton(hint: String) = onAllNodesWithContentDescription(hint).fetchSemanticsNodes().isNotEmpty()
+                waitUntil(timeoutMillis = 15_000) { shows("今日は何を食べたい") && stopButton("Stop at the end of each line") }
+
+                // the stop button turns stops on, and its hint says so
+                onAllNodesWithContentDescription("Stop at the end of each line").onFirst().performClick()
+                waitUntil(timeoutMillis = 5_000) { stopButton("Stopping at the end of each line") }
+                assertTrue(app.settings.autoPause)
+
+                // the stop at the line's end leaves the controls hidden; a pause asked for shows them
+                waitUntil(timeoutMillis = 10_000) { session.stoppedAtLine.value }
+                waitForIdle()
+                assertFalse("controls stayed hidden at the stop", keys.chromeVisible)
+                shot("5-stopped-at-line")
+
+                // l plays on through the stops, and the button shows that too
+                session.nextLine()
+                waitUntil(timeoutMillis = 5_000) { stopButton("Stops held off by H or L: click to stop again") }
+                session.pause()
+                waitUntil(timeoutMillis = 5_000) { keys.chromeVisible }
+                shot("6-held-off")
+
+                // the panel put away: the line over the video, and pointing at a word looks it up there
+                session.playLine(0, stopAtEnd = true)
+                waitUntil(timeoutMillis = 10_000) { session.stoppedAtLine.value }
+                app.settings.updatePanelHidden(true)
+                waitUntil(timeoutMillis = 5_000) { !shows("today") && shows("今日は何を食べたい") }
+                mainClock.advanceTimeBy(500)
+                shot("7-line-over-video")
+                fun has(description: String) = onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty()
+                fun anyControls() = keys.chromeVisible || shows("‹ Library") || has("Bring the panel back") || shows(" / ")
+
+                // the pointer on the line, and a pause: no controls, and the line stays put
+                fun lineTop() = onNodeWithText("今日は何を食べたい？").fetchSemanticsNode().boundsInRoot.top
+                val before = lineTop()
+                onNodeWithText("今日は何を食べたい？").performMouseInput { moveTo(center) }
+                waitUntil(timeoutMillis = 5_000) { shows("to eat") }
+                session.togglePause()
+                session.togglePause()
+                mainClock.advanceTimeBy(1_000)
+                assertFalse("no controls for the line", anyControls())
+                assertEquals("the line moved", before, lineTop(), 0.5f)
+                assertTrue("Esc closes the lookup", keys.onDismiss != null)
+                shot("8-lookup-over-video")
+
+                // straight up across the gap into the entries, they stay; off them, they go at once
+                val line = onNodeWithText("今日は何を食べたい？")
+                line.performMouseInput { moveTo(Offset(center.x, -6f)) }
+                line.performMouseInput { moveTo(Offset(center.x, -40f)) }
+                mainClock.advanceTimeBy(1_000)
+                assertTrue("the entries stayed while pointed at", shows("to eat"))
+                mainClock.autoAdvance = false
+                line.performMouseInput { moveTo(Offset(center.x, -400f)) }
+                mainClock.advanceTimeByFrame()
+                mainClock.advanceTimeByFrame()
+                assertFalse("the entries went at once", shows("to eat"))
+                mainClock.autoAdvance = true
+
+                // moving about the quiet middle, beside the line and just inside the side bands: still nothing
+                // (as fractions of the video's width and height)
+                for ((x, y) in listOf(0.33f to 0.33f, 0.15f to 0.5f, 0.25f to 0.9f)) {
+                    window().performMouseInput { moveTo(Offset(width * x, height * y)) }
+                }
+                mainClock.advanceTimeBy(500)
+                assertFalse("no controls in the quiet area", anyControls())
+
+                // the strip under the line brings everything up, the line clear of the bar; it all stays
+                // as the pointer goes along the bar, and goes once it's back in the quiet area
+                fun allControls() = keys.chromeVisible && shows("‹ Library") && has("Bring the panel back") && shows(" / ")
+                val low = lineTop()
+                window().performMouseInput { moveTo(Offset(width - 40f, height - 4f)) }
+                waitUntil(timeoutMillis = 5_000) { allControls() }
+                window().performMouseInput { moveTo(Offset(width - 200f, height - 30f)) }
+                mainClock.advanceTimeBy(1_000)
+                assertTrue("the controls stayed by the bar", allControls())
+                val lineBottom = onNodeWithText("今日は何を食べたい？").fetchSemanticsNode().boundsInRoot.bottom
+                val windowHeight = window().fetchSemanticsNode().boundsInRoot.height
+                assertTrue("the line clear of the bar, at $lineBottom", lineBottom < windowHeight - 40f)
+                shot("9-from-corner")
+                window().performMouseInput { moveTo(Offset(width / 3f, height / 3f)) }
+                waitUntil(timeoutMillis = 5_000) { !anyControls() }
+                mainClock.advanceTimeBy(1_000)
+                assertEquals("the line went back down", low, lineTop(), 0.5f)
+
+                // anywhere along it, and down the sides, likewise
+                for ((x, y) in listOf(0.5f to 0.995f, 0.01f to 0.5f, 0.99f to 0.3f)) {
+                    window().performMouseInput { moveTo(Offset(width * x, height * y)) }
+                    waitUntil(timeoutMillis = 5_000) { allControls() }
+                    window().performMouseInput { moveTo(Offset(width / 3f, height / 3f)) }
+                    waitUntil(timeoutMillis = 5_000) { !anyControls() }
+                }
+
+                // and the band along the top
+                window().performMouseInput { moveTo(Offset(width / 2f, height * 0.2f)) }
+                waitUntil(timeoutMillis = 5_000) { allControls() }
+                mainClock.advanceTimeBy(500)
+                val library = onNodeWithText("‹ Library").fetchSemanticsNode().boundsInRoot
+                assertTrue("Library top right, not at $library", library.right > 1300f && library.top < 100f)
+                shot("10-from-top")
+                window().performMouseInput { moveTo(Offset(width / 2f, height / 2f)) }
+                waitUntil(timeoutMillis = 5_000) { !anyControls() }
+
+                // the panel button brings the panel back
+                window().performMouseInput { moveTo(Offset(width - 40f, height - 4f)) }
+                waitUntil(timeoutMillis = 5_000) { has("Bring the panel back") }
+                onNodeWithContentDescription("Bring the panel back").performClick()
+                waitUntil(timeoutMillis = 5_000) { !app.settings.panelHidden }
+                waitUntil(timeoutMillis = 5_000) { stopButton("Stopping at the end of each line") }
+            }
+        }
+    }
+
+    /** A short line with a long translation: peeking shows all of the English, in the panel and over the video. */
+    @Test
+    fun peekFitsALongTranslation() {
+        assumeTrue("set IMMERSION_TEST_VIDEO", videoSource?.isFile == true)
+        val english = "Yes, of course I remember it, it was the summer we spent at my grandmother's house by the sea, " +
+            "the one with the blue door and the garden full of tomatoes that nobody ever managed to finish eating."
+        fixture(ja = srt(1.0..4.0 to "はい。"), en = srt(1.0..4.0 to english)) {
+            val keys = PlayerKeys()
+            runDesktopComposeUiTest(width = 1440, height = 860) {
+                setContent {
+                    DesktopTheme(AppTheme.Midnight) {
+                        PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
+                    }
+                }
+                waitUntil(timeoutMillis = 15_000) { shows("はい") }
+                session.pause()
+                fun fits(): Boolean {
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    onNodeWithText(english).fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+                    return layouts.single().let { !it.hasVisualOverflow && it.layoutInput.text.text == english }
+                }
+                keys.peeking = true
+                waitUntil(timeoutMillis = 5_000) { shows(english) }
+                mainClock.advanceTimeBy(500)
+                assertTrue("the English fits the panel", fits())
+                shot("12-peek-panel")
+
+                app.settings.updatePanelHidden(true)
+                waitUntil(timeoutMillis = 5_000) { onAllNodesWithText(english).fetchSemanticsNodes().size == 1 }
+                mainClock.advanceTimeBy(500)
+                assertTrue("the English fits over the video", fits())
+                shot("13-peek-over-video")
+                keys.peeking = false
+            }
         }
     }
 }

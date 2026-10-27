@@ -65,12 +65,26 @@ class PlayerSession(
     private var autoPausedLine = -1
     /** A line to stop at the end of once, whatever the stop-at-end setting says (-1 for none). */
     private var stopAfterLine = -1
+        set(value) { field = value; _stopsOnce.value = value >= 0 }
     /**
      * Whether the stop-at-end setting is held off. The plain keys (h/l, and carrying on from a
      * pause) mean "don't stop", so playback runs on until a key that stops at the end (j/k/;)
      * or the setting itself asks for stops again.
      */
     private var keepPlaying = false
+        set(value) { field = value; _stopsHeld.value = value }
+
+    private val _stopsOnce = MutableStateFlow(false)
+    /** Whether playback stops at the end of the line ahead, setting or not (j/k/;). */
+    val stopsOnce: StateFlow<Boolean> = _stopsOnce.asStateFlow()
+
+    private val _stopsHeld = MutableStateFlow(false)
+    /** Whether the stop-at-end setting is held off for now, by a key that plays on ([keepPlaying]). */
+    val stopsHeld: StateFlow<Boolean> = _stopsHeld.asStateFlow()
+
+    private val _stoppedAtLine = MutableStateFlow(false)
+    /** Paused by a line ending rather than by the user, so the controls can stay out of the way. */
+    val stoppedAtLine: StateFlow<Boolean> = _stoppedAtLine.asStateFlow()
     private var lastCopiedLine = -1
 
     init {
@@ -148,9 +162,21 @@ class PlayerSession(
         autoPausedLine = _lineIndex.value.takeIf { enabled && !_lineActive.value } ?: -1
     }
 
-    fun togglePause() = player.togglePause()
-    fun pause() = player.setPaused(true)
-    fun play() = player.setPaused(false)
+    // what the user asks for is never a stop at a line's end; pausing again while stopped changes nothing
+    fun togglePause() {
+        _stoppedAtLine.value = false
+        player.togglePause()
+    }
+
+    fun pause() {
+        if (!player.paused.value) _stoppedAtLine.value = false
+        player.setPaused(true)
+    }
+
+    fun play() {
+        _stoppedAtLine.value = false
+        player.setPaused(false)
+    }
 
     fun seekTo(seconds: Double) {
         player.seek(seconds.coerceAtLeast(0.0))
@@ -242,7 +268,8 @@ class PlayerSession(
             if (time >= cue.end - END_MARGIN && time < cue.end + 1.0) {
                 autoPausedLine = index
                 stopAfterLine = -1
-                pause()
+                _stoppedAtLine.value = true
+                player.setPaused(true)
             }
         }
     }

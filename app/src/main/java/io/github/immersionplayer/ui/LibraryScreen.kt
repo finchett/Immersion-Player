@@ -70,7 +70,6 @@ import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.library.NaturalOrder
-import io.github.immersionplayer.library.episodeNumber
 import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.library.isVideoName
 import kotlinx.coroutines.Dispatchers
@@ -89,7 +88,8 @@ private data class Listing(
 
 private sealed interface Entry {
     data class Folder(val file: DocumentFile, val episodes: Int, val cover: DocumentFile?) : Entry
-    data class Video(val file: DocumentFile) : Entry
+    /** [number]: its place among the folder's videos, from 1. */
+    data class Video(val file: DocumentFile, val number: Int) : Entry
 }
 
 @Composable
@@ -299,7 +299,7 @@ private fun FolderGrid(
     }
     val entries = shown.folders.map {
         Entry.Folder(it, shown.episodeCounts[it.uri.toString()] ?: 0, shown.covers[it.uri.toString()])
-    } + shown.videos.map { Entry.Video(it) }
+    } + shown.videos.mapIndexed { i, video -> Entry.Video(video, i + 1) }
     if (entries.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Nothing here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -322,7 +322,7 @@ private fun FolderGrid(
         }) { entry ->
             when (entry) {
                 is Entry.Folder -> FolderCard(app, entry) { onOpenFolder(entry.file) }
-                is Entry.Video -> VideoCard(app, entry.file) { onOpenVideo(entry.file, shown.all) }
+                is Entry.Video -> VideoCard(app, entry.file, entry.number) { onOpenVideo(entry.file, shown.all) }
             }
         }
     }
@@ -435,7 +435,7 @@ private fun rememberThumbnail(app: App, uri: String): android.graphics.Bitmap? {
 }
 
 @Composable
-private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
+private fun VideoCard(app: App, video: DocumentFile, number: Int, onClick: () -> Unit) {
     val uri = video.uri.toString()
     val position = app.prefs.position(uri)
     val duration = app.prefs.duration(uri)
@@ -450,6 +450,7 @@ private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))) {
                 val image = thumbnail
+                val numbered = app.prefs.episodeNumbers
                 if (image != null) {
                     Image(
                         bitmap = image.asImageBitmap(),
@@ -457,8 +458,18 @@ private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    if (numbered) {
+                        Text(
+                            "$number",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                                .background(Color(0xB0000000), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
                 } else {
-                    // unwatched: a quiet placeholder with the episode number, if the name has one
+                    // unwatched: a quiet placeholder with its place in the folder (names have too many other numbers to guess from)
                     Box(
                         Modifier.fillMaxSize().background(
                             Brush.linearGradient(
@@ -471,7 +482,7 @@ private fun VideoCard(app: App, video: DocumentFile, onClick: () -> Unit) {
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            episodeNumber(video.name.orEmpty()) ?: "▶",
+                            if (numbered) "$number" else "▶",
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         )
