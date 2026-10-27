@@ -66,7 +66,7 @@ class ScreensTest {
             runDesktopComposeUiTest(width = 1100, height = 640) {
                 var folder by mutableStateOf<File?>(null)
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
+                    DesktopTheme(AppTheme.Jade) {
                         Chrome(
                             header = { LibraryHeader(app, folder, onOpenFolder = { folder = it }, onOpenSettings = {}) },
                             body = { LibraryBody(app, folder, onOpenFolder = { folder = it }, onOpenVideo = {}) },
@@ -91,7 +91,7 @@ class ScreensTest {
 
                 // settings: every pane, in the theme it was designed in and in a dark one
                 var pane by mutableStateOf(SettingsPane.General)
-                var theme by mutableStateOf(AppTheme.Paper)
+                var theme by mutableStateOf(AppTheme.Celadon)
                 setContent {
                     DesktopTheme(theme) {
                         Chrome(
@@ -132,7 +132,7 @@ class ScreensTest {
                 waitForIdle()
                 shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "settings-anki.png")) }
                 pane = SettingsPane.Appearance
-                theme = AppTheme.Midnight
+                theme = AppTheme.Jade
                 waitForIdle()
                 Thread.sleep(150)
                 waitForIdle()

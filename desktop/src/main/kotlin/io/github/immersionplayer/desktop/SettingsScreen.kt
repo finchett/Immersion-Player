@@ -99,7 +99,7 @@ private val ContentWidth = 620.dp
 @Composable
 fun SettingsHeader(pane: SettingsPane) {
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        Text(pane.label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(pane.label, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -129,7 +129,7 @@ fun SettingsSidebar(pane: SettingsPane, onPane: (SettingsPane) -> Unit, onBack: 
                 // the app icon carries its own margin, so 40 dp draws a 32 dp tile
                 Image(painterResource("icon.png"), contentDescription = null, modifier = Modifier.size(40.dp))
                 Column {
-                    Text("Immersion Player", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Immersion Player", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Text(
                         "Version $APP_VERSION",
                         fontSize = 12.sp,
@@ -170,13 +170,13 @@ private fun NavItem(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         label,
         fontSize = 13.sp,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        color = if (selected) scheme.onSurface else scheme.onSurface.copy(alpha = 0.78f),
+        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+        color = if (selected) scheme.primary else scheme.onSurface.copy(alpha = 0.78f),
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(
                 when {
-                    selected -> scheme.onSurface.copy(alpha = 0.10f)
+                    selected -> scheme.primary.copy(alpha = 0.13f)
                     hovered -> scheme.onSurface.copy(alpha = 0.05f)
                     else -> Color.Transparent
                 },
@@ -347,13 +347,20 @@ private fun AppearancePane(app: DesktopApp) {
     val settings = app.settings
     Section("Theme") {
         Card {
-            Row(
+            // System first, then every theme, four to a row
+            Column(
                 Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Swatch("System", null, settings.theme == null, Modifier.weight(1f)) { settings.updateTheme(null) }
-                AppTheme.entries.forEach { theme ->
-                    Swatch(theme.label, theme, settings.theme == theme, Modifier.weight(1f)) { settings.updateTheme(theme) }
+                (listOf<AppTheme?>(null) + AppTheme.entries).chunked(4).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        row.forEach { theme ->
+                            Swatch(theme?.label ?: "System", theme, settings.theme == theme, Modifier.weight(1f)) {
+                                settings.updateTheme(theme)
+                            }
+                        }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             }
         }
@@ -704,13 +711,17 @@ val KEYS = listOf(
 
 // --- pieces ---------------------------------------------------------------------------------
 
-/** A card sits barely off the page: a touch lighter on a light theme, lifted on a dark one. */
+/** A card is a quiet surface, a step off the page in the theme's own tint. */
 private val ColorScheme.card: Color
-    get() = Color.White.copy(alpha = if (background.luminance() > 0.5f) 0.6f else 0.05f).compositeOver(background)
+    get() = surfaceVariant.copy(alpha = 0.7f).compositeOver(background)
 
 /** The background of a control that takes input, a step further again. */
 private val ColorScheme.control: Color
-    get() = if (background.luminance() > 0.5f) Color.White else Color.White.copy(alpha = 0.09f).compositeOver(card)
+    get() = if (background.luminance() > 0.5f) Color.White.copy(alpha = 0.75f).compositeOver(card)
+    else onSurface.copy(alpha = 0.07f).compositeOver(card)
+
+/** The edge of a control. */
+private val ColorScheme.controlLine: Color get() = onSurface.copy(alpha = 0.14f)
 
 /** The line around a card or between its rows: present, but only just. */
 val ColorScheme.hairline: Color get() = onSurface.copy(alpha = 0.11f)
@@ -730,18 +741,7 @@ private fun count(n: Int) = "%,d".format(n)
 @Composable
 private fun Section(title: String, note: String? = null, content: @Composable () -> Unit) {
     Column {
-        Row(Modifier.fillMaxWidth().padding(start = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
-            Text(
-                title,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            note?.let {
-                Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f))
-            }
-        }
+        SectionLabel(title, Modifier.padding(start = 2.dp, bottom = 10.dp), note)
         content()
     }
 }
@@ -750,9 +750,8 @@ private fun Section(title: String, note: String? = null, content: @Composable ()
 private fun Card(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.card)
-            .border(1.dp, MaterialTheme.colorScheme.hairline, RoundedCornerShape(10.dp)),
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.card),
         content = content,
     )
 }
@@ -827,7 +826,7 @@ private fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     ) {
         Box(
             Modifier.align(Alignment.CenterStart).offset(x = knob).size(14.dp).clip(CircleShape)
-                .background(Color.White),
+                .background(if (checked && scheme.primary.luminance() > 0.5f) scheme.background else Color.White),
         )
     }
 }
@@ -843,9 +842,9 @@ private fun SmallButton(text: String, onClick: () -> Unit) {
         color = scheme.onSurface,
         maxLines = 1,
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(if (hovered) scheme.onSurface.copy(alpha = 0.06f).compositeOver(scheme.control) else scheme.control)
-            .border(1.dp, scheme.onSurface.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
+            .border(1.dp, scheme.controlLine, RoundedCornerShape(8.dp))
             .hoverable(interaction)
             .clickable(interaction, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -872,9 +871,9 @@ private fun Select(text: String, options: List<String>, onSelect: (Int) -> Unit,
         val scheme = MaterialTheme.colorScheme
         Row(
             Modifier.width(width)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(8.dp))
                 .background(scheme.control)
-                .border(1.dp, scheme.onSurface.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
+                .border(1.dp, scheme.controlLine, RoundedCornerShape(8.dp))
                 .clickable { open = true }
                 .pointerHoverIcon(PointerIcon.Hand)
                 .padding(start = 10.dp, end = 8.dp, top = 5.dp, bottom = 5.dp),
@@ -913,9 +912,9 @@ private fun TextInput(value: String, onChange: (String) -> Unit, width: Dp = 220
         decorationBox = { field ->
             Box(
                 Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(scheme.control)
-                    .border(1.dp, scheme.onSurface.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
+                    .border(1.dp, scheme.controlLine, RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             ) {
                 if (value.isEmpty()) Text(placeholder, style = style, color = scheme.onSurfaceVariant.copy(alpha = 0.6f))
@@ -943,7 +942,7 @@ private fun Arrow(glyph: String, enabled: Boolean, onClick: () -> Unit) {
 private fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val fill = theme?.scheme?.background
-    val sample = theme?.scheme?.onBackground ?: Color(0xFF8A8070)
+    val sample = theme?.scheme?.onBackground ?: Color(0xFF6E8A7D)
     Column(
         modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand),
@@ -954,14 +953,14 @@ private fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier:
             Modifier.fillMaxWidth()
                 .border(2.dp, if (selected) scheme.primary else Color.Transparent, RoundedCornerShape(11.dp))
                 .padding(2.dp)
-                .aspectRatio(3f / 2f)
+                .aspectRatio(2.1f)
                 .clip(RoundedCornerShape(7.dp))
                 .background(
                     if (fill != null) Brush.linearGradient(0f to fill, 1f to fill)
                     // the system tile is split: the light theme on one side, the dark on the other
                     else Brush.horizontalGradient(
-                        0f to AppTheme.Paper.scheme.background, 0.5f to AppTheme.Paper.scheme.background,
-                        0.5f to AppTheme.Midnight.scheme.background, 1f to AppTheme.Midnight.scheme.background,
+                        0f to SystemLight.scheme.background, 0.5f to SystemLight.scheme.background,
+                        0.5f to SystemDark.scheme.background, 1f to SystemDark.scheme.background,
                     ),
                 )
                 .border(1.dp, scheme.hairline, RoundedCornerShape(7.dp)),
@@ -970,7 +969,7 @@ private fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier:
             Text(
                 "あ Aa",
                 fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 color = sample,
                 maxLines = 1,
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -979,8 +978,8 @@ private fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier:
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            color = if (selected) scheme.primary else scheme.onSurfaceVariant,
             maxLines = 1,
         )
     }
@@ -997,7 +996,7 @@ private fun Keycap(text: String) {
         modifier = Modifier
             .clip(RoundedCornerShape(5.dp))
             .background(scheme.control)
-            .border(1.dp, scheme.onSurface.copy(alpha = 0.18f), RoundedCornerShape(5.dp))
+            .border(1.dp, scheme.controlLine, RoundedCornerShape(5.dp))
             .widthIn(min = 22.dp)
             .padding(horizontal = 6.dp, vertical = 3.dp),
         textAlign = TextAlign.Center,

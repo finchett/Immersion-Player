@@ -27,6 +27,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -76,6 +77,10 @@ val HeaderStart: Dp
 val HeaderHeight: Dp
     @Composable get() = if (LocalTrafficLights.current) LocalCorners.current.lightCenter * 2 else 40.dp
 
+/** The themes "System" follows. */
+val SystemDark = AppTheme.Jade
+val SystemLight = AppTheme.Celadon
+
 /**
  * The app themes, retuned for a desktop: a denser type scale sized for reading at arm's length
  * with a mouse, no 48 dp touch targets, and the colours Material would otherwise fill with its
@@ -83,7 +88,7 @@ val HeaderHeight: Dp
  */
 @Composable
 fun DesktopTheme(choice: AppTheme?, content: @Composable () -> Unit) {
-    val theme = choice ?: if (isSystemInDarkTheme()) AppTheme.Midnight else AppTheme.Paper
+    val theme = choice ?: if (isSystemInDarkTheme()) SystemDark else SystemLight
     val scheme = remember(theme) { theme.scheme.forDesktop() }
     MaterialTheme(colorScheme = scheme, typography = DesktopTypography) {
         // default text colour for everything, so no screen depends on a Surface to set it
@@ -119,15 +124,17 @@ private fun Color.compositeOver(background: Color): Color {
     )
 }
 
+// regular and medium weights only: hierarchy comes from size and space
 private val DesktopTypography = Typography().let { base ->
     fun TextStyle.sized(size: Int, line: Int, weight: FontWeight = FontWeight.Normal) =
         copy(fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = 0.sp)
     base.copy(
-        headlineMedium = base.headlineMedium.sized(24, 30, FontWeight.Medium),
+        headlineLarge = base.headlineLarge.sized(28, 34),
+        headlineMedium = base.headlineMedium.sized(24, 30),
         headlineSmall = base.headlineSmall.sized(20, 26),
-        titleLarge = base.titleLarge.sized(17, 22, FontWeight.SemiBold),
-        titleMedium = base.titleMedium.sized(14, 20, FontWeight.SemiBold),
-        titleSmall = base.titleSmall.sized(13, 18, FontWeight.SemiBold),
+        titleLarge = base.titleLarge.sized(17, 22, FontWeight.Medium),
+        titleMedium = base.titleMedium.sized(14, 20, FontWeight.Medium),
+        titleSmall = base.titleSmall.sized(13, 18, FontWeight.Medium),
         bodyLarge = base.bodyLarge.sized(14, 21),
         bodyMedium = base.bodyMedium.sized(13, 19),
         bodySmall = base.bodySmall.sized(12, 17),
@@ -135,6 +142,24 @@ private val DesktopTypography = Typography().let { base ->
         labelMedium = base.labelMedium.sized(12, 16, FontWeight.Medium),
         labelSmall = base.labelSmall.sized(11, 14, FontWeight.Medium),
     )
+}
+
+/** A quiet label over a group: small capitals, spaced out, with an optional note at the far end. */
+@Composable
+fun SectionLabel(text: String, modifier: Modifier = Modifier, note: String? = null) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        Text(
+            text.uppercase(),
+            fontSize = 11.sp,
+            lineHeight = 14.sp,
+            letterSpacing = 1.4.sp,
+            fontWeight = FontWeight.Medium,
+            color = muted,
+            modifier = Modifier.weight(1f),
+        )
+        note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted.copy(alpha = 0.8f)) }
+    }
 }
 
 /** A text action: no button chrome, a tint on hover. */
