@@ -195,6 +195,12 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                             Text(if (folderName == null) "Choose…" else "Change…")
                         }
                     }
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingSwitchRow(
+                        title = "Number the episodes",
+                        description = "Shows each video's place in its folder on its card.",
+                        initial = app.prefs.episodeNumbers,
+                    ) { app.prefs.episodeNumbers = it }
                 }
 
                 SettingsSection("Languages") {

@@ -48,7 +48,7 @@ private val panelGestures = listOf(
     Gesture("↔", "Swipe sideways", "previous or next line"),
     Gesture("◉", "Tap", "play or pause"),
     Gesture("◉◉", "Double-tap", "stop at the end of each line, on or off"),
-    Gesture("⇔", "Drag the divider", "resize the video and the panel"),
+    Gesture("⇔", "Drag the divider", "resize the video and the panel; held sideways, past the edge to just watch (back brings the panel back)"),
 )
 
 /** First-run guide to the gestures; also reachable from settings. */

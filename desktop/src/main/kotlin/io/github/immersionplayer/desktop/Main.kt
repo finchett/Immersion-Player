@@ -130,14 +130,23 @@ fun main(args: Array<String>) {
                 Key.O -> current.seekBy(5.0)
                 Key.N -> current.shiftOffset(-0.1)
                 Key.M -> current.shiftOffset(0.1)
-                Key.U -> current.setAutoPause(!app.settings.autoPause)
+                Key.U -> {
+                    val on = !app.settings.autoPause
+                    current.setAutoPause(on)
+                    keys.notice = Notice(if (on) "Stopping at the end of every line" else "Playing straight through")
+                }
+                Key.S -> app.settings.updatePanelHidden(!app.settings.panelHidden)
                 Key.F -> toggleFullscreen()
                 Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
                 Key.A -> keys.onAddCard()
                 Key.Enter -> keys.onPlayNext?.invoke() ?: return false
                 Key.DirectionLeft -> if (event.isShiftPressed) current.seekBy(-5.0) else current.previousLine()
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
-                Key.Escape -> if (windowState.placement == WindowPlacement.Fullscreen) toggleFullscreen() else closeVideo()
+                Key.Escape -> when {
+                    keys.onDismiss != null -> keys.onDismiss?.invoke()
+                    windowState.placement == WindowPlacement.Fullscreen -> toggleFullscreen()
+                    else -> closeVideo()
+                }
                 else -> return false
             }
             return true

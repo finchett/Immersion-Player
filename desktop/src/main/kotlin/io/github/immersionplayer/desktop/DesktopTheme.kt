@@ -146,6 +146,7 @@ fun TextAction(
     enabled: Boolean = true,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     style: TextStyle = MaterialTheme.typography.labelLarge,
+    hoverColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -154,13 +155,13 @@ fun TextAction(
         style = style,
         color = when {
             !enabled -> color.copy(alpha = 0.35f)
-            hovered -> MaterialTheme.colorScheme.onSurface
+            hovered -> hoverColor
             else -> color
         },
         maxLines = 1,
         modifier = modifier
             .background(
-                if (hovered && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent,
+                if (hovered && enabled) hoverColor.copy(alpha = 0.08f) else Color.Transparent,
                 RoundedCornerShape(6.dp),
             )
             .hoverable(interaction, enabled)
@@ -172,19 +173,25 @@ fun TextAction(
 
 /** An action drawn as an icon rather than a word, with the same hover tint as [TextAction]. */
 @Composable
-fun IconAction(onClick: () -> Unit, modifier: Modifier = Modifier, icon: @Composable (Color) -> Unit) {
+fun IconAction(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    hoverColor: Color = MaterialTheme.colorScheme.onSurface,
+    icon: @Composable (Color) -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     Box(
         modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (hovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+            .background(if (hovered) hoverColor.copy(alpha = 0.08f) else Color.Transparent)
             .hoverable(interaction)
             .clickable(interaction, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
             .padding(5.dp),
     ) {
-        icon(if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        icon(if (hovered) hoverColor else color)
     }
 }
 

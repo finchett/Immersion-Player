@@ -4,10 +4,6 @@ private val VIDEO_EXTENSIONS = setOf("mkv", "mp4", "webm", "avi", "m4v", "mov", 
 
 fun isVideoName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
 
-/** "日常 12.mkv" -> "12" */
-fun episodeNumber(name: String): String? =
-    Regex("""(\d{1,3})(?!.*\d)""").find(name.substringBeforeLast('.'))?.groupValues?.get(1)
-
 /** Sorts "Episode 2" before "Episode 10". */
 object NaturalOrder : Comparator<String> {
     private val chunk = Regex("""\d+|\D+""")

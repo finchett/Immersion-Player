@@ -204,6 +204,12 @@ private fun GeneralPane(app: DesktopApp) {
                     chooseFolder(settings.libraryRoot?.let(::File))?.let { settings.updateLibraryRoot(it.path) }
                 }
             }
+            RowDivider()
+            ToggleRow(
+                "Number the episodes",
+                "Shows each video's place in its folder on its thumbnail",
+                settings.episodeNumbers, settings::updateEpisodeNumbers,
+            )
         }
     }
     Section("Languages") {
@@ -685,14 +691,15 @@ val KEYS = listOf(
     KeyHelp(listOf("I"), "Show the peek language", "hold, or hold the line"),
     KeyHelp(listOf("Y", "O"), "Seek 5 s back / forward"),
     KeyHelp(listOf("N", "M"), "Shift subtitles 0.1 s earlier / later"),
-    KeyHelp(listOf("U"), "Stop at the end of every line, on or off"),
+    KeyHelp(listOf("U"), "Stop at the end of every line, on or off", "or the button under the panel"),
+    KeyHelp(listOf("S"), "Put the panel away, or bring it back", "the line then goes over the video"),
     KeyHelp(listOf("F"), "Full screen", "or double-click"),
     KeyHelp(listOf("Z"), "Fill the area, or fit the whole picture", "or ⌘ + scroll"),
     KeyHelp(listOf("⌘", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", "or Ctrl; turns it on"),
     KeyHelp(listOf("⌘", "0"), "Anime4K off", "or Ctrl"),
-    KeyHelp(listOf("Esc"), "Leave full screen, then back to the library"),
+    KeyHelp(listOf("Esc"), "Close a lookup over the video, leave full screen, then back to the library"),
     KeyHelp(listOf("A"), "Add the looked-up word to Anki", "when Anki cards are on"),
-    KeyHelp(emptyList(), "Look up a word", "click or drag it"),
+    KeyHelp(emptyList(), "Look up a word", "click or drag it; over the video, point at it"),
 )
 
 // --- pieces ---------------------------------------------------------------------------------
