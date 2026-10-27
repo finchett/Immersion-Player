@@ -6,36 +6,36 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 enum class AppTheme(val label: String, val scheme: ColorScheme) {
-    /** The app's own colours, from the icon: pale ink on deep jade. */
+    /** The app's own colours: a jade accent on warm charcoal, like ink and jade. */
     Jade(
         "Jade",
         darkColorScheme(
             primary = Color(0xFFB9DFC8),
-            onPrimary = Color(0xFF101D1A),
+            onPrimary = Color(0xFF161513),
             secondary = Color(0xFFE0C3A3),
             tertiary = Color(0xFF8FCFB4),
-            background = Color(0xFF101D1A),
-            surface = Color(0xFF101D1A),
-            surfaceVariant = Color(0xFF1C3029),
-            onBackground = Color(0xFFD5ECDF),
-            onSurface = Color(0xFFD5ECDF),
-            onSurfaceVariant = Color(0xFFA2B9AC),
+            background = Color(0xFF161513),
+            surface = Color(0xFF161513),
+            surfaceVariant = Color(0xFF23211E),
+            onBackground = Color(0xFFE6E2DA),
+            onSurface = Color(0xFFE6E2DA),
+            onSurfaceVariant = Color(0xFFADA79D),
         ),
     ),
-    /** Jade's light side: ink on celadon. */
+    /** Jade's light side: the same accent on warm paper. */
     Celadon(
         "Celadon",
         lightColorScheme(
             primary = Color(0xFF245D4E),
-            onPrimary = Color(0xFFF3F6F1),
+            onPrimary = Color(0xFFF5F3EE),
             secondary = Color(0xFF8A4F35),
             tertiary = Color(0xFF2F7A62),
-            background = Color(0xFFF3F6F1),
-            surface = Color(0xFFF3F6F1),
-            surfaceVariant = Color(0xFFE5EDE3),
-            onBackground = Color(0xFF173F38),
-            onSurface = Color(0xFF173F38),
-            onSurfaceVariant = Color(0xFF52695E),
+            background = Color(0xFFF5F3EE),
+            surface = Color(0xFFF5F3EE),
+            surfaceVariant = Color(0xFFEAE6DE),
+            onBackground = Color(0xFF2A2722),
+            onSurface = Color(0xFF2A2722),
+            onSurfaceVariant = Color(0xFF6A645A),
         ),
     ),
     Midnight(
