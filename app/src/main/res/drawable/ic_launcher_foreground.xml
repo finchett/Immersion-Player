@@ -1,17 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Play button over a rounded "highlighted word" pill, as used in the player. -->
+<!-- The anime face: the dark bob and eyes over the light background, with a faint drop
+     shadow. Same geometry as desktop/icons/icon.svg; the face is in its own 1024 px units. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#664F7BE0"
-        android:pathData="M36,63h36a8,8 0,0 1,8 8v0a8,8 0,0 1,-8 8h-36a8,8 0,0 1,-8 -8v0a8,8 0,0 1,8 -8z" />
-    <path
-        android:fillColor="#FF8AB4F8"
-        android:pathData="M45.5,30.5L67.5,44.2Q70,45.8 67.5,47.4L45.5,61.1Q42.5,63 42.5,59.4L42.5,32.2Q42.5,28.6 45.5,30.5Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M40,69.5h28a1.5,1.5 0,0 1,0 3h-28a1.5,1.5 0,0 1,0 -3z" />
+    <group
+        android:translateX="26.7188"
+        android:translateY="25.3828"
+        android:scaleX="0.05625"
+        android:scaleY="0.05625">
+        <group android:translateY="8">
+            <path android:fillColor="#17111111" android:pathData="M70 451C83 348 94 271 133 214C193 124 312 45 413 29C510 13 602 28 680 77C744 103 790 143 822 192C865 254 883 345 896 439C907 540 918 635 898 744C881 837 835 907 747 949C757 922 762 894 760 864C683 907 585 923 483 949C381 923 284 906 211 864C208 896 214 926 225 949C137 906 91 836 75 744C56 635 65 540 70 451Z M718 133L729 124L791 187L780 198Z M696 156L707 147L763 204L752 215Z M184 554C188 664 220 769 265 817C300 855 410 908 483 930C562 905 663 857 696 821C750 759 778 660 784 550L731 550C655 549 598 525 545 477C547 502 566 548 583 565C588 564 594 560 599 558L652 558C695 558 718 569 773 600C744 619 736 647 721 672C734 623 728 593 692 585C681 580 695 597 695 613L695 647C678 688 659 704 634 704C592 705 582 659 598 597C601 584 607 574 600 578L578 585L583 594C531 574 473 541 448 514C422 487 407 449 391 420C388 452 404 501 435 541C369 542 309 501 295 470C284 445 294 410 305 377C278 417 253 457 241 493C235 515 206 540 184 554Z" />
+            <path android:fillColor="#17111111" android:pathData="M195 601C252 568 272 556 319 557C359 557 374 558 401 574L377 572C386 578 396 585 403 594C388 587 374 581 360 576C374 611 379 650 369 677C359 703 335 708 314 700C278 685 259 633 276 589C279 581 273 586 268 586C235 594 235 634 248 674C226 643 225 622 195 601Z" />
+        </group>
+        <path android:pathData="M70 451C83 348 94 271 133 214C193 124 312 45 413 29C510 13 602 28 680 77C744 103 790 143 822 192C865 254 883 345 896 439C907 540 918 635 898 744C881 837 835 907 747 949C757 922 762 894 760 864C683 907 585 923 483 949C381 923 284 906 211 864C208 896 214 926 225 949C137 906 91 836 75 744C56 635 65 540 70 451Z M718 133L729 124L791 187L780 198Z M696 156L707 147L763 204L752 215Z M184 554C188 664 220 769 265 817C300 855 410 908 483 930C562 905 663 857 696 821C750 759 778 660 784 550L731 550C655 549 598 525 545 477C547 502 566 548 583 565C588 564 594 560 599 558L652 558C695 558 718 569 773 600C744 619 736 647 721 672C734 623 728 593 692 585C681 580 695 597 695 613L695 647C678 688 659 704 634 704C592 705 582 659 598 597C601 584 607 574 600 578L578 585L583 594C531 574 473 541 448 514C422 487 407 449 391 420C388 452 404 501 435 541C369 542 309 501 295 470C284 445 294 410 305 377C278 417 253 457 241 493C235 515 206 540 184 554Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="146" android:startY="0" android:endX="728" android:endY="1000">
+                    <item android:offset="0" android:color="#FF383838" />
+                    <item android:offset="1" android:color="#FF111111" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M195 601C252 568 272 556 319 557C359 557 374 558 401 574L377 572C386 578 396 585 403 594C388 587 374 581 360 576C374 611 379 650 369 677C359 703 335 708 314 700C278 685 259 633 276 589C279 581 273 586 268 586C235 594 235 634 248 674C226 643 225 622 195 601Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="146" android:startY="0" android:endX="728" android:endY="1000">
+                    <item android:offset="0" android:color="#FF383838" />
+                    <item android:offset="1" android:color="#FF111111" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:fillColor="#FFFAFAFA" android:pathData="M571 576L584 573C591 572 586 577 574 582C571 584 569 578 571 576Z" />
+    </group>
 </vector>
