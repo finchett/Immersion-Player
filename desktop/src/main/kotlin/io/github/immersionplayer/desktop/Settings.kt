@@ -8,6 +8,8 @@ import io.github.immersionplayer.anki.AnkiException
 import io.github.immersionplayer.anki.CardFormat
 import io.github.immersionplayer.anki.CardFormats
 import io.github.immersionplayer.anki.CardTarget
+import io.github.immersionplayer.library.Titles
+import io.github.immersionplayer.library.isVideoName
 import io.github.immersionplayer.ui.AppTheme
 import org.json.JSONObject
 import java.io.File
@@ -64,6 +66,9 @@ class Settings(node: String = "io/github/immersionplayer") {
         private set
     /** Each video's place in its folder, on its thumbnail. */
     var episodeNumbers by mutableStateOf(prefs.getBoolean("episode_numbers", true))
+        private set
+    /** Show and folder names without release tags, and episodes as "Episode 1" (see [Titles]). */
+    var tidyNames by mutableStateOf(prefs.getBoolean("tidy_names", true))
         private set
     /**
      * The study panel put away (Full): the video takes the window, the line goes over it, and the
@@ -160,6 +165,10 @@ class Settings(node: String = "io/github/immersionplayer") {
     fun updatePauseOnLookup(value: Boolean) { pauseOnLookup = value; prefs.putBoolean("pause_on_lookup", value) }
     fun updateCopyLines(value: Boolean) { copyLines = value; prefs.putBoolean("copy_lines", value) }
     fun updateEpisodeNumbers(value: Boolean) { episodeNumbers = value; prefs.putBoolean("episode_numbers", value) }
+    fun updateTidyNames(value: Boolean) { tidyNames = value; prefs.putBoolean("tidy_names", value) }
+
+    /** How a file or folder called [name] is shown. */
+    fun title(name: String): String = if (tidyNames) Titles.clean(name) else if (isVideoName(name)) name.substringBeforeLast('.') else name
     fun updatePanelHidden(value: Boolean) { panelHidden = value; prefs.putBoolean("panel_hidden", value) }
     fun updateVideoFill(value: Boolean) { videoFill = value; prefs.putBoolean("video_fill", value) }
     fun updateAnime4kPreset(value: Anime4K.Preset) { anime4kPreset = value; prefs.put("anime4k_preset", value.name) }

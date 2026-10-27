@@ -56,6 +56,11 @@ class ScreensTest {
         if (video != null) Files.createSymbolicLink(File(season, "Episode 1.mkv").toPath(), video.absoluteFile.toPath())
         else File(season, "Episode 1.mkv").writeText("")
         File(dir, "Other").mkdirs()
+        // a release folder, named the way they come
+        val release = File(dir, "[IndieSubs] K-On! (2009) [BD 1080p x265 FLAC]").apply { mkdirs() }
+        listOf("01 (1080p BD) [9F3A21BC]", "02 (1080p BD) [1B2C3D4E]", "10v2 (1080p BD) [AA00BB11]").forEach {
+            File(release, "[IndieSubs] K-On! - $it.mkv").writeText("")
+        }
         val node = "io/github/immersionplayer-test-screens"
         Preferences.userRoot().node(node).removeNode()
         val settings = Settings(node).apply { updateLibraryRoot(dir.path) }
@@ -77,6 +82,13 @@ class ScreensTest {
                 if (video != null) {
                     waitUntil(timeoutMillis = 20_000) { app.thumbnails.versions.containsKey(File(season, "Episode 1.mkv").path) }
                 }
+                // release tags come off the folder, and its episodes are just which episode
+                assertTrue(onAllNodesWithText("K-On! (2009)").fetchSemanticsNodes().isNotEmpty())
+                shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "library-root.png")) }
+                folder = release
+                waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Episode 10").fetchSemanticsNodes().isNotEmpty() }
+                assertTrue(onAllNodesWithText("Episode 1").fetchSemanticsNodes().isNotEmpty())
+                shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "library-release.png")) }
                 folder = show
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Lesson 10").fetchSemanticsNodes().isNotEmpty() }
                 val order = onAllNodesWithText("Lesson", substring = true).fetchSemanticsNodes()
