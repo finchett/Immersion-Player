@@ -1,5 +1,17 @@
 package io.github.immersionplayer.desktop
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,7 +37,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -86,30 +97,25 @@ private fun locate(app: DesktopApp, folder: File?): Pair<File?, File?> {
     return root to current
 }
 
-/** Header content: the path from the library root, each part a way back up, and Settings. */
+/**
+ * Header content: the way back up from the folder being shown (the library, then each folder
+ * above this one), and Settings. The folder's own name is the page title, so it isn't repeated.
+ */
 @Composable
 fun LibraryHeader(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, onOpenSettings: () -> Unit) {
     val (root, current) = locate(app, folder)
-    val crumbs = generateSequence(current) { it.parentFile?.takeIf { _ -> it != root } }
-        .toList().reversed().takeIf { current != null } ?: emptyList()
+    val above = generateSequence(current?.takeIf { it != root }?.parentFile) { it.parentFile?.takeIf { _ -> it != root } }
+        .takeWhile { root != null && it.path.startsWith(root.path) }
+        .toList().reversed()
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            if (crumbs.isEmpty()) {
-                Text("Library", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 8.dp))
-            }
-            crumbs.forEachIndexed { i, dir ->
-                if (i > 0) Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (i == crumbs.lastIndex) {
-                    Text(
-                        dir.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    )
-                } else {
-                    TextAction(dir.name, onClick = { onOpenFolder(dir) }, style = MaterialTheme.typography.titleLarge)
-                }
+            above.forEachIndexed { i, dir ->
+                if (i > 0) Text("/", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                TextAction(
+                    if (dir == root) "Library" else dir.name,
+                    onClick = { onOpenFolder(dir) },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
         IconAction(onClick = onOpenSettings) { Cog(it) }
@@ -122,39 +128,66 @@ fun LibraryBody(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, on
     val (_, current) = locate(app, folder)
     if (current == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Your library", style = MaterialTheme.typography.headlineMedium)
                 Text("Pick the folder that holds your videos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = {
-                    chooseFolder(null)?.let {
-                        app.settings.updateLibraryRoot(it.path)
-                        onOpenFolder(it)
-                    }
-                }) { Text("Choose folder") }
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    onClick = {
+                        chooseFolder(null)?.let {
+                            app.settings.updateLibraryRoot(it.path)
+                            onOpenFolder(it)
+                        }
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    elevation = null,
+                ) { Text("Choose folder", style = MaterialTheme.typography.labelLarge) }
             }
         }
     } else {
-        FolderContents(app, current, onOpenFolder, onOpenVideo)
+        FolderContents(app, current, isRoot = current == locate(app, null).first, onOpenFolder, onOpenVideo)
     }
 }
 
 @Composable
-private fun FolderContents(app: DesktopApp, folder: File, onOpenFolder: (File) -> Unit, onOpenVideo: (File) -> Unit) {
+private fun FolderContents(
+    app: DesktopApp,
+    folder: File,
+    isRoot: Boolean,
+    onOpenFolder: (File) -> Unit,
+    onOpenVideo: (File) -> Unit,
+) {
     var listing by remember(folder) { mutableStateOf<Listing?>(null) }
     LaunchedEffect(folder) { listing = withContext(Dispatchers.IO) { list(folder) } }
     val shown = listing ?: return
+    val title = if (isRoot) "Your library" else folder.name
     if (shown.folders.isEmpty() && shown.videos.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No videos here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 28.dp)) {
+            PageTitle(title, null)
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No videos here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(240.dp),
+        columns = GridCells.Adaptive(232.dp),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        contentPadding = PaddingValues(start = 32.dp, end = 32.dp, top = 28.dp, bottom = 40.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
+        item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+            PageTitle(title, listOfNotNull(
+                count(shown.folders.size, "folder"),
+                count(shown.videos.size, "video"),
+            ).joinToString(" · "))
+        }
+        // labelled groups only when there are two kinds to tell apart
+        val both = shown.folders.isNotEmpty() && shown.videos.isNotEmpty()
+        if (both) {
+            item(key = "folders", span = { GridItemSpan(maxLineSpan) }) { SectionLabel("Folders", Modifier.padding(top = 4.dp)) }
+        }
         items(shown.folders, key = { it.dir.path }) { item ->
             Card(
                 app = app,
@@ -169,6 +202,9 @@ private fun FolderContents(app: DesktopApp, folder: File, onOpenFolder: (File) -
                 },
                 onClick = { onOpenFolder(item.dir) },
             )
+        }
+        if (both) {
+            item(key = "videos", span = { GridItemSpan(maxLineSpan) }) { SectionLabel("Videos", Modifier.padding(top = 10.dp)) }
         }
         // numbered by place in the folder: names carry too many other numbers (1080p, 10bit) to guess from
         itemsIndexed(shown.videos, key = { _, video -> video.path }) { index, video ->
@@ -195,55 +231,96 @@ private fun Card(
     subtitle: String?,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(10.dp)
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val ring by animateColorAsState(if (hovered) scheme.primary else scheme.primary.copy(alpha = 0f), tween(120), label = "ring")
     Column(
         Modifier.hoverable(interaction).clickable(interaction, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(
-                    2.dp,
-                    if (hovered) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    shape,
-                ),
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape).background(scheme.surfaceVariant)
+                .border(1.5.dp, ring, shape),
             contentAlignment = Alignment.Center,
         ) {
             val image = thumbnailOf?.let { rememberThumbnail(app, it) }
             if (image != null) {
                 Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else if (subtitle != null) {
-                Text("▤", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FolderMark(scheme.onSurfaceVariant.copy(alpha = 0.55f))
             }
             if (badge != null) {
                 Text(
                     badge,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = scheme.onSurface,
                     modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                        .background(Color(0xB0000000), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                        .background(scheme.background.copy(alpha = 0.82f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
                 )
             }
             if (progress > 0f) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp),
-                    trackColor = Color(0x60000000),
-                    drawStopIndicator = {},
-                    gapSize = 0.dp,
-                )
+                // a thin line along the foot of the frame: how far in, nothing more
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x59000000))) {
+                    Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).fillMaxHeight().background(scheme.primary))
+                }
             }
         }
-        Column(Modifier.padding(horizontal = 2.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (hovered) scheme.primary else scheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+/** The page's name, large and plain, with what's in it underneath. */
+@Composable
+private fun PageTitle(title: String, detail: String?) {
+    Column(Modifier.padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (!detail.isNullOrEmpty()) {
+            Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun count(n: Int, noun: String) = when (n) {
+    0 -> null
+    1 -> "1 $noun"
+    else -> "$n ${noun}s"
+}
+
+/** A folder without a video to show: a plain folder outline in the empty frame. */
+@Composable
+private fun FolderMark(color: Color) {
+    Canvas(Modifier.size(44.dp, 34.dp)) {
+        val stroke = Stroke(width = 1.6.dp.toPx())
+        val tab = Path().apply {
+            moveTo(0f, size.height * 0.22f)
+            lineTo(0f, size.height * 0.08f)
+            quadraticTo(0f, 0f, size.width * 0.06f, 0f)
+            lineTo(size.width * 0.34f, 0f)
+            lineTo(size.width * 0.44f, size.height * 0.14f)
+        }
+        drawPath(tab, color, style = stroke)
+        drawRoundRect(
+            color,
+            topLeft = Offset(0f, size.height * 0.14f),
+            size = Size(size.width, size.height * 0.86f),
+            cornerRadius = CornerRadius(4.dp.toPx()),
+            style = stroke,
+        )
     }
 }
 

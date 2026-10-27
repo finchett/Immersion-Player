@@ -137,7 +137,7 @@ class PlayerScreenTest {
             val keys = PlayerKeys()
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
+                    DesktopTheme(AppTheme.Jade) {
                         PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
                     }
                 }
@@ -190,7 +190,7 @@ class PlayerScreenTest {
             var opened: File? = null
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
+                    DesktopTheme(AppTheme.Jade) {
                         PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = { opened = it })
                     }
                 }
@@ -226,7 +226,7 @@ class PlayerScreenTest {
             fun shaders() = session.player.propertyString("glsl-shaders").orEmpty()
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
+                    DesktopTheme(AppTheme.Jade) {
                         PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
                     }
                 }
@@ -406,7 +406,7 @@ class PlayerScreenTest {
             val keys = PlayerKeys()
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
+                    DesktopTheme(AppTheme.Jade) {
                         PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
                     }
                 }
@@ -531,7 +531,7 @@ class PlayerScreenTest {
             val keys = PlayerKeys()
             runDesktopComposeUiTest(width = 1440, height = 860) {
                 setContent {
-                    DesktopTheme(AppTheme.Midnight) {
+                    DesktopTheme(AppTheme.Jade) {
                         PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
                     }
                 }
