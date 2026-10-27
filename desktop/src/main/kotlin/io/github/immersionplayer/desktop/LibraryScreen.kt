@@ -54,6 +54,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.immersionplayer.library.NaturalOrder
+import io.github.immersionplayer.library.Titles
 import io.github.immersionplayer.library.isVideoName
 import io.github.immersionplayer.ui.Cog
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +113,7 @@ fun LibraryHeader(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, 
             above.forEachIndexed { i, dir ->
                 if (i > 0) Text("/", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                 TextAction(
-                    if (dir == root) "Library" else dir.name,
+                    if (dir == root) "Library" else app.settings.title(dir.name),
                     onClick = { onOpenFolder(dir) },
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -160,7 +161,11 @@ private fun FolderContents(
     var listing by remember(folder) { mutableStateOf<Listing?>(null) }
     LaunchedEffect(folder) { listing = withContext(Dispatchers.IO) { list(folder) } }
     val shown = listing ?: return
-    val title = if (isRoot) "Your library" else folder.name
+    val title = if (isRoot) "Your library" else app.settings.title(folder.name)
+    val tidy = app.settings.tidyNames
+    val videoTitles = remember(shown, tidy) {
+        if (tidy) Titles.episodes(shown.videos.map { it.name }) else shown.videos.map { it.nameWithoutExtension }
+    }
     if (shown.folders.isEmpty() && shown.videos.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 28.dp)) {
             PageTitle(title, null)
@@ -194,7 +199,7 @@ private fun FolderContents(
                 thumbnailOf = item.cover,
                 badge = null,
                 progress = 0f,
-                title = item.dir.name,
+                title = app.settings.title(item.dir.name),
                 subtitle = when (item.videos) {
                     0 -> null
                     1 -> "1 video"
@@ -211,9 +216,10 @@ private fun FolderContents(
             Card(
                 app = app,
                 thumbnailOf = video,
-                badge = if (app.settings.episodeNumbers) "${index + 1}" else null,
+                // a title that already says which episode it is needs no place number beside it
+                badge = if (app.settings.episodeNumbers && !namesEpisode(videoTitles[index])) "${index + 1}" else null,
                 progress = remember(video) { app.settings.progress(video.absolutePath) },
-                title = video.nameWithoutExtension,
+                title = videoTitles[index],
                 subtitle = null,
                 onClick = { onOpenVideo(video) },
             )
@@ -294,6 +300,8 @@ private fun PageTitle(title: String, detail: String?) {
         }
     }
 }
+
+private fun namesEpisode(title: String) = title.startsWith("Episode ") || Regex("""^S\d+ E\d+""").containsMatchIn(title)
 
 private fun count(n: Int, noun: String) = when (n) {
     0 -> null

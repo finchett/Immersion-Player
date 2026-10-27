@@ -253,7 +253,7 @@ fun PlayerScreen(
             wordLength = entry.sourceLength,
             entry = entry,
             translation = session.secondary.value?.translationFor(cue.start, cue.end),
-            videoName = session.video.nameWithoutExtension,
+            videoName = app.settings.title(session.video.name),
             start = cue.start + offset,
             end = cue.end + offset,
         )
@@ -546,7 +546,7 @@ private fun VideoArea(
             exit = fadeOut(tween(150)),
             modifier = Modifier.align(Alignment.Center),
         ) {
-            next?.let { NextEpisode(it, onPlayNext) }
+            next?.let { NextEpisode(app.settings.title(it.name), onPlayNext) }
         }
         AnimatedVisibility(
             visible,
@@ -582,7 +582,7 @@ private fun VideoArea(
 
 /** Offered over the last frame: the next video in the folder, a click (or Return) away. */
 @Composable
-private fun NextEpisode(video: File, onPlay: () -> Unit) {
+private fun NextEpisode(title: String, onPlay: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     Column(
@@ -599,7 +599,7 @@ private fun NextEpisode(video: File, onPlay: () -> Unit) {
         Text("Next episode", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                video.nameWithoutExtension,
+                title,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 maxLines = 2,

@@ -210,6 +210,12 @@ private fun GeneralPane(app: DesktopApp) {
                 "Shows each video's place in its folder on its thumbnail",
                 settings.episodeNumbers, settings::updateEpisodeNumbers,
             )
+            RowDivider()
+            ToggleRow(
+                "Tidy up names",
+                "Hides release tags like [Group] and 1080p, and shows episodes as Episode 1",
+                settings.tidyNames, settings::updateTidyNames,
+            )
         }
     }
     Section("Languages") {
