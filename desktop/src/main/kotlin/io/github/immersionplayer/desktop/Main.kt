@@ -156,6 +156,7 @@ fun main(args: Array<String>) {
         val appIcon = painterResource("icon.png")
         LaunchedEffect(Unit) { setDockIcon() }
 
+        val title = (screen as? Screen.Player)?.video?.nameWithoutExtension ?: "Immersion Player"
         Window(
             onCloseRequest = {
                 session?.close()
@@ -163,7 +164,7 @@ fun main(args: Array<String>) {
                 exitApplication()
             },
             state = windowState,
-            title = (screen as? Screen.Player)?.video?.nameWithoutExtension ?: "Immersion Player",
+            title = title,
             icon = appIcon,
             onPreviewKeyEvent = ::onKey,
         ) {
@@ -174,13 +175,15 @@ fun main(args: Array<String>) {
                     window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
                     window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
                 }
-                // traffic lights pushed in and faded with the player controls; AppKit resets their
-                // layout on resize, so this runs again whenever the size or state changes
+                // traffic lights centred in the header and faded with the player controls; AppKit
+                // resets their layout on resize and on a new title, so this runs again whenever the
+                // size, state or title changes
                 val lightsVisible = screen !is Screen.Player || keys.chromeVisible
-                LaunchedEffect(windowState.size, windowState.placement, lightsVisible, screen::class) {
-                    MacTrafficLights.apply(lightsVisible)
+                val lightCenter = HeaderHeight.value / 2.0
+                LaunchedEffect(windowState.size, windowState.placement, lightsVisible, screen::class, title) {
+                    MacTrafficLights.apply(lightsVisible, lightCenter, title)
                     delay(150) // after AppKit's own relayout following a resize
-                    MacTrafficLights.apply(lightsVisible)
+                    MacTrafficLights.apply(lightsVisible, lightCenter, title)
                 }
             }
             val fullscreen = windowState.placement == WindowPlacement.Fullscreen

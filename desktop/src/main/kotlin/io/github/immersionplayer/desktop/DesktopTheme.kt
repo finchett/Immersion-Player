@@ -49,35 +49,34 @@ val isMac = System.getProperty("os.name").lowercase().contains("mac")
 val LocalTrafficLights = staticCompositionLocalOf { isMac }
 
 /**
- * Corner geometry, all concentric with the window corner (radius R): the video card steps in
- * from the window edge by the same amount the traffic lights' edge sits inside the card.
- * On macOS R is the real window radius; elsewhere there are no lights, so plain values.
+ * Corner geometry, concentric with the window corner (radius R): the video card steps in from
+ * the window edge and rounds about the same centre. On macOS R is the real window radius;
+ * elsewhere, plain values.
  */
 class Corners(windowRadius: Double) {
-    // only a window with rounded corners and traffic lights has anything to be concentric with;
-    // full screen (radius 0) and other systems get plain values
+    // only a window with rounded corners has anything to be concentric with; full screen
+    // (radius 0) and other systems get plain values
     private val concentric = isMac && windowRadius > MacTrafficLights.LIGHT_RADIUS
-    /** One step in, shared by every layer: three steps span the window corner to a light's edge. */
+    /** One step in: a third of the way from the window corner to a light's radius. */
     private val step: Dp = if (concentric) ((windowRadius - MacTrafficLights.LIGHT_RADIUS) / 3).dp else 6.dp
     val cardGap: Dp = step
     val cardRadius: Dp = if (concentric) windowRadius.dp - step else 12.dp
-    /** Centre of the corner curve, where the first light sits. */
-    val lightCenter: Dp = windowRadius.dp
 }
 
 val LocalCorners = staticCompositionLocalOf { Corners(16.0) }
+
+/**
+ * Height of every header, the player panel's too. The traffic lights are centred in it, as far in
+ * from the left as from the top, the way a Mac toolbar holds them, and stay there on every screen.
+ */
+val HeaderHeight = 40.dp
 
 /** Where a header on the title-bar line starts: clear of the traffic lights when they're shown. */
 val HeaderStart: Dp
     @Composable get() {
         if (!LocalTrafficLights.current) return 12.dp
-        val c = LocalCorners.current
-        return c.lightCenter + (MacTrafficLights.LIGHT_SPACING * 2 + MacTrafficLights.LIGHT_RADIUS).dp + 16.dp
+        return HeaderHeight / 2 + (MacTrafficLights.LIGHT_SPACING * 2 + MacTrafficLights.LIGHT_RADIUS).dp + 16.dp
     }
-
-/** Height of a header row whose middle lines up with the traffic lights. */
-val HeaderHeight: Dp
-    @Composable get() = if (LocalTrafficLights.current) LocalCorners.current.lightCenter * 2 else 40.dp
 
 /**
  * The app themes, retuned for a desktop: a denser type scale sized for reading at arm's length
