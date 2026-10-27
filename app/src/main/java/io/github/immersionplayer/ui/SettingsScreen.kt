@@ -201,6 +201,12 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                         description = "Shows each video's place in its folder on its card.",
                         initial = app.prefs.episodeNumbers,
                     ) { app.prefs.episodeNumbers = it }
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingSwitchRow(
+                        title = "Tidy up names",
+                        description = "Hides release tags like [Group] and 1080p, and shows episodes as Episode 1.",
+                        initial = app.prefs.tidyNames,
+                    ) { app.prefs.tidyNames = it }
                 }
 
                 SettingsSection("Languages") {

@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,10 +51,11 @@ fun SettingsSection(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title.uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.4.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f).padding(start = 4.dp),
             )
             trailing?.invoke()
@@ -140,8 +142,8 @@ fun ThemeSwatch(label: String, theme: AppTheme?, selected: Boolean, onClick: () 
                     if (theme != null) Brush.linearGradient(0f to theme.scheme.background, 1f to theme.scheme.background)
                     // the system tile is split: the light theme on one side, the dark on the other
                     else Brush.horizontalGradient(
-                        0f to AppTheme.Paper.scheme.background, 0.5f to AppTheme.Paper.scheme.background,
-                        0.5f to AppTheme.Midnight.scheme.background, 1f to AppTheme.Midnight.scheme.background,
+                        0f to SystemLight.scheme.background, 0.5f to SystemLight.scheme.background,
+                        0.5f to SystemDark.scheme.background, 1f to SystemDark.scheme.background,
                     ),
                 )
                 .border(1.dp, scheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
@@ -150,7 +152,7 @@ fun ThemeSwatch(label: String, theme: AppTheme?, selected: Boolean, onClick: () 
             Text(
                 "あ Aa",
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 color = theme?.scheme?.onBackground ?: scheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
@@ -158,8 +160,8 @@ fun ThemeSwatch(label: String, theme: AppTheme?, selected: Boolean, onClick: () 
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            color = if (selected) scheme.primary else scheme.onSurfaceVariant,
             maxLines = 1,
         )
     }
@@ -174,7 +176,7 @@ fun AppFooter(version: String) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
-            Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF111316)),
+            Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(colorResource(R.color.ic_launcher_background)),
             contentAlignment = Alignment.Center,
         ) {
             // the launcher foreground draws inside a 72 of 108 dp safe zone, so it is scaled to fill

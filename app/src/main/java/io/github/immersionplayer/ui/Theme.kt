@@ -10,10 +10,9 @@ class Appearance(private val prefs: Prefs) {
     /** The chosen theme, or null to follow the phone's light/dark setting. */
     var theme: AppTheme? by mutableStateOf(
         when (val stored = prefs.theme) {
-            // installs from before there was a system option keep the theme they had
-            null -> AppTheme.Midnight
-            SYSTEM -> null
-            else -> AppTheme.entries.firstOrNull { it.name == stored } ?: AppTheme.Midnight
+            // nothing chosen follows the phone, in the app's own Jade and Celadon
+            null, SYSTEM -> null
+            else -> AppTheme.entries.firstOrNull { it.name == stored }
         },
     )
         private set

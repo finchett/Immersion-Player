@@ -70,6 +70,8 @@ import androidx.documentfile.provider.DocumentFile
 import io.github.immersionplayer.App
 import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.library.NaturalOrder
+import io.github.immersionplayer.library.Titles
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.library.isVideoName
 import kotlinx.coroutines.Dispatchers
@@ -149,9 +151,14 @@ fun LibraryScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
             if (root == null) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Choose the folder that holds your shows, e.g. Movies/Immersion.")
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Your library", style = MaterialTheme.typography.headlineMedium)
+                        Text(
+                            "Choose the folder that holds your shows, e.g. Movies/Immersion.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
                         Button(onClick = { pickFolder.launch(null) }) { Text("Choose folder") }
                     }
                 }
@@ -169,6 +176,7 @@ fun LibraryScreen(
                         FolderGrid(
                             app = app,
                             folder = it,
+                            title = if (folder.size > 1) app.title(it.name.orEmpty()) else "Your library",
                             controlsVisible = controlsVisible,
                             onOpenFolder = { child -> path = path + child },
                             onOpenVideo = onOpenVideo,
@@ -177,13 +185,15 @@ fun LibraryScreen(
                 }
             }
 
-            FolderChip(
-                visible = controlsVisible,
-                inFolder = path.size > 1,
-                name = if (path.size > 1) path.last().name.orEmpty() else "Immersion Player",
-                onUp = { path = path.dropLast(1) },
-                modifier = Modifier.align(Alignment.TopStart),
-            )
+            // the folder's own name is the page title; the chip is the way back up
+            if (path.size > 1) {
+                FolderChip(
+                    visible = controlsVisible,
+                    name = if (path.size > 2) app.title(path[path.size - 2].name.orEmpty()) else "Library",
+                    onUp = { path = path.dropLast(1) },
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
             SettingsButton(
                 visible = controlsVisible,
                 onOpenSettings = onOpenSettings,
@@ -228,6 +238,7 @@ private object LibraryCache {
 private fun FolderGrid(
     app: App,
     folder: DocumentFile,
+    title: String,
     controlsVisible: MutableState<Boolean>,
     onOpenFolder: (DocumentFile) -> Unit,
     onOpenVideo: (DocumentFile, List<DocumentFile>) -> Unit,
@@ -297,33 +308,46 @@ private fun FolderGrid(
         Box(Modifier.fillMaxSize())
         return
     }
-    val entries = shown.folders.map {
-        Entry.Folder(it, shown.episodeCounts[it.uri.toString()] ?: 0, shown.covers[it.uri.toString()])
-    } + shown.videos.mapIndexed { i, video -> Entry.Video(video, i + 1) }
-    if (entries.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Nothing here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
+    val tidy = app.prefs.tidyNames
+    val videoTitles = remember(shown, tidy) {
+        val names = shown.videos.map { it.name.orEmpty() }
+        if (tidy) Titles.episodes(names) else names.map { it.substringBeforeLast('.') }
     }
+    val folders = shown.folders.map {
+        Entry.Folder(it, shown.episodeCounts[it.uri.toString()] ?: 0, shown.covers[it.uri.toString()])
+    }
+    val videos = shown.videos.mapIndexed { i, video -> Entry.Video(video, i + 1) }
+    val detail = listOfNotNull(count(folders.size, "folder"), count(videos.size, "video")).joinToString(" · ")
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Adaptive(200.dp),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 56.dp, bottom = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 60.dp, bottom = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        items(entries, key = {
-            when (it) {
-                is Entry.Folder -> it.file.uri.toString()
-                is Entry.Video -> it.file.uri.toString()
+        item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+            Column(Modifier.padding(start = 2.dp, bottom = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    detail.ifEmpty { "Nothing here." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        }) { entry ->
-            when (entry) {
-                is Entry.Folder -> FolderCard(app, entry) { onOpenFolder(entry.file) }
-                is Entry.Video -> VideoCard(app, entry.file, entry.number) { onOpenVideo(entry.file, shown.all) }
-            }
+        }
+        // labelled groups only when there are two kinds to tell apart
+        val both = folders.isNotEmpty() && videos.isNotEmpty()
+        if (both) item(key = "folders", span = { GridItemSpan(maxLineSpan) }) { GroupLabel("Folders") }
+        items(folders, key = { it.file.uri.toString() }) { entry ->
+            FolderCard(app, entry) { onOpenFolder(entry.file) }
+        }
+        if (both) item(key = "videos", span = { GridItemSpan(maxLineSpan) }) { GroupLabel("Videos") }
+        items(videos, key = { it.file.uri.toString() }) { entry ->
+            val name = videoTitles[entry.number - 1]
+            // a title that already says which episode it is needs no place number beside it
+            val number = entry.number.takeIf { app.prefs.episodeNumbers && !namesEpisode(name) }
+            VideoCard(app, entry.file, name, number) { onOpenVideo(entry.file, shown.all) }
         }
     }
 }
@@ -332,7 +356,6 @@ private fun FolderGrid(
 @Composable
 private fun FolderChip(
     visible: State<Boolean>,
-    inFolder: Boolean,
     name: String,
     onUp: () -> Unit,
     modifier: Modifier,
@@ -344,15 +367,13 @@ private fun FolderChip(
             modifier = Modifier
                 .safeDrawingPadding()
                 .padding(start = 14.dp, top = 8.dp)
-                .clickable(enabled = inFolder, onClick = onUp),
+                .clickable(onClick = onUp),
         ) {
             Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (inFolder) {
-                    Text("‹  ", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-                }
+                Text("‹  ", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
                 Text(
                     name,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 320.dp),
@@ -381,42 +402,39 @@ private fun SettingsButton(visible: State<Boolean>, onOpenSettings: () -> Unit, 
 @Composable
 private fun FolderCard(app: App, folder: Entry.Folder, onClick: () -> Unit) {
     val thumbnail = folder.cover?.let { rememberThumbnail(app, it.uri.toString()) }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column {
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (thumbnail != null) {
-                    Image(
-                        bitmap = thumbnail.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Text("📁", fontSize = 26.sp)
-                }
-            }
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                Text(
-                    folder.file.name.orEmpty(),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(scheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (thumbnail != null) {
+                Image(
+                    bitmap = thumbnail.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                if (folder.episodes > 0) {
-                    Text(
-                        "${folder.episodes} ${if (folder.episodes == 1) "video" else "videos"}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            } else {
+                FolderMark(scheme.onSurfaceVariant.copy(alpha = 0.55f))
+            }
+        }
+        Column(Modifier.padding(start = 2.dp, end = 2.dp, bottom = 4.dp)) {
+            Text(
+                app.title(folder.file.name.orEmpty()),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (folder.episodes > 0) {
+                Text(
+                    "${folder.episodes} ${if (folder.episodes == 1) "video" else "videos"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -435,22 +453,20 @@ private fun rememberThumbnail(app: App, uri: String): android.graphics.Bitmap? {
 }
 
 @Composable
-private fun VideoCard(app: App, video: DocumentFile, number: Int, onClick: () -> Unit) {
+private fun VideoCard(app: App, video: DocumentFile, title: String, number: Int?, onClick: () -> Unit) {
     val uri = video.uri.toString()
     val position = app.prefs.position(uri)
     val duration = app.prefs.duration(uri)
     val progress = if (duration > 0) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
     val thumbnail = rememberThumbnail(app, uri)
 
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))) {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(scheme.surfaceVariant)) {
                 val image = thumbnail
-                val numbered = app.prefs.episodeNumbers
                 if (image != null) {
                     Image(
                         bitmap = image.asImageBitmap(),
@@ -458,40 +474,29 @@ private fun VideoCard(app: App, video: DocumentFile, number: Int, onClick: () ->
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
-                    if (numbered) {
+                    if (number != null) {
                         Text(
                             "$number",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = scheme.onSurface,
                             modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                                .background(Color(0xB0000000), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                                .background(scheme.background.copy(alpha = 0.82f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 7.dp, vertical = 2.dp),
                         )
                     }
                 } else {
-                    // unwatched: a quiet placeholder with its place in the folder (names have too many other numbers to guess from)
-                    Box(
-                        Modifier.fillMaxSize().background(
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                )
-                            )
-                        ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            if (numbered) "$number" else "▶",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        )
-                    }
+                    // not seen yet: its place in the folder, quietly, on the plain frame
+                    Text(
+                        number?.toString() ?: "▶",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = scheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.align(Alignment.Center),
+                    )
                 }
                 if (progress > 0f) {
                     Box(
-                        Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp)
-                            .background(Color(0x55000000)),
+                        Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)
+                            .background(Color(0x59000000)),
                     ) {
                         Box(
                             Modifier.fillMaxHeight().fillMaxWidth(progress)
@@ -500,9 +505,9 @@ private fun VideoCard(app: App, video: DocumentFile, number: Int, onClick: () ->
                     }
                 }
             }
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Column(Modifier.padding(start = 2.dp, end = 2.dp, bottom = 4.dp)) {
                 Text(
-                    video.name?.substringBeforeLast('.').orEmpty(),
+                    title,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -514,12 +519,36 @@ private fun VideoCard(app: App, video: DocumentFile, number: Int, onClick: () ->
                         duration > 0 -> formatTime(duration)
                         else -> " "
                     },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (position > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (position > 0) scheme.primary else scheme.onSurfaceVariant,
                 )
             }
-        }
     }
+}
+
+@Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text.uppercase(),
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 1.4.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 2.dp, top = 6.dp),
+    )
+}
+
+/** How a file or folder called [name] is shown. */
+private fun App.title(name: String): String =
+    if (prefs.tidyNames) Titles.clean(name) else if (isVideoName(name)) name.substringBeforeLast('.') else name
+
+private fun namesEpisode(title: String) = title.startsWith("Episode ") || Regex("""^S\d+ E\d+""").containsMatchIn(title)
+
+private fun count(n: Int, noun: String) = when (n) {
+    0 -> null
+    1 -> "1 $noun"
+    else -> "$n ${noun}s"
 }
 
 private fun list(folder: DocumentFile): Listing {
