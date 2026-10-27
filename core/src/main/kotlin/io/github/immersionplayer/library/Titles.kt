@@ -24,7 +24,8 @@ object Titles {
     // what a parenthesis holds when it's about the release rather than the show
     private val releaseWords = Regex("""\b(?:complete|batch|uncensored|raw|subs?|subbed|dub|dubbed|fin)\b""", RegexOption.IGNORE_CASE)
     private val checksum = Regex("""^[0-9A-Fa-f]{8}$""")
-    private val brackets = Regex("""\[[^\]]*]|【[^】]*】|\{[^}]*}""")
+    // closing brackets escaped too: Android's ICU regex rejects a bare ] or }, where the JVM allows it
+    private val brackets = Regex("""\[[^\]]*\]|【[^】]*】|\{[^\}]*\}""")
     private val parentheses = Regex("""\(([^)]*)\)""")
     private val version = Regex("""(?<=\d)v\d(?![A-Za-z0-9])""", RegexOption.IGNORE_CASE)
     private val season = Regex("""(?<![A-Za-z0-9])S(\d{1,2})(?![A-Za-z0-9])""", RegexOption.IGNORE_CASE)
