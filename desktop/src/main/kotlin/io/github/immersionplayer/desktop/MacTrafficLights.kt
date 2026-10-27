@@ -63,10 +63,10 @@ object MacTrafficLights {
     private val pending = java.util.Collections.synchronizedSet(HashSet<Work>())
 
     /**
-     * Centres the first light on the centre of the window's corner curve, so the lights and the
-     * video card are concentric with the window corner, and shows or fades them. No-op off macOS.
+     * Centres the first light [center] points in from the top and left, and shows or fades them.
+     * No-op off macOS.
      */
-    fun apply(visible: Boolean) {
+    fun apply(visible: Boolean, center: Double) {
         if (!isMac) return
         onMain {
             val result = runCatching {
@@ -76,7 +76,6 @@ object MacTrafficLights {
                     val radius = msgSend.invokeDouble(arrayOf(window, sel("_cornerRadius")))
                     if (radius > 0 && radius != cornerRadius) Snapshot.withMutableSnapshot { cornerRadius = radius }
                 }
-                val center = cornerRadius
 
                 val buttons = (0..2).map { send(window, "standardWindowButton:", it.toLong()) }
                 if (buttons.any { it == null }) return@onMain
@@ -86,8 +85,9 @@ object MacTrafficLights {
                 val bar = frame(container)
                 if (baseTitlebarHeight == 0.0) baseTitlebarHeight = bar.height
                 val buttonHeight = frame(buttons[0]).height
-                // tall enough that the buttons aren't clipped at their new height
-                val height = maxOf(baseTitlebarHeight, center + buttonHeight / 2)
+                // the whole row the lights are centred in, and never so short that the buttons
+                // are clipped at their new height
+                val height = maxOf(baseTitlebarHeight, center * 2, center + buttonHeight / 2)
                 sendVoid(container, "setFrame:", rect(bar.x, contentHeight - height, bar.width, height))
 
                 buttons.forEachIndexed { i, button ->

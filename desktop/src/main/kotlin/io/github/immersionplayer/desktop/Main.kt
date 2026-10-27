@@ -174,13 +174,14 @@ fun main(args: Array<String>) {
                     window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
                     window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
                 }
-                // traffic lights pushed in and faded with the player controls; AppKit resets their
-                // layout on resize, so this runs again whenever the size or state changes
+                // traffic lights centred in the header and faded with the player controls; AppKit
+                // resets their layout on resize, so this runs again whenever the size or state changes
                 val lightsVisible = screen !is Screen.Player || keys.chromeVisible
+                val lightCenter = HeaderHeight.value / 2.0
                 LaunchedEffect(windowState.size, windowState.placement, lightsVisible, screen::class) {
-                    MacTrafficLights.apply(lightsVisible)
+                    MacTrafficLights.apply(lightsVisible, lightCenter)
                     delay(150) // after AppKit's own relayout following a resize
-                    MacTrafficLights.apply(lightsVisible)
+                    MacTrafficLights.apply(lightsVisible, lightCenter)
                 }
             }
             val fullscreen = windowState.placement == WindowPlacement.Fullscreen
