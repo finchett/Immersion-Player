@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -137,7 +138,7 @@ fun main(args: Array<String>) {
                     keys.notice = Notice(if (on) "Stopping at the end of every line" else "Playing straight through")
                 }
                 Key.S -> app.settings.updatePanelHidden(!app.settings.panelHidden)
-                Key.F -> toggleFullscreen()
+                Key.F, Key.F11 -> toggleFullscreen()
                 Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
                 Key.A -> keys.onAddCard()
                 Key.Enter -> keys.onPlayNext?.invoke() ?: return false
@@ -191,6 +192,7 @@ fun main(args: Array<String>) {
                 }
             }
             val fullscreen = windowState.placement == WindowPlacement.Fullscreen
+            SideEffect { keys.fullscreen = fullscreen }
             DesktopTheme(app.settings.theme) {
                 CompositionLocalProvider(
                     LocalTrafficLights provides (isMac && !fullscreen),
@@ -202,6 +204,11 @@ fun main(args: Array<String>) {
                     // the native window too, so a resize never flashes white before Compose repaints
                     val background = MaterialTheme.colorScheme.background
                     LaunchedEffect(background) { window.background = java.awt.Color(background.toArgb()) }
+                    // and Windows draws its title bar in the same colours
+                    if (isWindows) {
+                        val onBackground = MaterialTheme.colorScheme.onBackground
+                        LaunchedEffect(background, onBackground) { WindowsTitleBar.apply(window, background, onBackground) }
+                    }
                     // the theme background behind the screens, so a crossfade never shows the window's white.
                     // Library and settings share one key: moving between them doesn't animate here, only
                     // their bodies do, under a header bar that stays put.
