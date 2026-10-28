@@ -81,12 +81,27 @@ jobs:
           sudo apt-get update -q
           # the package adds itself to the menu, whose folders a server image lacks and a desktop has
           sudo mkdir -p /usr/share/applications /usr/share/desktop-directories
-          sudo apt-get install -yq ./dist/*.deb xvfb ffmpeg
+          sudo apt-get install -yq ./dist/*.deb xvfb ffmpeg imagemagick
           ffmpeg -v error -f lavfi -i testsrc=duration=20:size=640x360:rate=24 -c:v libx264 test.mkv
-          timeout 30 xvfb-run -a "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app.log 2>&1 || true
+          # a virtual display and no GPU: where OpenGL frames come back blank, the player has to
+          # notice and switch to software, so the screenshot shows the test pattern, not black
+          xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
+            "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app.log 2>&1 &
+            sleep 25
+            import -window root shot.png
+            kill %1' || true
           cat app.log
           cat ~/.local/share/immersion-player/errors.log 2>/dev/null || true
           ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/immersion-player/errors.log 2>/dev/null
+          # the video takes the left of the window: its average brightness, 0 for black
+          brightness=$(convert shot.png -crop 50%x100%+0+0 -colorspace gray -format "%[fx:mean]" info:)
+          echo "video area brightness: $brightness"
+          awk -v b="$brightness" 'BEGIN { exit !(b > 0.1) }'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-playback
+          path: shot.png
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64

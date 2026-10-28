@@ -2,7 +2,6 @@ package io.github.immersionplayer.desktop.mpv
 
 import com.sun.jna.CallbackReference
 import com.sun.jna.Memory
-import com.sun.jna.Platform
 import com.sun.jna.Pointer
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_END_FILE
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_FILE_LOADED
@@ -33,10 +32,12 @@ import java.util.concurrent.Semaphore
  * EGL), and each frame is read back into the bitmap: that's what runs GLSL shaders such as
  * Anime4K. If that context can't be made, it falls back to the software render API, which draws
  * straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces the
- * software one, and =gl the GPU one.
+ * software one.
  *
- * Off macOS the software one is the default for now: the OpenGL path has only been tried on
- * machines without a GPU, where on Linux it drew black frames.
+ * A context can be made and still read back nothing: on Linux without a GPU (Mesa's llvmpipe on a
+ * virtual display) every frame came back as zeros. mpv's frames are opaque, so a frame whose
+ * alpha is all zero is one that never arrived; after a few of those the player drops GL and
+ * carries on in software ([checkGlFrame]).
  */
 class MpvPlayer {
     private val lib = MpvLib.INSTANCE
@@ -131,8 +132,7 @@ class MpvPlayer {
     }
 
     private fun createRenderContext() {
-        val renderer = System.getProperty("immersion.renderer") ?: if (Platform.isMac()) "gl" else "sw"
-        if (renderer != "sw") {
+        if (System.getProperty("immersion.renderer") != "sw") {
             OffscreenGl.create()?.let { context ->
                 gl = context
                 val initParams = Memory(16).apply {
@@ -236,6 +236,51 @@ class MpvPlayer {
     private val format = cString("rgb0")
     private val fbo = Memory(16)
 
+    // GL frames checked so far, until one shows real pixels, and how many of them came back blank
+    private var glProven = false
+    private var blankFrames = 0
+
+    /**
+     * Whether [pixmap], just read back from GL, holds a frame. Samples a spread of pixels: one with
+     * any alpha proves GL works and checking stops. [BLANK_FRAMES] blank ones in a row, and GL is
+     * dropped for the software renderer, which draws the next frame.
+     */
+    private fun checkGlFrame(pixmap: Pixmap, width: Int, height: Int) {
+        if (glProven) return
+        // -Dimmersion.blankGl blanks the readback, to try this where GL works
+        if (System.getProperty("immersion.blankGl") != null) Pointer(pixmap.addr).setMemory(0, pixmap.rowBytes.toLong() * height, 0)
+        val pixels = Pointer(pixmap.addr)
+        val opaque = (0 until 64).any { i ->
+            val x = (i % 8) * (width - 1) / 7
+            val y = (i / 8) * (height - 1) / 7
+            // BGRA: alpha is the fourth byte
+            pixels.getByte(y.toLong() * pixmap.rowBytes + x * 4L + 3) != 0.toByte()
+        }
+        if (opaque) {
+            glProven = true
+        } else if (++blankFrames >= BLANK_FRAMES) {
+            System.err.println("OpenGL frames came back blank (${gl?.renderer}); drawing in software instead")
+            useSoftware()
+        }
+    }
+
+    /** Swaps the GL render context for a software one, mid-playback. On the render thread. */
+    private fun useSoftware() {
+        // freeing the context takes mpv's video output with it, and mpv turns the track off
+        val track = propertyString("vid")?.takeIf { it != "no" } ?: "auto"
+        lib.mpv_render_context_set_update_callback(renderContext, null, null)
+        lib.mpv_render_context_free(renderContext)
+        gl?.destroy()
+        gl = null
+        createRenderContext(MpvLib.RENDER_PARAM_API_TYPE to cString("sw"))
+            ?: error("mpv_render_context_create failed")
+        lib.mpv_render_context_set_update_callback(renderContext, updateCallback, null)
+        // the software renderer's pixels are laid out differently (see bufferFor)
+        buffers = arrayOfNulls(2)
+        property("vid", track)
+        wake.release()
+    }
+
     private fun renderLoop() {
         var renderedSize = 0 to 0
         while (running) {
@@ -268,6 +313,9 @@ class MpvPlayer {
             val params = renderParams(MpvLib.RENDER_PARAM_OPENGL_FBO to fbo)
             lib.mpv_render_context_render(renderContext, params)
             gl.read(Pointer(pixmap.addr), pixmap.rowBytes)
+            checkGlFrame(pixmap, width, height)
+            // dropped for software: this frame is blank, the next comes from the new renderer
+            if (this.gl == null) return
         } else {
             renderSoftware(pixmap, width, height)
         }
@@ -348,3 +396,6 @@ class MpvPlayer {
         }
     }
 }
+
+/** Blank GL frames in a row before the player gives up on GL; one alone could be a fluke of timing. */
+private const val BLANK_FRAMES = 3
