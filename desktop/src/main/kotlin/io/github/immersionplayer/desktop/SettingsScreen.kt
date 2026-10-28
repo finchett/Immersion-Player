@@ -1002,6 +1002,10 @@ internal fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier
                 .border(1.dp, scheme.hairline, RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.BottomCenter,
         ) {
+            // the accent, so themes on similar backgrounds still tell apart
+            theme?.scheme?.primary?.let { accent ->
+                Box(Modifier.align(Alignment.TopStart).padding(8.dp).size(18.dp, 5.dp).clip(CircleShape).background(accent))
+            }
             Text(
                 "あ Aa",
                 fontSize = 11.sp,
