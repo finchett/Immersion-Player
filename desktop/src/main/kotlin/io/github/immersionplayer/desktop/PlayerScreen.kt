@@ -563,6 +563,9 @@ private fun VideoArea(
         }
         // over the bar, so the line stays hoverable where the bar's shading reaches up behind it
         overlay?.invoke(this, visible)
+        // nothing marks it, but where the app draws the window's frame the video's top moves the
+        // window, as a title bar would; under the Library button, so that still takes its clicks
+        if (ownsFrame) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(HeaderHeight).movesWindow())
         // with the panel put away, so is its header: the way back to the library comes top right,
         // clear of the traffic lights, or top left where the window's own buttons hold the right
         AnimatedVisibility(
