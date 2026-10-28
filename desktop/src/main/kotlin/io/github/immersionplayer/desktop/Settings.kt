@@ -44,8 +44,8 @@ object AppDirs {
 /**
  * User settings and per-video state, in java.util.prefs (plist on macOS, registry on Windows,
  * ~/.java on Linux). Settings the UI reads are Compose state so changes apply immediately.
+ * -Dimmersion.prefs=<node> keeps a separate set in place of the app's own, to try a first launch.
  */
-/** [node] defaults to the app's own; -Dimmersion.prefs=<node> keeps a separate set, to try a first launch. */
 class Settings(node: String = System.getProperty("immersion.prefs") ?: "io/github/immersionplayer") {
     private val prefs = Preferences.userRoot().node(node)
     private val videos = prefs.node("videos")
