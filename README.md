@@ -246,8 +246,11 @@ Other note types get a guess from their field names.
 - Desktop uses the same libmpv. It runs mpv's GPU renderer in an offscreen OpenGL context (CGL
   on macOS, WGL on Windows, EGL on Linux) and reads each frame back into the Compose window. If
   OpenGL can't be set up, mpv's software renderer draws into it directly (about 5 ms per 1080p
-  frame on Apple Silicon). `-Prenderer=sw` forces the software one. Windows and Linux have run in
-  VMs without a GPU, on the software renderer.
+  frame on Apple Silicon). Without a GPU, OpenGL is only emulated on the CPU (Mesa's llvmpipe and
+  the like), which is slower than mpv's software renderer and drew seams on llvmpipe, so it's
+  passed over. And should a context read back nothing, mpv's frames being opaque, the first
+  frames' alpha is checked and the player switches to software mid-playback. `-Prenderer=sw`
+  forces the software one.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
   Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
   Auto, Fast or Best. They need the GPU renderer, so they're unavailable where it falls back to
@@ -399,9 +402,9 @@ desktop/    Compose Desktop
 - Sidecar subtitles can't be found for videos opened from another app (a content URI doesn't say
   what's next to it).
 - Android: arm64 only, phone layouts only.
-- Desktop: Macs with Apple Silicon, Windows and Linux on x64. On Windows and Linux video uses mpv's
-  software renderer for now, so Anime4K is Mac only until the OpenGL path has been tried on real
-  GPUs there. Lookups deinflect Japanese only, whatever language is set to study.
+- Desktop: Macs with Apple Silicon, Windows and Linux on x64. OpenGL on Windows and Linux has only
+  been run without a real GPU so far (where it falls back to software); Anime4K there needs it to
+  work. Lookups deinflect Japanese only, whatever language is set to study.
 
 ## Licence
 
