@@ -57,6 +57,8 @@ jobs:
           mkdir -p dist unpacked
           dpkg-deb -R desktop/build/compose/binaries/main/deb/*.deb unpacked
           control=unpacked/DEBIAN/control
+          # its trailing blank line would start a second entry
+          sed -i '/^$/d' $control
           if grep -q '^Depends:' $control; then
             sed -i 's/^Depends: \(.*\)$/Depends: \1, libmpv2 | libmpv1/' $control
           else

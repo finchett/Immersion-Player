@@ -101,7 +101,7 @@ Download from the [latest release](https://github.com/finchett/Immersion-Player/
 - **Windows (x64, Windows 10 or newer):** run the `.msi`. It installs for you alone, so it doesn't
   need an administrator. It isn't signed yet, so SmartScreen may stop it the first time: choose
   **More info**, then **Run anyway**.
-- **Linux (x64, Ubuntu 24.04, Debian 12 or newer):** install the `.deb` with
+- **Linux (x64, Ubuntu 24.04, Debian 13 or newer):** install the `.deb` with
   `sudo apt install ./Immersion-Player-*-linux-x64.deb`, which brings libmpv along.
 
 On the Mac and Android new versions install themselves. On Windows and Linux the app tells you
