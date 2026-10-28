@@ -859,7 +859,8 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, note: String?, 
     val ankiStatus by app.anki.status.collectAsState()
     // same height as the other headers, so it lines up with the traffic lights across the window
     Row(
-        Modifier.fillMaxWidth().height(HeaderHeight).padding(horizontal = 8.dp),
+        // the panel runs to the window's right edge, under the window's buttons where the app draws them
+        Modifier.fillMaxWidth().height(HeaderHeight).movesWindow().padding(start = 8.dp, end = 8.dp + HeaderEnd),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextAction("‹ Library", onClick = onBack)
