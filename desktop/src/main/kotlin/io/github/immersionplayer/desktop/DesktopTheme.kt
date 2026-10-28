@@ -44,6 +44,8 @@ import io.github.immersionplayer.ui.SystemDark
 import io.github.immersionplayer.ui.SystemLight
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
+val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 
 /** Whether the macOS traffic lights are drawn over the content (not in full screen). */
 val LocalTrafficLights = staticCompositionLocalOf { isMac }

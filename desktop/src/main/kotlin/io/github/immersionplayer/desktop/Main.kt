@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ fun main(args: Array<String>) {
     if (args.firstOrNull() == "--bench") return bench(args[1], args.getOrNull(2)?.toInt() ?: 1920)
     val app = DesktopApp()
     MacTrafficLights.probe()
+    if (isLinux) setLinuxWindowClass()
     Thread({ app.prepareDictionaries() }, "dictionary-setup").apply { isDaemon = true }.start()
     app.updater.start()
 
@@ -68,10 +70,17 @@ fun main(args: Array<String>) {
         }
         val keys = remember { PlayerKeys() }
 
-        fun toggleFullscreen() {
-            windowState.placement =
-                if (windowState.placement == WindowPlacement.Fullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
+        // Windows' placement full screen keeps the title bar, so there WindowsFullscreen does it
+        var windowsFullscreen by remember { mutableStateOf(false) }
+        fun isFullscreen() = if (isWindows) windowsFullscreen else windowState.placement == WindowPlacement.Fullscreen
+        fun setFullscreen(on: Boolean) {
+            if (isWindows) {
+                windowsFullscreen = on
+            } else {
+                windowState.placement = if (on) WindowPlacement.Fullscreen else WindowPlacement.Floating
+            }
         }
+        fun toggleFullscreen() = setFullscreen(!isFullscreen())
         keys.onToggleFullscreen = ::toggleFullscreen
 
         fun openVideo(video: File, from: File?) {
@@ -85,7 +94,7 @@ fun main(args: Array<String>) {
             session?.close()
             session = null
             keys.peeking = false
-            if (windowState.placement == WindowPlacement.Fullscreen) windowState.placement = WindowPlacement.Floating
+            if (isFullscreen()) setFullscreen(false)
             screen = Screen.Library(current.from)
         }
 
@@ -137,7 +146,7 @@ fun main(args: Array<String>) {
                     keys.notice = Notice(if (on) "Stopping at the end of every line" else "Playing straight through")
                 }
                 Key.S -> app.settings.updatePanelHidden(!app.settings.panelHidden)
-                Key.F -> toggleFullscreen()
+                Key.F, Key.F11 -> toggleFullscreen()
                 Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
                 Key.A -> keys.onAddCard()
                 Key.Enter -> keys.onPlayNext?.invoke() ?: return false
@@ -145,7 +154,7 @@ fun main(args: Array<String>) {
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
                 Key.Escape -> when {
                     keys.onDismiss != null -> keys.onDismiss?.invoke()
-                    windowState.placement == WindowPlacement.Fullscreen -> toggleFullscreen()
+                    isFullscreen() -> toggleFullscreen()
                     else -> closeVideo()
                 }
                 else -> return false
@@ -190,7 +199,9 @@ fun main(args: Array<String>) {
                     MacTrafficLights.apply(lightsVisible, lightCenter, title)
                 }
             }
-            val fullscreen = windowState.placement == WindowPlacement.Fullscreen
+            val fullscreen = isFullscreen()
+            SideEffect { keys.fullscreen = fullscreen }
+            if (isWindows) LaunchedEffect(windowsFullscreen) { WindowsFullscreen.set(window, windowsFullscreen) }
             DesktopTheme(app.settings.theme) {
                 CompositionLocalProvider(
                     LocalTrafficLights provides (isMac && !fullscreen),
@@ -202,6 +213,11 @@ fun main(args: Array<String>) {
                     // the native window too, so a resize never flashes white before Compose repaints
                     val background = MaterialTheme.colorScheme.background
                     LaunchedEffect(background) { window.background = java.awt.Color(background.toArgb()) }
+                    // and Windows draws its title bar in the same colours
+                    if (isWindows) {
+                        val onBackground = MaterialTheme.colorScheme.onBackground
+                        LaunchedEffect(background, onBackground) { WindowsTitleBar.apply(window, background, onBackground) }
+                    }
                     // the theme background behind the screens, so a crossfade never shows the window's white.
                     // Library and settings share one key: moving between them doesn't animate here, only
                     // their bodies do, under a header bar that stays put.
@@ -338,5 +354,17 @@ private fun setDockIcon() {
     runCatching {
         val url = object {}.javaClass.getResource("/icon.png") ?: return
         java.awt.Taskbar.getTaskbar().iconImage = javax.imageio.ImageIO.read(url)
+    }
+}
+
+/**
+ * Linux docks (GNOME's among them) find a window's launcher by its WM_CLASS, which AWT names after
+ * the main class unless told otherwise. This is the launcher the .deb installs, named by jpackage
+ * from the package name. Needs java.desktop's sun.awt.X11 opened (desktop/build.gradle.kts).
+ */
+private fun setLinuxWindowClass() {
+    runCatching {
+        val toolkit = java.awt.Toolkit.getDefaultToolkit()
+        toolkit.javaClass.getDeclaredField("awtAppClassName").apply { isAccessible = true }.set(toolkit, "immersion-player-Immersion_Player")
     }
 }

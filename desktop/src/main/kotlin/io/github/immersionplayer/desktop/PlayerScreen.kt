@@ -113,6 +113,7 @@ import io.github.immersionplayer.dictionary.TermEntry
 import io.github.immersionplayer.library.formatTime
 import io.github.immersionplayer.subs.SubtitleTrack
 import io.github.immersionplayer.ui.Cog
+import io.github.immersionplayer.ui.FullscreenIcon
 import io.github.immersionplayer.ui.PanelIcon
 import io.github.immersionplayer.ui.QuietArea
 import io.github.immersionplayer.ui.Scrubber
@@ -137,6 +138,8 @@ class PlayerKeys {
     /** Whether the player's controls are showing; the traffic lights come and go with them. */
     var chromeVisible by mutableStateOf(true)
     var onToggleFullscreen: () -> Unit = {}
+    /** Whether the window is in full screen, so the button offers the way back out. */
+    var fullscreen by mutableStateOf(false)
     /** Makes an Anki card of the word looked up first, when cards are turned on. */
     var onAddCard: () -> Unit = {}
     /** Opens the next episode, while the end-of-video prompt offers one. */
@@ -556,7 +559,7 @@ private fun VideoArea(
                 .onPointerEvent(PointerEventType.Enter) { overControls = true }
                 .onPointerEvent(PointerEventType.Exit) { overControls = false },
         ) {
-            Controls(app, session, onMenu = { menuOpen = it }, onScrubbing = { scrubbing = it })
+            Controls(app, session, keys, onMenu = { menuOpen = it }, onScrubbing = { scrubbing = it })
         }
         // over the bar, so the line stays hoverable where the bar's shading reaches up behind it
         overlay?.invoke(this, visible)
@@ -625,11 +628,18 @@ private val HiddenCursor = PointerIcon(
 
 /**
  * The bar along the bottom of the video, one compact row and the same in both layouts: play,
- * the time, the seek bar across the middle, then the line buttons, the menus and the panel.
- * [onScrubbing] tells while a scrub is under way.
+ * the time, the seek bar across the middle, then the line buttons, the menus and the panel, and
+ * off macOS (where the green traffic light does it) full screen. [onScrubbing] tells while a
+ * scrub is under way.
  */
 @Composable
-private fun Controls(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit, onScrubbing: (Boolean) -> Unit) {
+private fun Controls(
+    app: DesktopApp,
+    session: PlayerSession,
+    keys: PlayerKeys,
+    onMenu: (Boolean) -> Unit,
+    onScrubbing: (Boolean) -> Unit,
+) {
     val position by session.position.collectAsState()
     val duration by session.duration.collectAsState()
     val paused by session.paused.collectAsState()
@@ -675,6 +685,7 @@ private fun Controls(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) 
         TrackMenu(session, onMenu, color = muted, hoverColor = white)
         ShaderMenu(app, session, onMenu)
         PanelButton(app, color = muted, hoverColor = white)
+        if (!isMac) FullscreenButton(keys, color = muted, hoverColor = white)
     }
 }
 
@@ -1124,6 +1135,19 @@ private fun PanelButton(app: DesktopApp, color: Color, hoverColor: Color) {
             color = color,
             hoverColor = hoverColor,
         ) { PanelIcon(it, shown = !hidden) }
+    }
+}
+
+@Composable
+private fun FullscreenButton(keys: PlayerKeys, color: Color, hoverColor: Color) {
+    val hint = if (keys.fullscreen) "Leave full screen" else "Full screen"
+    Hint(hint, "F") {
+        IconAction(
+            { keys.onToggleFullscreen() },
+            modifier = Modifier.semantics { contentDescription = hint },
+            color = color,
+            hoverColor = hoverColor,
+        ) { FullscreenIcon(it, full = keys.fullscreen) }
     }
 }
 

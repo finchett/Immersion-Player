@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.Dp
@@ -106,6 +107,29 @@ fun LineStopIcon(color: Color, diameter: Dp = 16.dp) {
         drawRoundRect(color, Offset(w * 0.04f, h * 0.44f), Size(w * 0.4f, h * 0.12f), radius)
         drawRoundRect(color, Offset(w * 0.54f, h * 0.2f), Size(w * 0.14f, h * 0.6f), radius)
         drawRoundRect(color, Offset(w * 0.8f, h * 0.2f), Size(w * 0.14f, h * 0.6f), radius)
+    }
+}
+
+/** Full screen: four corners bent outwards, or bent inwards to leave it while [full]. */
+@Composable
+fun FullscreenIcon(color: Color, full: Boolean, diameter: Dp = 16.dp) {
+    Canvas(Modifier.size(diameter)) {
+        val d = size.minDimension
+        val stroke = Stroke(d * 0.1f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val near = d * 0.12f
+        val far = d - near
+        val arm = d * 0.28f
+        for (x in listOf(near, far)) for (y in listOf(near, far)) {
+            // the arms run along the edges from each corner; leaving, they meet inside instead
+            val dx = if (x == near) arm else -arm
+            val dy = if (y == near) arm else -arm
+            val path = Path().apply {
+                moveTo(x + dx, y)
+                if (full) lineTo(x + dx, y + dy) else lineTo(x, y)
+                lineTo(x, y + dy)
+            }
+            drawPath(path, color, style = stroke)
+        }
     }
 }
 
