@@ -169,6 +169,29 @@ Both are on [releases](https://github.com/finchett/Immersion-Player/releases/lat
 - **macOS (Apple Silicon):** the `.dmg`. It isn't notarised, so the first launch needs
   right-click → Open, or `xattr -dr com.apple.quarantine "/Applications/Immersion Player.app"`.
 
+From 0.5 on, both apps keep themselves up to date. They check the latest release's `update.json`
+at launch and every six hours. When there's something new they download it in the background,
+check it against the feed's signature and SHA-256, and offer **What's new**.
+
+- **macOS** copies the new app out of the `.dmg` and swaps it in whenever the app quits (or at
+  once, with Restart now). This only happens where the app can write to its own folder, as in
+  /Applications; anywhere else it links to the release instead.
+- **Android** installs through PackageInstaller. The first update asks for "Install unknown apps"
+  and a confirmation. After that the app is its own installer, so updates go in without asking
+  (Android 12+) when it's put away off the player.
+
+### Release
+
+```sh
+./scripts/release.sh --try notes.md   # same files in dist/, feed on localhost, to try the update first
+./scripts/release.sh notes.md         # builds, signs and drafts the GitHub release
+gh release edit v0.5.0 --draft=false  # publishing is what sends the update
+```
+
+The version lives in `gradle.properties` (`appVersion`), and Android's versionCode is derived
+from it. The feed is signed with `~/.keystores/immersion-update.pem`, whose public half is in
+`core`'s `Updates`. Back that key up: installed apps accept no other.
+
 ### Build: Android
 
 ```sh

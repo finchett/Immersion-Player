@@ -17,10 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.io.RandomAccessFile
 
-/** Shown in settings; a packaged build carries the same number in its bundle (build.gradle.kts). */
-const val APP_VERSION = "0.4.0"
-
-/** App-wide services: settings, the dictionary, subtitle loading, Anki. */
+/** App-wide services: settings, the dictionary, subtitle loading, Anki, updates. */
 class DesktopApp(
     private val dataDir: File = AppDirs.data,
     private val cacheDir: File = AppDirs.cache,
@@ -36,6 +33,8 @@ class DesktopApp(
         mediaDir = File(cacheDir, "anki"),
         logError = ::logError,
     )
+    /** Started by main, so tests never touch the feed. */
+    val updater = Updater(cacheDir, dataDir, ::logError)
 
     private val _setupStatus = MutableStateFlow<String?>(null)
     /** Progress while a bundled dictionary is being installed, else null. */

@@ -28,6 +28,7 @@ import io.github.immersionplayer.ui.LibraryScreen
 import io.github.immersionplayer.ui.PlayerScreen
 import io.github.immersionplayer.ui.SettingsScreen
 import io.github.immersionplayer.ui.isVideo
+import io.github.immersionplayer.update.AppUpdateState
 import kotlinx.coroutines.android.awaitFrame
 import java.io.File
 
@@ -117,6 +118,15 @@ class MainActivity : ComponentActivity() {
 
     private fun MotionEvent.isInjected(): Boolean =
         deviceId <= 0 || device == null || device.isVirtual
+
+    /** Put away off the player: the moment a downloaded update can go in without interrupting anything. */
+    override fun onStop() {
+        super.onStop()
+        val updater = (application as App).updater
+        if (screen !is Screen.Player && updater.state.value is AppUpdateState.Ready && updater.installsSilently) {
+            updater.install(this)
+        }
+    }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)

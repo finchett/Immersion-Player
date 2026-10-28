@@ -19,6 +19,10 @@ fun loadKeystoreProps(): Properties? {
 
 val keystoreProps: Properties? = loadKeystoreProps()
 
+// from gradle.properties, shared with the desktop app; 0.5.0 is versionCode 500
+val appVersion = providers.gradleProperty("appVersion").get()
+val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+
 android {
     namespace = "io.github.immersionplayer"
     compileSdk = 36
@@ -27,8 +31,8 @@ android {
         applicationId = "io.github.immersionplayer"
         minSdk = 30
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4"
+        versionCode = appVersionCode
+        versionName = appVersion
         // on-device tests; run by hand (see androidTest), since connectedAndroidTest uninstalls the app after
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {

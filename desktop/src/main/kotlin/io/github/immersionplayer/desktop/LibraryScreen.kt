@@ -98,7 +98,13 @@ private fun locate(app: DesktopApp, folder: File?): Pair<File?, File?> {
  * above this one), and Settings. The folder's own name is the page title, so it isn't repeated.
  */
 @Composable
-fun LibraryHeader(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, onOpenSettings: () -> Unit) {
+fun LibraryHeader(
+    app: DesktopApp,
+    folder: File?,
+    onOpenFolder: (File) -> Unit,
+    onOpenSettings: () -> Unit,
+    onRestartToUpdate: () -> Unit = {},
+) {
     val (root, current) = locate(app, folder)
     val above = generateSequence(current?.takeIf { it != root }?.parentFile) { it.parentFile?.takeIf { _ -> it != root } }
         .takeWhile { root != null && it.path.startsWith(root.path) }
@@ -114,6 +120,7 @@ fun LibraryHeader(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, 
                 )
             }
         }
+        UpdatePill(app, onRestartToUpdate)
         IconAction(onClick = onOpenSettings) { Cog(it) }
     }
 }
