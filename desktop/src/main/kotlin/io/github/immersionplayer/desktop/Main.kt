@@ -351,7 +351,7 @@ private fun Browse(
         if (settings) {
             Chrome(
                 header = { SettingsHeader(pane) },
-                body = { SettingsBody(app, pane) },
+                body = { SettingsBody(app, pane, onRestartToUpdate) },
                 // the panes live in a sidebar that runs the whole height, under the lights
                 leading = {
                     SettingsSidebar(app, pane, onPane = { pane = it }, onBack = { navigate(library) }, onRestartToUpdate)
