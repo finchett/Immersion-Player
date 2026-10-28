@@ -67,6 +67,16 @@ jobs:
           echo 'Recommends: libtesseract5, tesseract-ocr-jpn' >> $control
           cat $control
           dpkg-deb --root-owner-group -b unpacked "dist/Immersion-Player-$version-linux-x64.deb"
+      - name: Install it and play something
+        # the package installs on a clean system, and the app finds libmpv and opens a video with it
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq ./dist/*.deb xvfb ffmpeg
+          ffmpeg -v error -f lavfi -i testsrc=duration=20:size=640x360:rate=24 -c:v libx264 test.mkv
+          timeout 30 xvfb-run -a "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app.log 2>&1 || true
+          cat app.log
+          cat ~/.local/share/immersion-player/errors.log 2>/dev/null || true
+          ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/immersion-player/errors.log 2>/dev/null
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64
