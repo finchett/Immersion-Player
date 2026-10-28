@@ -246,9 +246,11 @@ Other note types get a guess from their field names.
 - Desktop uses the same libmpv. It runs mpv's GPU renderer in an offscreen OpenGL context (CGL
   on macOS, WGL on Windows, EGL on Linux) and reads each frame back into the Compose window. If
   OpenGL can't be set up, mpv's software renderer draws into it directly (about 5 ms per 1080p
-  frame on Apple Silicon). A context can also be made and read back nothing, as on Linux without
-  a GPU: mpv's frames are opaque, so the first frames' alpha is checked, and if they come back
-  blank the player switches to software mid-playback. `-Prenderer=sw` forces the software one.
+  frame on Apple Silicon). Without a GPU, OpenGL is only emulated on the CPU (Mesa's llvmpipe and
+  the like), which is slower than mpv's software renderer and drew seams on llvmpipe, so it's
+  passed over. And should a context read back nothing, mpv's frames being opaque, the first
+  frames' alpha is checked and the player switches to software mid-playback. `-Prenderer=sw`
+  forces the software one.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
   Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
   Auto, Fast or Best. They need the GPU renderer, so they're unavailable where it falls back to
