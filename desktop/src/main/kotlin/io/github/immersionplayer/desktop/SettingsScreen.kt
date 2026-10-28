@@ -75,8 +75,6 @@ import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.dictionary.YomitanImporter
 import io.github.immersionplayer.subs.SubtitleFiles
 import io.github.immersionplayer.ui.AppTheme
-import io.github.immersionplayer.ui.SystemDark
-import io.github.immersionplayer.ui.SystemLight
 import io.github.immersionplayer.ui.NoteTypeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -383,22 +381,7 @@ private fun AppearancePane(app: DesktopApp) {
     val settings = app.settings
     Section("Theme") {
         Card {
-            // System first, then every theme, four to a row
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                (listOf<AppTheme?>(null) + AppTheme.entries).chunked(4).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        row.forEach { theme ->
-                            Swatch(theme?.label ?: "System", theme, settings.theme == theme, Modifier.weight(1f)) {
-                                settings.updateTheme(theme)
-                            }
-                        }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
-                }
-            }
+            ThemePicker(settings, Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp))
         }
     }
     Section("Video") {
@@ -971,54 +954,6 @@ private fun Arrow(glyph: String, enabled: Boolean, onClick: () -> Unit) {
         style = MaterialTheme.typography.labelSmall,
         modifier = Modifier.width(20.dp),
     )
-}
-
-/** A theme as a tile of its own colours; [theme] null is the one that follows the system. */
-@Composable
-internal fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val fill = theme?.scheme?.background
-    val sample = theme?.scheme?.onBackground ?: Color(0xFF6E8A7D)
-    Column(
-        modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Box(
-            Modifier.fillMaxWidth()
-                .border(2.dp, if (selected) scheme.primary else Color.Transparent, RoundedCornerShape(11.dp))
-                .padding(2.dp)
-                .aspectRatio(2.1f)
-                .clip(RoundedCornerShape(7.dp))
-                .background(
-                    if (fill != null) Brush.linearGradient(0f to fill, 1f to fill)
-                    // the system tile is split: the light theme on one side, the dark on the other
-                    else Brush.horizontalGradient(
-                        0f to SystemLight.scheme.background, 0.5f to SystemLight.scheme.background,
-                        0.5f to SystemDark.scheme.background, 1f to SystemDark.scheme.background,
-                    ),
-                )
-                .border(1.dp, scheme.hairline, RoundedCornerShape(7.dp)),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            Text(
-                "あ Aa",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = sample,
-                maxLines = 1,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-        }
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-            color = if (selected) scheme.primary else scheme.onSurfaceVariant,
-            maxLines = 1,
-        )
-    }
 }
 
 @Composable

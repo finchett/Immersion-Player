@@ -11,6 +11,8 @@ import io.github.immersionplayer.anki.CardTarget
 import io.github.immersionplayer.library.Titles
 import io.github.immersionplayer.library.isVideoName
 import io.github.immersionplayer.ui.AppTheme
+import io.github.immersionplayer.ui.ThemeFamily
+import io.github.immersionplayer.ui.ThemeMode
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
@@ -50,9 +52,23 @@ class Settings(node: String = System.getProperty("immersion.prefs") ?: "io/githu
     private val prefs = Preferences.userRoot().node(node)
     private val videos = prefs.node("videos")
 
-    /** A fixed theme, or null to follow the system's light/dark appearance. */
-    var theme by mutableStateOf(AppTheme.entries.firstOrNull { it.name == prefs.get("theme", null) })
+    /**
+     * The theme family, and whether it's shown light, dark or as the system is. Before families
+     * there was one theme, or none to follow the system, kept as "theme"; that carries over.
+     */
+    var themeFamily by mutableStateOf(
+        ThemeFamily.entries.firstOrNull { it.name == prefs.get("theme_family", null) }
+            ?: oldTheme()?.let(ThemeFamily::of) ?: ThemeFamily.Jade,
+    )
         private set
+    var themeMode by mutableStateOf(
+        ThemeMode.entries.firstOrNull { it.name == prefs.get("theme_mode", null) }
+            ?: oldTheme()?.let { if (ThemeFamily.of(it).dark == it) ThemeMode.Dark else ThemeMode.Light } ?: ThemeMode.Auto,
+    )
+        private set
+
+    private fun oldTheme() = AppTheme.entries.firstOrNull { it.name == prefs.get("theme", null) }
+
     var subtitleSize by mutableStateOf(prefs.getFloat("subtitle_size", 30f))
         private set
     var panelFraction by mutableStateOf(prefs.getFloat("panel_fraction", 0.36f))
@@ -156,10 +172,8 @@ class Settings(node: String = System.getProperty("immersion.prefs") ?: "io/githu
     fun updateAnkiImageAnimated(value: Boolean) { ankiImageAnimated = value; prefs.putBoolean("anki_image_animated", value) }
     fun updateAnkiImageHeight(value: Int) { ankiImageHeight = value; prefs.putInt("anki_image_height", value) }
 
-    fun updateTheme(value: AppTheme?) {
-        theme = value
-        if (value == null) prefs.remove("theme") else prefs.put("theme", value.name)
-    }
+    fun updateThemeFamily(value: ThemeFamily) { themeFamily = value; prefs.put("theme_family", value.name) }
+    fun updateThemeMode(value: ThemeMode) { themeMode = value; prefs.put("theme_mode", value.name) }
     fun updateSubtitleSize(value: Float) { subtitleSize = value; prefs.putFloat("subtitle_size", value) }
     fun updatePanelFraction(value: Float) { panelFraction = value; prefs.putFloat("panel_fraction", value) }
     fun updateAutoPause(value: Boolean) { autoPause = value; prefs.putBoolean("auto_pause", value) }

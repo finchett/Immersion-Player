@@ -191,21 +191,9 @@ private fun ColumnScope.LookStep(app: DesktopApp) {
     Eyebrow("Step 1 of 4")
     Headline("Pick a look")
     Spacer(Modifier.height(10.dp))
-    Body("Your eyes, your call. System follows your computer's light and dark mode.")
+    Body("Your eyes, your call. Auto follows your computer's light and dark mode.")
     Spacer(Modifier.height(26.dp))
-    val settings = app.settings
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        (listOf<AppTheme?>(null) + AppTheme.entries).chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                row.forEach { theme ->
-                    Swatch(theme?.label ?: "System", theme, settings.theme == theme, Modifier.weight(1f)) {
-                        settings.updateTheme(theme)
-                    }
-                }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
+    ThemePicker(app.settings)
 }
 
 @Composable
