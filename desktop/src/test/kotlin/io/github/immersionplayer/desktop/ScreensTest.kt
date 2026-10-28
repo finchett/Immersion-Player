@@ -116,6 +116,10 @@ class ScreensTest {
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Media folder").fetchSemanticsNodes().isNotEmpty() }
                 SettingsPane.entries.forEach { entry ->
                     pane = entry
+                    // About's notes come from GitHub; given a moment, the picture shows them
+                    if (entry == SettingsPane.About) {
+                        runCatching { waitUntil(timeoutMillis = 8_000) { onAllNodesWithText("Fetching the notes…").fetchSemanticsNodes().isEmpty() } }
+                    }
                     waitForIdle()
                     Thread.sleep(150)
                     waitForIdle()
@@ -123,7 +127,11 @@ class ScreensTest {
                         ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "settings-${entry.name.lowercase()}.png"))
                     }
                 }
+                // About tells the version and what it brought (or why it can't, offline)
+                assertTrue(onAllNodesWithText("What's new in $APP_VERSION", ignoreCase = true).fetchSemanticsNodes().isNotEmpty())
                 // the sidebar switches panes, and the keys pane really is the keys
+                pane = SettingsPane.Keyboard
+                waitForIdle()
                 assertTrue(onAllNodesWithText("Full screen").fetchSemanticsNodes().isNotEmpty())
                 pane = SettingsPane.Dictionaries
                 waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("Test dictionary").fetchSemanticsNodes().isNotEmpty() }

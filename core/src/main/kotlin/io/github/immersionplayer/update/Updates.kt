@@ -26,11 +26,24 @@ class UpdateRelease(val version: String, val page: String, val notes: String, va
 object Updates {
     const val FEED = "https://github.com/finchett/Immersion-Player/releases/latest/download/update.json"
     const val RELEASES_PAGE = "https://github.com/finchett/Immersion-Player/releases/latest"
+    const val REPO_PAGE = "https://github.com/finchett/Immersion-Player"
+    const val ISSUES_PAGE = "$REPO_PAGE/issues"
+
+    fun releasePage(version: String) = "$REPO_PAGE/releases/tag/v$version"
 
     /** Public halves of the release keys (P-256, X.509, base64). Add the new one here before retiring an old one. */
     private val KEYS = listOf(
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDV2/PZWIw9VCxiBgeTVzPdTbN22KuwFFISJapNc93RTsYp88UeBeg5Pd6Nlm7MZ+ku95EXcUU6Baltuo0etYMQ==",
     )
+
+    /**
+     * [version]'s notes as its GitHub release gives them, or null if they can't be had. Not
+     * signed like the feed, so only ever shown, never acted on.
+     */
+    fun releaseNotes(version: String): String? = runCatching {
+        val release = JSONObject(String(fetch("https://api.github.com/repos/finchett/Immersion-Player/releases/tags/v$version"), Charsets.UTF_8))
+        release.optString("body").takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     /** Fetches and verifies the latest release's update.json (and its .sig beside it). */
     fun latest(feed: String = FEED): UpdateRelease {

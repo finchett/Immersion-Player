@@ -37,6 +37,24 @@ class Updater(cacheDir: File, dataDir: File, private val logError: (String, Thro
 
     /** The notes of the update on its way, for its first launch. */
     val whatsNew = WhatsNew(File(dataDir, "whats-new.json"))
+    private val notesDir = File(dataDir, "release-notes")
+
+    /**
+     * What's new in the running version, for Settings › About: the notes that came with its update
+     * if they're still waiting, else a copy kept from before, else its GitHub release's (kept for
+     * next time). Null if none can be had. Slow the first time; call it off the UI thread.
+     */
+    fun currentNotes(): String? {
+        whatsNew.pending(APP_VERSION)?.let { return it }
+        val kept = File(notesDir, "$APP_VERSION.md")
+        if (kept.isFile) return kept.readText()
+        return Updates.releaseNotes(APP_VERSION)?.also { notes ->
+            runCatching {
+                notesDir.mkdirs()
+                kept.writeText(notes)
+            }
+        }
+    }
 
     private val dir = File(cacheDir, "updates")
     private val stagedDir = File(dir, "staged")

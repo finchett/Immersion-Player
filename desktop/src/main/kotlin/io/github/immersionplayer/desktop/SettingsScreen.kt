@@ -90,6 +90,8 @@ enum class SettingsPane(val label: String) {
     Appearance("Appearance"),
     Anki("Anki"),
     Keyboard("Keyboard"),
+    /** Opened from the app's name at the foot of the sidebar, not listed with the rest. */
+    About("About"),
 }
 
 private val SidebarWidth = 216.dp
@@ -133,14 +135,30 @@ fun SettingsSidebar(
                 )
             }
             Column(Modifier.padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SettingsPane.entries.forEach { entry ->
+                SettingsPane.entries.filter { it != SettingsPane.About }.forEach { entry ->
                     NavItem(entry.label, selected = entry == pane, onClick = { onPane(entry) })
                 }
             }
             Spacer(Modifier.weight(1f))
             HorizontalDivider(color = MaterialTheme.colorScheme.hairline)
+            // the app's name and version open About, lit like a selected pane while it's open
+            val interaction = remember { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
+            val about = pane == SettingsPane.About
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(6.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        when {
+                            about -> MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
+                            hovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+                            else -> Color.Transparent
+                        },
+                    )
+                    .hoverable(interaction)
+                    .clickable(interaction, indication = null) { onPane(SettingsPane.About) }
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -172,7 +190,7 @@ fun SettingsSidebar(
 
 /** The open pane: its settings as cards of rows, a section heading above each card. */
 @Composable
-fun SettingsBody(app: DesktopApp, pane: SettingsPane) {
+fun SettingsBody(app: DesktopApp, pane: SettingsPane, onRestartToUpdate: () -> Unit = {}) {
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Column(
             Modifier.widthIn(max = ContentWidth).padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 40.dp),
@@ -185,6 +203,7 @@ fun SettingsBody(app: DesktopApp, pane: SettingsPane) {
                 SettingsPane.Appearance -> AppearancePane(app)
                 SettingsPane.Anki -> AnkiPane(app)
                 SettingsPane.Keyboard -> KeyboardPane()
+                SettingsPane.About -> AboutPane(app, onRestartToUpdate)
             }
         }
     }
