@@ -1,41 +1,105 @@
+<div align="center">
+
+<img src="desktop/src/main/resources/icon.png" width="120" alt="">
+
 # Immersion Player
 
-**A Japanese video player where the subtitle line is the interface.**
+**Learn Japanese from the shows you love.**
 
-[![Licence: MPL-2.0](https://img.shields.io/badge/licence-MPL--2.0-blue)](LICENSE)
-![Android 11+](https://img.shields.io/badge/Android-11%2B-3ddc84)
-![arm64-v8a](https://img.shields.io/badge/abi-arm64--v8a-lightgrey)
-![macOS 12+](https://img.shields.io/badge/macOS-12%2B%20Apple%20Silicon-lightgrey)
+A video player with a Japanese dictionary built into the subtitles.<br>
+Point at a word and it's looked up. Step back a line and hear it again. Keep the ones you want as Anki cards.
 
-A video player for Android and macOS with a Japanese dictionary built in. The video plays on one side; the
-current line sits on the other with a word already looked up. Tap another word, drag across a
-phrase, hold for the English, swipe to step back a line and hear it again.
+[![Download for Mac](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-245D4E?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
+[![Download for Android](https://img.shields.io/badge/Download-Android-245D4E?style=for-the-badge&logo=android&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
 
-![Stepping through lines while the video plays](docs/loop.gif)
+[![Latest release](https://img.shields.io/github/v/release/finchett/Immersion-Player?label=latest&color=8FCFB4)](https://github.com/finchett/Immersion-Player/releases/latest)
+[![Licence: MPL-2.0](https://img.shields.io/badge/licence-MPL--2.0-8FCFB4)](LICENSE)
+![macOS 12+](https://img.shields.io/badge/macOS-12%2B-lightgrey)
+![Android 11+](https://img.shields.io/badge/Android-11%2B-lightgrey)
 
-## Android: no buttons
+</div>
 
-Every action is a gesture. The app lists them once, on first run.
+<br>
 
-| Where | Gesture | Does |
-|---|---|---|
-| Video | tap | play / pause |
-| Video | double-tap left or right edge | −5 s / +5 s, and keep tapping to stack |
-| Video | drag sideways | scrub — move up or down mid-drag to scrub faster |
-| Video | pinch | fill the area, or fit the whole picture |
-| Video (paused) | tap or drag the bottom line | seek |
-| Line | tap a word | look it up |
-| Line | drag across the text | look up exactly what you selected |
-| Line | hold | show the English translation |
-| Panel | swipe sideways | previous / next line (back from a stop replays the line first) |
-| Panel | tap | play / pause |
-| Panel | double-tap | stop at the end of every line, on or off |
-| Divider | drag | resize the video and the panel; held sideways, past the screen's edge the panel goes and the video takes it all, with plain subtitles, for just watching (back, or the swipe in from a side, brings the panel back; so does dragging in from the middle of that edge). Upright the panel always stays |
-| Shoulder triggers | press | previous / next line (RedMagic, see below) |
+![Sintel playing, with the current line beside it and 物心 looked up from it](docs/screenshots/player.webp)
 
-![Portrait mode, with the same line shown as Japanese and then held to reveal the English](docs/portrait.png)
+<br>
 
-## Desktop: keys
+Immersion learning works: watch a lot of Japanese you enjoy, and look up what you don't know.
+The trouble is the looking up. Pausing, copying a line into a dictionary, finding the word,
+finding your place again. Immersion Player takes all of that out. The line being spoken sits
+beside the video with a word already looked up, and every other word is a click away.
+
+## Features
+
+### Every word, one click away
+
+Click a word, or drag across a phrase, and its entry appears. The lookup finds the longest word
+at the point you chose and undoes the grammar on the way, so 探しているんです brings up 探す,
+and 食べさせられなかった brings up 食べる, with the steps shown. Hold **i** to peek at the line in
+English.
+
+Put the panel away with **s** and the line sits over the video instead. Point at a word there and
+it's looked up in place.
+
+![The line over the video, with 探す looked up from 探しているんです](docs/screenshots/over-video.webp)
+
+### Made for studying
+
+- **Step through lines.** **h** and **l** go back and forward a line, **;** plays this one again. Turn
+  on *stop at the end of every line* and the video waits for you after each one.
+- **Your dictionaries.** JMdict comes built in. Add Jitendex, JPDB frequencies, pitch accent and
+  anything else in Yomitan format, and their entries render in full: structured content, example
+  sentences, frequency tags.
+- **Anki cards in one key.** Press **a** and the word goes to Anki with the sentence, its audio, a
+  moving clip or a still of the scene, the reading as furigana and its pitch accent. Works with
+  any note type, and knows the popular *Japanese sentences* one field by field.
+- **Subtitles from anywhere.** Sidecar files, or the tracks inside the video: SRT, ASS, WebVTT, and
+  even Blu-ray picture subtitles, read with OCR as they come up.
+
+### Your library, ready to watch
+
+Point it at the folder your shows live in. Each folder becomes a series with a cover, episodes
+sort the way you'd expect (2 before 10), release tags like `[Group] 1080p` are tidied away, and
+it remembers where you stopped. When an episode ends, it offers the next.
+
+![The library: Big Buck Bunny, Caminandes, Elephants Dream, Sintel and Tears of Steel](docs/screenshots/library.png)
+
+### Set up in a minute
+
+The first launch walks you through it: pick a look, choose your video folder, tick the
+dictionaries you want (they download and install while you carry on), and connect Anki if you
+use it.
+
+![The welcome's dictionary step, with Jitendex and JPDB frequency ticked](docs/screenshots/welcome.png)
+
+### Make it yours
+
+Themes in light and dark pairs that follow your Mac's appearance, or stay put: Jade, Sakura,
+Nord, Paper, GNOME's Adwaita and KDE's Breeze, plus OLED Black for the darkest rooms. Anime4K's upscaling
+shaders come built in, with a preset picked to suit your GPU.
+
+![Settings › Appearance in the dark Jade theme](docs/screenshots/themes.png)
+
+### Always up to date
+
+New versions download in the background and install when you quit, with a note on what's new.
+Every update is signed and checked before it goes in.
+
+## Get it
+
+Download from the [latest release](https://github.com/finchett/Immersion-Player/releases/latest).
+
+- **Mac (Apple Silicon, macOS 12 or newer):** open the `.dmg` and drag the app to Applications. It
+  isn't notarised yet, so the first time, right-click it and choose **Open**, or run
+  `xattr -dr com.apple.quarantine "/Applications/Immersion Player.app"`.
+- **Android (arm64, Android 11 or newer):** install the `.apk`.
+- **Windows and Linux:** the app runs on both, but there are no downloads yet. They're on the way.
+
+Found a bug, or wish it did something? [Open an issue](https://github.com/finchett/Immersion-Player/issues).
+It's young and changing quickly, and feedback shapes what comes next.
+
+## Keys (desktop)
 
 | Key | Does |
 |---|---|
@@ -47,9 +111,9 @@ Every action is a gesture. The app lists them once, on first run.
 | y / o | seek 5 s back / forward |
 | n / m | shift subtitles 0.1 s earlier / later |
 | u | stop at the end of every line, on or off (also the button under the panel) |
-| s | put the panel away, or bring it back: the line goes over the video, where pointing at a word looks it up, and the controls keep out of sight until the pointer reaches the top, a side, or the strip under the line |
+| s | put the panel away, or bring it back: the line goes over the video, where pointing at a word looks it up |
 | z, or ⌘ + scroll | fill the area, or fit the whole picture |
-| f, or double-click | full screen |
+| f, F11, or double-click | full screen |
 | ⌘ (or Ctrl) + 1–6 | Anime4K mode A, B, C, A+A, B+B, C+A (turns it on at Auto if it's off) |
 | ⌘ (or Ctrl) + 0 | Anime4K off |
 | Esc | close a lookup over the video, leave full screen, then back to the library |
@@ -58,24 +122,72 @@ Every action is a gesture. The app lists them once, on first run.
 | Return | at the end of a video, play the next one in its folder |
 
 Paused, `l` and `k` carry on playing rather than skipping ahead; press again once it plays to
-jump to the next line. (A swipe on Android always jumps, since a tap there already means play.)
-`h` and `l` also hold off `u` (stop at the end of every line), so the video runs on until you ask
-for a stop again with `j`, `k` or `;`.
+jump to the next line. `h` and `l` also hold off `u`, so the video runs on until you ask for a
+stop again with `j`, `k` or `;`.
 
-## Dictionaries
+## Android: no buttons
+
+On a phone every action is a gesture, and the app lists them once, on first run.
+
+![Stepping through lines while the video plays, on Android](docs/loop.gif)
+
+| Where | Gesture | Does |
+|---|---|---|
+| Video | tap | play / pause |
+| Video | double-tap left or right edge | −5 s / +5 s, and keep tapping to stack |
+| Video | drag sideways | scrub; move up or down mid-drag to scrub faster |
+| Video | pinch | fill the area, or fit the whole picture |
+| Video (paused) | tap or drag the bottom line | seek |
+| Line | tap a word | look it up |
+| Line | drag across the text | look up exactly what you selected |
+| Line | hold | show the English translation |
+| Panel | swipe sideways | previous / next line (back from a stop replays the line first) |
+| Panel | tap | play / pause |
+| Panel | double-tap | stop at the end of every line, on or off |
+| Divider | drag | resize the video and the panel. Sideways, drag it past the screen's edge and the video takes it all, with plain subtitles, for just watching; back brings the panel back |
+| Shoulder triggers | press | previous / next line (RedMagic, see below) |
+
+![Portrait mode, with the same line shown as Japanese and then held to reveal the English](docs/portrait.png)
+
+<details>
+<summary><b>Shoulder triggers on RedMagic phones</b></summary>
+
+Maps the two capacitive triggers to previous/next line. Off by default, needs
+[Shizuku](https://shizuku.rikka.app/), advanced settings.
+
+They report `KEY_F7`/`KEY_F8` but the events never reach an app: the sensors are unpowered unless
+Nubia's game settings are on, and Nubia's game service consumes the keys first. The app therefore
+bypasses the input stack. While a video is open, a Shizuku user service (shell privilege) enables
+the sensors, re-applies the setting every second because Nubia resets it, and reads the device
+nodes with `getevent`. Settings are restored on exit.
+
+Shizuku has to be started again after every reboot; the app's permission persists. Nothing else
+in the app uses it. Approach from [RedTrigger](https://github.com/zampierilucas/RedTrigger).
+
+</details>
+
+## How it works
+
+<details>
+<summary><b>Dictionaries</b></summary>
 
 - Imports Yomitan/Rikaitan zips: term banks, frequency lists, pitch accent. Structured content is
   rendered, not flattened.
-- JMdict is bundled and installs on first launch. Stored in SQLite, searched on device.
+- JMdict is bundled and installs on first launch. Jitendex, JPDB frequency and JMnedict are
+  offered at first launch and downloaded from where their makers publish them. Stored in SQLite,
+  searched on device.
 - Lookup takes the longest match at the point you touched and deinflects:
   食べさせられなかった → 食べる, with the chain shown in the entry.
-- Every new line is looked up automatically — first kanji found, skipping speaker names and
+- Every new line is looked up automatically: first kanji found, skipping speaker names and
   bracketed readings, falling through candidates until one hits.
 
-## Anki cards
+</details>
 
-Off by default; turn it on under Settings › Anki. Tap or click the round **+** on a dictionary
-entry (or press `a` on desktop) and the word goes to Anki with:
+<details>
+<summary><b>Anki cards</b></summary>
+
+Off by default; turn it on under Settings › Anki (or in the welcome). Tap or click the round **+**
+on a dictionary entry (or press `a` on desktop) and the word goes to Anki with:
 
 - the line, the word in bold, and the peek-language line as its translation
 - the word, its reading as Anki furigana, pitch accent graphs, and a short definition ("first day, opening day or premiere"; the full one is an option)
@@ -102,30 +214,31 @@ its [example deck on AnkiWeb](https://ankiweb.net/shared/info/1557722832) or fro
 [Ajatt-Tools](https://github.com/Ajatt-Tools/AnkiNoteTypes/tree/main/templates/Japanese%20sentences).
 Other note types get a guess from their field names.
 
-## Playback
+</details>
+
+<details>
+<summary><b>Playback</b></summary>
 
 - libmpv, from [mpv-android](https://github.com/mpv-android/mpv-android)'s prebuilt binaries.
   Needed because much of what you'll play is 10-bit H.264, which Android's hardware decoders
-  don't support and its software decoder refuses — a `MediaCodec` player shows a black rectangle.
+  don't support and its software decoder refuses: a `MediaCodec` player shows a black rectangle.
 - Desktop uses the same libmpv. It runs mpv's GPU renderer in an offscreen OpenGL context (CGL
   on macOS, WGL on Windows, EGL on Linux) and reads each frame back into the Compose window. If
   OpenGL can't be set up, mpv's software renderer draws into it directly (about 5 ms per 1080p
-  frame on Apple Silicon). `-Prenderer=sw` forces the software one. The macOS and Linux paths
-  have been run (Linux in a container, on Mesa's software rasteriser); Windows hasn't yet.
+  frame on Apple Silicon). `-Prenderer=sw` forces the software one. Windows and Linux have run in
+  VMs without a GPU, on the software renderer.
 - [Anime4K](https://github.com/bloc97/Anime4K) v4 shaders are bundled. Pick a preset under
   Settings › Appearance › Shaders, or from the shader button on the video's controls: Off,
   Auto, Fast or Best. They need the GPU renderer, so they're unavailable where it falls back to
   software.
   - Fast runs Anime4K's smaller networks, and Best its largest (its own HQ setup).
-  - Auto makes an educated guess from the GPU's name, as its OpenGL driver reports it, so nobody
-    has to work out what their machine can run. For NVIDIA, AMD and Intel it follows Anime4K's
-    own guidance: Best from about a GTX 1080, RTX 2060, RX 590, Vega 56, RX 5600 or 6600, or
-    Arc A580; Fast below that and for integrated graphics. Apple GPUs are judged by their core
-    count against about 12 TFLOPS, roughly that same bar, so the larger Max GPUs (M2 Max 38-core
+  - Auto makes an educated guess from the GPU's name, as its OpenGL driver reports it. For NVIDIA,
+    AMD and Intel it follows Anime4K's own guidance: Best from about a GTX 1080, RTX 2060, RX 590,
+    Vega 56, RX 5600 or 6600, or Arc A580; Fast below that and for integrated graphics. Apple GPUs
+    are judged by their core count against about 12 TFLOPS, so the larger Max GPUs (M2 Max 38-core
     and up) and the Ultras get Best. Anything it doesn't recognise gets Fast.
   - The mode follows the video's resolution, as Anime4K's instructions suggest: A for 1080p, B
-    for 720p, C for 480p. Under Advanced, or with ⌘ + 1–6, you can pick any of its six modes
-    instead.
+    for 720p, C for 480p. Under Advanced, or with ⌘ + 1–6, you can pick any of its six modes.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly: Matroska EBML walked in-app, zlib-compressed
   tracks handled, SRT/ASS/SSA/WebVTT parsed. Sidecar files beat embedded tracks. Cached per file.
@@ -135,43 +248,19 @@ Other note types get a guess from their field names.
   file, and each line's text is read as it comes up, a few lines ahead, with the rest filled in
   the background (about 50 ms a line on an M-series Mac). The text is kept, so a second viewing
   needs no OCR.
-- Tracks are picked by the languages set in settings on both platforms, audio included; a track
-  chosen for one video (the cog in the player) still overrides that for it. Tags are checked
-  against the text: each line votes by script, so a Japanese track tagged `eng` is still found,
-  an English track with Japanese song lyrics stays English, and one tagged `und` is judged by its
-  text alone.
+- Tracks are picked by the languages set in settings, audio included; a track chosen for one
+  video (the cog in the player) still overrides that for it. Tags are checked against the text:
+  each line votes by script, so a Japanese track tagged `eng` is still found, an English track
+  with Japanese song lyrics stays English, and one tagged `und` is judged by its text alone.
 
-![The library, with thumbnails and resume positions](docs/library.png)
+</details>
 
-The library groups a folder of shows, sorts episodes in natural order, remembers where you
-stopped, and offers the next episode when one ends. It also opens videos handed to it by other
-apps.
+<details>
+<summary><b>Updates</b></summary>
 
-## Shoulder triggers (RedMagic)
-
-Maps the two capacitive triggers to previous/next line. Off by default, needs
-[Shizuku](https://shizuku.rikka.app/), advanced settings.
-
-They report `KEY_F7`/`KEY_F8` but the events never reach an app: the sensors are unpowered unless
-Nubia's game settings are on, and Nubia's game service consumes the keys first. The app therefore
-bypasses the input stack. While a video is open, a Shizuku user service (shell privilege) enables
-the sensors, re-applies the setting every second because Nubia resets it, and reads the device
-nodes with `getevent`. Settings are restored on exit.
-
-Shizuku has to be started again after every reboot; the app's permission persists. Nothing else
-in the app uses it. Approach from [RedTrigger](https://github.com/zampierilucas/RedTrigger).
-
-## Install
-
-Both are on [releases](https://github.com/finchett/Immersion-Player/releases/latest).
-
-- **Android:** the APK.
-- **macOS (Apple Silicon):** the `.dmg`. It isn't notarised, so the first launch needs
-  right-click → Open, or `xattr -dr com.apple.quarantine "/Applications/Immersion Player.app"`.
-
-From 0.5 on, both apps keep themselves up to date. They check the latest release's `update.json`
-at launch and every six hours. When there's something new they download it in the background,
-check it against the feed's signature and SHA-256, and offer **What's new**.
+Both apps check the latest release's `update.json` at launch and every six hours. When there's
+something new they download it in the background, check it against the feed's signature and
+SHA-256, and offer **What's new**.
 
 - **macOS** copies the new app out of the `.dmg` and swaps it in whenever the app quits (or at
   once, with Restart now). This only happens where the app can write to its own folder, as in
@@ -180,17 +269,24 @@ check it against the feed's signature and SHA-256, and offer **What's new**.
   and a confirmation. After that the app is its own installer, so updates go in without asking
   (Android 12+) when it's put away off the player.
 
-### Release
+</details>
+
+## Development
+
+### Build: desktop
 
 ```sh
-./scripts/release.sh --try notes.md   # same files in dist/, feed on localhost, to try the update first
-./scripts/release.sh notes.md         # builds, signs and drafts the GitHub release
-gh release edit v0.5.0 --draft=false  # publishing is what sends the update
+brew install mpv tesseract                # libmpv and libtesseract, found at run time
+./gradlew :desktop:run
+./gradlew :desktop:packageMacRelease      # desktop/build/release/*.dmg, libmpv bundled
 ```
 
-The version lives in `gradle.properties` (`appVersion`), and Android's versionCode is derived
-from it. The feed is signed with `~/.keystores/immersion-update.pem`, whose public half is in
-`core`'s `Updates`. Back that key up: installed apps accept no other.
+Packaging copies Homebrew's libmpv and libtesseract, and the libraries they load, into the app
+and relinks them, so the result doesn't need Homebrew. Only macOS on Apple Silicon is packaged
+so far.
+
+To try a first launch without touching your own settings, run a packaged build with
+`JAVA_TOOL_OPTIONS="-Duser.home=/tmp/fresh -Dimmersion.prefs=io/github/immersionplayer-fresh"`.
 
 ### Build: Android
 
@@ -205,21 +301,21 @@ Needs JDK 17, Android SDK platform 36, and an arm64 device on Android 11 or newe
 
 The native libraries are not committed. `app/src/main/java/is/xyz/mpv/MPVLib.kt` is vendored
 unchanged from the same mpv-android tag, because the prebuilt `libplayer.so` binds to that exact
-class — keep the two in step when you update either.
+class: keep the two in step when you update either.
 
-### Build: desktop
+### Release
 
 ```sh
-brew install mpv tesseract                # libmpv and libtesseract, found at run time
-./gradlew :desktop:run
-./gradlew :desktop:packageMacRelease      # desktop/build/release/*.dmg, libmpv bundled
+./scripts/release.sh --try notes.md   # same files in dist/, feed on localhost, to try the update first
+./scripts/release.sh notes.md         # builds, signs and drafts the GitHub release
+gh release edit v0.6.0 --draft=false  # publishing is what sends the update
 ```
 
-Packaging copies Homebrew's libmpv and libtesseract, and the libraries they load, into the app
-and relinks them, so the result doesn't need Homebrew. Only macOS on Apple Silicon is packaged; the code has no
-macOS-only parts besides the traffic-light placement, but Windows and Linux are untested.
+The version lives in `gradle.properties` (`appVersion`), and Android's versionCode is derived
+from it. The feed is signed with `~/.keystores/immersion-update.pem`, whose public half is in
+`core`'s `Updates`. Back that key up: installed apps accept no other.
 
-## Tests
+### Tests
 
 ```sh
 ./gradlew :core:test
@@ -237,7 +333,10 @@ IMMERSION_TEST_EN_ASS=episode.en.ass \  # ffmpeg -i episode.mkv -map 0:s:<en> -c
 ./gradlew :core:test
 ```
 
-## Debugging
+The screenshots above come from `ReadmeScreenshots`, which renders the real screens at twice
+the size; its header says what it needs.
+
+### Debugging
 
 Some phones quietly disable logcat for third-party apps, so crashes go to `files/last_crash.txt`
 and lookup failures to `files/errors.log`:
@@ -246,16 +345,17 @@ and lookup failures to `files/errors.log`:
 adb shell run-as io.github.immersionplayer cat files/last_crash.txt
 ```
 
-## Layout
+### Layout
 
 ```
 core/       plain Kotlin/JVM, shared by every platform
   subs/        SRT/ASS parsers, Matroska extractor, embedded-track cache, PGS decoding and
                line-by-line OCR (the engine is each platform's)
   media/       audio tracks as mpv lists them
-  dictionary/  Yomitan importer, SQLite store (behind Sql), deinflector, lookup
+  dictionary/  Yomitan importer, SQLite store (behind Sql), deinflector, lookup, catalogue
   mining/      card model and store for Anki export
   library/     natural sort, video names
+  update/      the signed update feed
 shared-ui/  Compose shared by both apps: dictionary panel, glossary renderer, themes
 app/        Android
   player/      MpvView (libmpv surface), PlayerSession (playback state, line stepping)
@@ -264,8 +364,8 @@ app/        Android
   triggers/    Shizuku user service for the RedMagic shoulder buttons
   ui/          library, player, settings
 desktop/    Compose Desktop
-  mpv/         libmpv over JNA, software-rendered into a Skia bitmap
-               library, player, settings, macOS window chrome
+  mpv/         libmpv over JNA, rendered offscreen into a Skia bitmap
+               library, player, settings, welcome, window chrome for each OS
 ```
 
 ## Limitations
@@ -308,6 +408,18 @@ planned for every platform, after which the apps are MPL-2.0 with LGPL libraries
   [Tesseract4Android](https://github.com/adaptech-cz/Tesseract4Android), Apache-2.0; its
   Leptonica is BSD-2-Clause.
 
-The footage in the screenshots is
-[Build your first WebAuthn app](https://www.youtube.com/watch?v=8ren54IMSf4) by Eiji Kitamura for
-Chrome for Developers, used under CC BY 3.0, with its own Japanese and English subtitle tracks.
+### Screenshots
+
+- The desktop screenshots show Blender Foundation's open movies, all under Creative Commons
+  Attribution: [Sintel](https://durian.blender.org/) (© Blender Foundation, CC BY 3.0, with its
+  official Japanese subtitles), [Big Buck Bunny](https://peach.blender.org/) (CC BY 3.0),
+  [Elephants Dream](https://orange.blender.org/) (CC BY 2.5),
+  [Tears of Steel](https://mango.blender.org/) (CC BY 3.0) and
+  [Caminandes: Gran Dillama](https://commons.wikimedia.org/wiki/File:Caminandes_-_Gran_Dillama_-_Blender_Foundation%27s_new_Open_Movie.webm)
+  (CC BY). The dictionary entries in
+  them are from [Jitendex](https://jitendex.org/) (CC BY-SA 4.0) and JMdict, with
+  [JPDB](https://jpdb.io/) frequencies.
+- The Android screenshots show
+  [Build your first WebAuthn app](https://www.youtube.com/watch?v=8ren54IMSf4) by Eiji Kitamura
+  for Chrome for Developers, used under CC BY 3.0, with its own Japanese and English subtitle
+  tracks.
