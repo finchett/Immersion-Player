@@ -62,6 +62,7 @@ fun main(args: Array<String>) {
     if (isLinux) setLinuxWindowClass()
     Thread({ app.prepareDictionaries() }, "dictionary-setup").apply { isDaemon = true }.start()
     app.updater.start()
+    app.startUsageStats()
 
     application {
         val windowState = rememberWindowState(width = 1440.dp, height = 860.dp)

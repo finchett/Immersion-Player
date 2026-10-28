@@ -110,6 +110,16 @@ when one is out and links to it; installing in place is coming.
 Found a bug, or wish it did something? [Open an issue](https://github.com/finchett/Immersion-Player/issues).
 It's young and changing quickly, and feedback shapes what comes next.
 
+### Privacy
+
+To know how many people use it and on what, the app sends one small message a day to Google
+Analytics, through its Measurement Protocol (no Google SDK). It holds a random id made for your
+install, your platform and system version, and the app's version. Nothing about what you watch,
+look up or add to Anki, and no account. On the desktop it starts once you've finished the
+welcome. Turn it off in the welcome, or any time under Settings › General › Privacy (Settings ›
+Privacy on Android), and nothing more is sent. The code is
+[`UsageStats`](core/src/main/kotlin/io/github/immersionplayer/stats/UsageStats.kt).
+
 ## Keys (desktop)
 
 | Key | Does |

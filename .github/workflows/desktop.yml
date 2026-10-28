@@ -12,6 +12,10 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    # the anonymous usage counts' keys (UsageStats), kept as repository secrets
+    env:
+      ORG_GRADLE_PROJECT_analyticsMeasurementId: ${{ secrets.ANALYTICS_MEASUREMENT_ID }}
+      ORG_GRADLE_PROJECT_analyticsApiSecret: ${{ secrets.ANALYTICS_API_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -42,6 +46,10 @@ jobs:
 
   linux:
     runs-on: ubuntu-24.04
+    # the anonymous usage counts' keys (UsageStats), kept as repository secrets
+    env:
+      ORG_GRADLE_PROJECT_analyticsMeasurementId: ${{ secrets.ANALYTICS_MEASUREMENT_ID }}
+      ORG_GRADLE_PROJECT_analyticsApiSecret: ${{ secrets.ANALYTICS_API_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

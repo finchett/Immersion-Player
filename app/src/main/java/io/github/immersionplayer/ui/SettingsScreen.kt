@@ -308,6 +308,14 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                     AnkiSettings(app)
                 }
 
+                SettingsSection("Privacy") {
+                    SettingSwitchRow(
+                        title = "Send anonymous usage counts",
+                        description = "Once a day: a random id for this install, your Android version and the app's. Nothing you watch or look up.",
+                        initial = app.prefs.usageStats,
+                    ) { app.prefs.usageStats = it }
+                }
+
                 SettingsSection(
                     title = "Advanced",
                     trailing = {

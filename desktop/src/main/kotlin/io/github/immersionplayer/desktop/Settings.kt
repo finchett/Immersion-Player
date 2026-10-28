@@ -204,6 +204,16 @@ class Settings(node: String = System.getProperty("immersion.prefs") ?: "io/githu
         private set
     fun finishOnboarding() { onboarded = true; prefs.putBoolean("onboarded", true) }
 
+    /** Whether the anonymous usage counts are sent (UsageStats); on unless turned off. */
+    var usageStats by mutableStateOf(prefs.getBoolean("usage_stats", true))
+        private set
+    fun updateUsageStats(value: Boolean) { usageStats = value; prefs.putBoolean("usage_stats", value) }
+
+    /** A random id for this install, made the first time it's asked for; all the counts know of anyone. */
+    val installId: String by lazy {
+        prefs.get("install_id", null) ?: java.util.UUID.randomUUID().toString().also { prefs.put("install_id", it) }
+    }
+
     fun isBundledInstalled(name: String) = prefs.getBoolean("bundled:$name", false)
     fun setBundledInstalled(name: String) = prefs.putBoolean("bundled:$name", true)
 

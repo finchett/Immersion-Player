@@ -392,6 +392,19 @@ private fun ColumnScope.DoneStep(app: DesktopApp) {
         Tip(listOf("←", "→"), "The previous or next line")
         Tip(listOf("A"), "Turn the word you looked up into an Anki card")
     }
+    Spacer(Modifier.height(12.dp))
+    // the counts start once this is done, so turning them off here means none are sent
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(scheme.surfaceVariant).padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Send anonymous usage counts", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(USAGE_STATS_DETAIL, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        }
+        Toggle(app.settings.usageStats, app.settings::updateUsageStats)
+    }
     Spacer(Modifier.height(16.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Found a bug, or wish it did something? ", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)

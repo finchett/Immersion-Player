@@ -13,14 +13,24 @@ kotlin {
 val appVersion = providers.gradleProperty("appVersion").get()
 
 // APP_VERSION, from gradle.properties, so the app knows which release it is
+val analyticsId = providers.gradleProperty("analyticsMeasurementId").getOrElse("")
+val analyticsSecret = providers.gradleProperty("analyticsApiSecret").getOrElse("")
+
 val writeBuildInfo by tasks.registering {
     val out = layout.buildDirectory.dir("generated/buildinfo")
     inputs.property("version", appVersion)
+    inputs.property("analyticsId", analyticsId)
+    inputs.property("analyticsSecret", analyticsSecret)
     outputs.dir(out)
     doLast {
         val file = out.get().file("io/github/immersionplayer/desktop/BuildInfo.kt").asFile
         file.parentFile.mkdirs()
-        file.writeText("package io.github.immersionplayer.desktop\n\nconst val APP_VERSION = \"$appVersion\"\n")
+        file.writeText(
+            "package io.github.immersionplayer.desktop\n\n" +
+                "const val APP_VERSION = \"$appVersion\"\n" +
+                "const val ANALYTICS_MEASUREMENT_ID = \"$analyticsId\"\n" +
+                "const val ANALYTICS_API_SECRET = \"$analyticsSecret\"\n",
+        )
     }
 }
 

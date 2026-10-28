@@ -259,7 +259,21 @@ private fun GeneralPane(app: DesktopApp) {
             }
         }
     }
+    Section("Privacy") {
+        Card {
+            ToggleRow(
+                "Send anonymous usage counts",
+                USAGE_STATS_DETAIL,
+                settings.usageStats, settings::updateUsageStats,
+            )
+        }
+    }
 }
+
+/** What the usage counts are, wherever they can be turned off. */
+const val USAGE_STATS_DETAIL =
+    "Once a day: a random id for this install, your system and the app's version. Nothing you watch or look up."
+
 
 @Composable
 private fun DictionariesPane(app: DesktopApp) {
