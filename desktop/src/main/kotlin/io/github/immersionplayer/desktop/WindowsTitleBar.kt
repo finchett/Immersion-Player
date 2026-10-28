@@ -10,9 +10,10 @@ import com.sun.jna.ptr.IntByReference
 import java.awt.Window
 
 /**
- * The native Windows title bar in the app's colours. Windows 11 draws the caption, its text and
- * the window border in whatever colours the app asks for, keeping its own buttons, snapping and
- * shadow; dark mode turns those buttons' glyphs light. Windows 10 ignores the colours.
+ * The window's edge in the app's colours. The app draws its own title bar ([WindowFrame]), so
+ * what Windows 11 still draws is the border, which takes the background's colour, and the
+ * corners, rounded while the window floats; dark mode matches the system menus to dark themes.
+ * Windows 10 ignores all of it.
  */
 object WindowsTitleBar {
     private interface Dwm : Library {
@@ -25,14 +26,18 @@ object WindowsTitleBar {
     private const val BORDER_COLOR = 34
     private const val CAPTION_COLOR = 35
     private const val TEXT_COLOR = 36
+    private const val CORNER_PREFERENCE = 33
+    private const val CORNERS_SQUARE = 1
+    private const val CORNERS_ROUND = 2
 
-    fun apply(window: Window, caption: Color, text: Color) {
+    fun apply(window: Window, caption: Color, text: Color, rounded: Boolean) {
         runCatching {
             val hwnd = Native.getWindowPointer(window) ?: return
             set(hwnd, USE_IMMERSIVE_DARK_MODE, if (caption.luminance() < 0.5f) 1 else 0)
             set(hwnd, CAPTION_COLOR, caption.colorRef())
             set(hwnd, BORDER_COLOR, caption.colorRef())
             set(hwnd, TEXT_COLOR, text.colorRef())
+            set(hwnd, CORNER_PREFERENCE, if (rounded) CORNERS_ROUND else CORNERS_SQUARE)
         }
     }
 

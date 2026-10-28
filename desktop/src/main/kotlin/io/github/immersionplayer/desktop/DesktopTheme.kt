@@ -236,8 +236,8 @@ fun Chrome(header: @Composable () -> Unit, body: @Composable () -> Unit, leading
         leading?.invoke()
         Column(Modifier.fillMaxSize()) {
             Box(
-                Modifier.fillMaxWidth().height(HeaderHeight)
-                    .padding(start = if (leading == null) HeaderStart else 32.dp, end = 12.dp),
+                Modifier.fillMaxWidth().height(HeaderHeight).movesWindow()
+                    .padding(start = if (leading == null) HeaderStart else 32.dp, end = 12.dp + HeaderEnd),
             ) { header() }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Box(Modifier.fillMaxSize()) { body() }

@@ -118,7 +118,7 @@ fun SettingsSidebar(
     val update by app.updater.state.collectAsState()
     Row(Modifier.width(SidebarWidth).fillMaxHeight()) {
         Column(Modifier.weight(1f).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant)) {
-            Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(end = 10.dp)) {
+            Box(Modifier.fillMaxWidth().height(HeaderHeight).movesWindow().padding(end = 10.dp)) {
                 // clear of the traffic lights on macOS
                 Text(
                     "Settings",

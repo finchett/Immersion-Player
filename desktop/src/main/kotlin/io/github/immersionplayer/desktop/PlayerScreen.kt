@@ -563,12 +563,17 @@ private fun VideoArea(
         }
         // over the bar, so the line stays hoverable where the bar's shading reaches up behind it
         overlay?.invoke(this, visible)
-        // with the panel put away, so is its header: the way back to the library comes top right
+        // nothing marks it, but where the app draws the window's frame the video's top moves the
+        // window, as a title bar would; under the Library button, so that still takes its clicks
+        if (ownsFrame) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(HeaderHeight).movesWindow())
+        // with the panel put away, so is its header: the way back to the library comes top right,
+        // clear of the traffic lights, or top left where the window's own buttons hold the right
         AnimatedVisibility(
             visible && full,
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(400)),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)
+            modifier = Modifier.align(if (ownsFrame) Alignment.TopStart else Alignment.TopEnd)
+                .padding(top = 8.dp, start = 12.dp, end = 8.dp)
                 .onPointerEvent(PointerEventType.Enter) { overControls = true }
                 .onPointerEvent(PointerEventType.Exit) { overControls = false },
         ) {
@@ -859,7 +864,8 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, note: String?, 
     val ankiStatus by app.anki.status.collectAsState()
     // same height as the other headers, so it lines up with the traffic lights across the window
     Row(
-        Modifier.fillMaxWidth().height(HeaderHeight).padding(horizontal = 8.dp),
+        // the panel runs to the window's right edge, under the window's buttons where the app draws them
+        Modifier.fillMaxWidth().height(HeaderHeight).movesWindow().padding(start = 8.dp, end = 8.dp + HeaderEnd),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextAction("‹ Library", onClick = onBack)
@@ -878,7 +884,9 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, note: String?, 
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
-        TrackMenu(session)
+        // the play bar has the same menu; where the window's buttons end the header, it'd sit
+        // oddly beside them, so only macOS keeps it here
+        if (!ownsFrame) TrackMenu(session)
     }
 }
 

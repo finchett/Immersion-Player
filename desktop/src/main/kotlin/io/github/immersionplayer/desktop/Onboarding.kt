@@ -100,7 +100,8 @@ fun Onboarding(app: DesktopApp, onFinish: () -> Unit, start: OnboardingStep = On
     var installed by remember { mutableStateOf<List<DictionaryInfo>>(emptyList()) }
     LaunchedEffect(step, installs) { installed = withContext(Dispatchers.IO) { app.database.dictionaries() } }
 
-    Box(Modifier.fillMaxSize().background(scheme.background)) {
+    // no header here, so the page itself moves the window where the app draws the frame
+    Box(Modifier.fillMaxSize().background(scheme.background).movesWindow()) {
         Column(
             Modifier.fillMaxSize().padding(top = HeaderHeight, bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

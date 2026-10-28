@@ -1,6 +1,11 @@
 package io.github.immersionplayer.desktop
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
@@ -187,6 +192,8 @@ fun main(args: Array<String>) {
             state = windowState,
             title = title,
             icon = appIcon,
+            // Windows and Linux: the app's own frame, its header the title bar (WindowFrame)
+            undecorated = ownsFrame,
             onPreviewKeyEvent = ::onKey,
         ) {
             if (isMac) {
@@ -209,9 +216,12 @@ fun main(args: Array<String>) {
             }
             val fullscreen = isFullscreen()
             SideEffect { keys.fullscreen = fullscreen }
+            val frame = remember { if (ownsFrame) WindowFrame(window, windowState) else null }
+            LaunchedEffect(Unit) { window.minimumSize = java.awt.Dimension(720, 480) }
             if (isWindows) LaunchedEffect(windowsFullscreen) { WindowsFullscreen.set(window, windowsFullscreen) }
             DesktopTheme(app.settings.themeFamily, app.settings.themeMode) {
                 CompositionLocalProvider(
+                    LocalWindowFrame provides frame?.takeIf { !fullscreen },
                     LocalTrafficLights provides (isMac && !fullscreen),
                     LocalCorners provides Corners(if (fullscreen) 0.0 else MacTrafficLights.cornerRadius),
                 ) {
@@ -221,14 +231,16 @@ fun main(args: Array<String>) {
                     // the native window too, so a resize never flashes white before Compose repaints
                     val background = MaterialTheme.colorScheme.background
                     LaunchedEffect(background) { window.background = java.awt.Color(background.toArgb()) }
-                    // and Windows draws its title bar in the same colours
+                    // and Windows draws its border in the same colours, rounding the corners while it floats
                     if (isWindows) {
                         val onBackground = MaterialTheme.colorScheme.onBackground
-                        LaunchedEffect(background, onBackground) { WindowsTitleBar.apply(window, background, onBackground) }
+                        val rounded = !fullscreen && windowState.placement == WindowPlacement.Floating
+                        LaunchedEffect(background, onBackground, rounded) { WindowsTitleBar.apply(window, background, onBackground, rounded) }
                     }
                     // the theme background behind the screens, so a crossfade never shows the window's white.
                     // Library and settings share one key: moving between them doesn't animate here, only
                     // their bodies do, under a header bar that stays put.
+                    Box(Modifier.fillMaxSize()) {
                     AnimatedContent(
                         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                         targetState = screen,
@@ -261,6 +273,24 @@ fun main(args: Array<String>) {
                                 },
                             )
                         }
+                    }
+                    if (frame != null && !fullscreen) {
+                        // the window's buttons, faded with the player's controls as the traffic lights are
+                        val inPlayer = screen is Screen.Player
+                        AnimatedVisibility(
+                            visible = !inPlayer || keys.chromeVisible,
+                            enter = fadeIn(tween(160)),
+                            exit = fadeOut(tween(400)),
+                            modifier = Modifier.align(Alignment.TopEnd),
+                        ) {
+                            WindowButtons(frame, onClose = ::quit, onDark = inPlayer && app.settings.panelHidden)
+                        }
+                        // Linux draws no edge round a frameless window, so it gets a hairline
+                        if (isLinux && windowState.placement == WindowPlacement.Floating) {
+                            Box(Modifier.fillMaxSize().border(1.dp, MaterialTheme.colorScheme.outlineVariant))
+                        }
+                        ResizeEdges(frame)
+                    }
                     }
                 }
             }
