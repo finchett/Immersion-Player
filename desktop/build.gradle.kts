@@ -87,8 +87,21 @@ compose.desktop {
                 appCategory = "public.app-category.education"
                 minimumSystemVersion = "12.0"
             }
-            windows { iconFile.set(project.file("icons/icon.ico")) }
-            linux { iconFile.set(project.file("src/main/resources/icon.png")) }
+            windows {
+                iconFile.set(project.file("icons/icon.ico"))
+                // into the user's own folder, so neither installing nor updating asks for an admin
+                perUserInstall = true
+                // the same for every release, so a new installer replaces the old version
+                upgradeUuid = "17ce85a1-57a0-4e4e-9c09-549dfad03d7d"
+                menuGroup = "Immersion Player"
+                shortcut = true
+            }
+            linux {
+                iconFile.set(project.file("src/main/resources/icon.png"))
+                packageName = "immersion-player"
+                appCategory = "Video"
+                menuGroup = "AudioVideo;Video;Education"
+            }
         }
     }
 }

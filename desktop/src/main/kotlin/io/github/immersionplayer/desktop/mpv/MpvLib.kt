@@ -64,7 +64,15 @@ interface MpvLib : Library {
 
         val INSTANCE: MpvLib by lazy {
             useCNumericLocale()
-            Native.load(bundled() ?: if (Platform.isWindows()) "libmpv-2" else "mpv", MpvLib::class.java)
+            // Linux's packages give libmpv.so only with the -dev package, so the versioned names too
+            val names = bundled()?.let(::listOf) ?: when {
+                Platform.isWindows() -> listOf("libmpv-2")
+                Platform.isLinux() -> listOf("mpv", "libmpv.so.2", "libmpv.so.1")
+                else -> listOf("mpv")
+            }
+            names.drop(1).fold(runCatching { Native.load(names[0], MpvLib::class.java) }) { loaded, name ->
+                loaded.recoverCatching { Native.load(name, MpvLib::class.java) }
+            }.getOrThrow()
         }
 
         /** The libmpv packaged with the app, if this is a packaged build; else the system's. */

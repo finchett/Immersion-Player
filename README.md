@@ -10,11 +10,15 @@ A video player with a Japanese dictionary built into the subtitles.<br>
 Point at a word and it's looked up. Step back a line and hear it again. Keep the ones you want as Anki cards.
 
 [![Download for Mac](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-245D4E?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-245D4E?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux%20(.deb)-245D4E?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
 [![Download for Android](https://img.shields.io/badge/Download-Android-245D4E?style=for-the-badge&logo=android&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
 
 [![Latest release](https://img.shields.io/github/v/release/finchett/Immersion-Player?label=latest&color=8FCFB4)](https://github.com/finchett/Immersion-Player/releases/latest)
 [![Licence: MPL-2.0](https://img.shields.io/badge/licence-MPL--2.0-8FCFB4)](LICENSE)
 ![macOS 12+](https://img.shields.io/badge/macOS-12%2B-lightgrey)
+![Windows 10+](https://img.shields.io/badge/Windows-10%2B-lightgrey)
+![Ubuntu 24.04+](https://img.shields.io/badge/Ubuntu-24.04%2B-lightgrey)
 ![Android 11+](https://img.shields.io/badge/Android-11%2B-lightgrey)
 
 </div>
@@ -94,7 +98,14 @@ Download from the [latest release](https://github.com/finchett/Immersion-Player/
   isn't notarised yet, so the first time, right-click it and choose **Open**, or run
   `xattr -dr com.apple.quarantine "/Applications/Immersion Player.app"`.
 - **Android (arm64, Android 11 or newer):** install the `.apk`.
-- **Windows and Linux:** the app runs on both, but there are no downloads yet. They're on the way.
+- **Windows (x64, Windows 10 or newer):** run the `.msi`. It installs for you alone, so it doesn't
+  need an administrator. It isn't signed yet, so SmartScreen may stop it the first time: choose
+  **More info**, then **Run anyway**.
+- **Linux (x64, Ubuntu 24.04, Debian 13 or newer):** install the `.deb` with
+  `sudo apt install ./Immersion-Player-*-linux-x64.deb`, which brings libmpv along.
+
+On the Mac and Android new versions install themselves. On Windows and Linux the app tells you
+when one is out and links to it; installing in place is coming.
 
 Found a bug, or wish it did something? [Open an issue](https://github.com/finchett/Immersion-Player/issues).
 It's young and changing quickly, and feedback shapes what comes next.
@@ -282,8 +293,12 @@ brew install mpv tesseract                # libmpv and libtesseract, found at ru
 ```
 
 Packaging copies Homebrew's libmpv and libtesseract, and the libraries they load, into the app
-and relinks them, so the result doesn't need Homebrew. Only macOS on Apple Silicon is packaged
-so far.
+and relinks them, so the result doesn't need Homebrew.
+
+Windows and Linux are packaged by the *Desktop builds* workflow on GitHub's runners, since
+jpackage only packages for the system it runs on: an `.msi` with shinchiro's libmpv bundled, and a
+`.deb` that depends on the system's libmpv. `release.sh` takes them from the run for the commit
+it releases.
 
 To try a first launch without touching your own settings, run a packaged build with
 `JAVA_TOOL_OPTIONS="-Duser.home=/tmp/fresh -Dimmersion.prefs=io/github/immersionplayer-fresh"`.
@@ -374,8 +389,9 @@ desktop/    Compose Desktop
 - Sidecar subtitles can't be found for videos opened from another app (a content URI doesn't say
   what's next to it).
 - Android: arm64 only, phone layouts only.
-- Desktop: only macOS on Apple Silicon is packaged. Lookups deinflect Japanese only, whatever
-  language is set to study.
+- Desktop: Macs with Apple Silicon, Windows and Linux on x64. On Windows and Linux video uses mpv's
+  software renderer for now, so Anime4K is Mac only until the OpenGL path has been tried on real
+  GPUs there. Lookups deinflect Japanese only, whatever language is set to study.
 
 ## Licence
 
@@ -384,7 +400,7 @@ You may use, modify, sell and redistribute it, and combine it with other code un
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
-The mpv and FFmpeg it bundles are, for now, GPL builds, so the Android and macOS apps as built
+The mpv and FFmpeg it bundles are, for now, GPL builds, so the Android, macOS and Windows apps as built
 today are distributed under the GPL as a whole, which MPL-2.0 allows. LGPL builds of both are
 planned for every platform, after which the apps are MPL-2.0 with LGPL libraries.
 
@@ -397,6 +413,9 @@ planned for every platform, after which the apps are MPL-2.0 with LGPL libraries
   built by mpv-android.
 - **libmpv, FFmpeg and their libraries** (macOS build, copied from Homebrew): GPL, including
   x264 and x265.
+- **libmpv and FFmpeg** (Windows build, from
+  [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake)): GPL. The Linux
+  package uses the system's own libmpv.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
 - **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public

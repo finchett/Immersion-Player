@@ -21,7 +21,13 @@ internal interface TesseractLib : Library {
     fun TessBaseAPIDelete(handle: Pointer)
 
     companion object {
-        val INSTANCE: TesseractLib by lazy { Native.load(bundled() ?: "tesseract", TesseractLib::class.java) }
+        val INSTANCE: TesseractLib by lazy {
+            // as with libmpv, Linux has the plain name only with the -dev package
+            val names = bundled()?.let(::listOf) ?: listOf("tesseract", "libtesseract.so.5")
+            names.drop(1).fold(runCatching { Native.load(names[0], TesseractLib::class.java) }) { loaded, name ->
+                loaded.recoverCatching { Native.load(name, TesseractLib::class.java) }
+            }.getOrThrow()
+        }
 
         /** The libtesseract packaged with the app, if this is a packaged build; else the system's. */
         private fun bundled(): String? {
