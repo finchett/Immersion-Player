@@ -44,8 +44,9 @@ object AppDirs {
 /**
  * User settings and per-video state, in java.util.prefs (plist on macOS, registry on Windows,
  * ~/.java on Linux). Settings the UI reads are Compose state so changes apply immediately.
+ * -Dimmersion.prefs=<node> keeps a separate set in place of the app's own, to try a first launch.
  */
-class Settings(node: String = "io/github/immersionplayer") {
+class Settings(node: String = System.getProperty("immersion.prefs") ?: "io/github/immersionplayer") {
     private val prefs = Preferences.userRoot().node(node)
     private val videos = prefs.node("videos")
 
@@ -183,6 +184,11 @@ class Settings(node: String = "io/github/immersionplayer") {
         libraryRoot = value
         if (value == null) prefs.remove("library_root") else prefs.put("library_root", value)
     }
+
+    /** Whether the welcome has run; anyone who'd picked a library before it existed has seen enough. */
+    var onboarded by mutableStateOf(prefs.getBoolean("onboarded", libraryRoot != null))
+        private set
+    fun finishOnboarding() { onboarded = true; prefs.putBoolean("onboarded", true) }
 
     fun isBundledInstalled(name: String) = prefs.getBoolean("bundled:$name", false)
     fun setBundledInstalled(name: String) = prefs.putBoolean("bundled:$name", true)
