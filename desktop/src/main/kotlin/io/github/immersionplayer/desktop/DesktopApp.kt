@@ -6,6 +6,7 @@ import io.github.immersionplayer.dictionary.DictionaryDatabase
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.dictionary.JdbcSql
 import io.github.immersionplayer.dictionary.YomitanImporter
+import io.github.immersionplayer.stats.UsageStats
 import io.github.immersionplayer.subs.EmbeddedSubtitleCache
 import io.github.immersionplayer.subs.ImageSubtitles
 import io.github.immersionplayer.subs.MatroskaSubtitleExtractor
@@ -37,6 +38,29 @@ class DesktopApp(
     )
     /** Started by main, so tests never touch the feed. */
     val updater = Updater(cacheDir, dataDir, ::logError)
+    private val usageStats = UsageStats(ANALYTICS_MEASUREMENT_ID, ANALYTICS_API_SECRET)
+
+    /**
+     * Counts this install as using the app: once the welcome is done (so turning the counts off
+     * there sends nothing at all), then once a day while it stays open. Started by main.
+     */
+    fun startUsageStats() {
+        if (!usageStats.configured) return
+        Thread({
+            while (!settings.onboarded) Thread.sleep(30_000)
+            while (true) {
+                if (settings.usageStats) {
+                    val platform = when {
+                        isMac -> "macos"
+                        isWindows -> "windows"
+                        else -> "linux"
+                    }
+                    usageStats.appOpen(settings.installId, platform, System.getProperty("os.version"), APP_VERSION)
+                }
+                Thread.sleep(24 * 60 * 60 * 1000L)
+            }
+        }, "usage-stats").apply { isDaemon = true }.start()
+    }
 
     private val _setupStatus = MutableStateFlow<String?>(null)
     /** Progress while a bundled dictionary is being installed, else null. */

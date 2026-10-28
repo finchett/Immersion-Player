@@ -17,6 +17,21 @@ class Prefs(context: Context) {
         get() = prefs.getString("library_tree_uri", null)
         set(value) = prefs.edit { putString("library_tree_uri", value) }
 
+    /** Whether the anonymous usage counts are sent (UsageStats); on unless turned off. */
+    var usageStats: Boolean
+        get() = prefs.getBoolean("usage_stats", true)
+        set(value) = prefs.edit { putBoolean("usage_stats", value) }
+
+    /** A random id for this install, made the first time it's asked for; all the counts know of anyone. */
+    val installId: String
+        get() = prefs.getString("install_id", null)
+            ?: java.util.UUID.randomUUID().toString().also { id -> prefs.edit { putString("install_id", id) } }
+
+    /** When the usage counts were last sent, so they go at most once a day. */
+    var usageStatsSentAt: Long
+        get() = prefs.getLong("usage_stats_sent_at", 0)
+        set(value) = prefs.edit { putLong("usage_stats_sent_at", value) }
+
     /** Use the phone's shoulder triggers (via Shizuku) to step through lines. */
     var shoulderTriggers: Boolean
         get() = prefs.getBoolean("shoulder_triggers", true)

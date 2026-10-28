@@ -33,6 +33,9 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersion
+        // the anonymous usage counts (core's UsageStats); empty sends nothing
+        buildConfigField("String", "ANALYTICS_MEASUREMENT_ID", "\"${providers.gradleProperty("analyticsMeasurementId").getOrElse("")}\"")
+        buildConfigField("String", "ANALYTICS_API_SECRET", "\"${providers.gradleProperty("analyticsApiSecret").getOrElse("")}\"")
         // on-device tests; run by hand (see androidTest), since connectedAndroidTest uninstalls the app after
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {

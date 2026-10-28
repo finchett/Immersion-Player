@@ -7,6 +7,7 @@ import io.github.immersionplayer.dictionary.BundledDictionaries
 import io.github.immersionplayer.dictionary.DictionaryDatabase
 import io.github.immersionplayer.dictionary.DictionaryLookup
 import io.github.immersionplayer.mining.MiningStore
+import io.github.immersionplayer.stats.UsageStats
 import io.github.immersionplayer.subs.SubtitleLoader
 import io.github.immersionplayer.ui.AnkiCards
 import io.github.immersionplayer.ui.Appearance
@@ -42,6 +43,17 @@ class App : Application() {
         }
     }
 
+    /** Counts this install as using the app, at most once a day; see core's UsageStats. */
+    private fun sendUsageStats() {
+        val stats = UsageStats(BuildConfig.ANALYTICS_MEASUREMENT_ID, BuildConfig.ANALYTICS_API_SECRET)
+        val now = System.currentTimeMillis()
+        if (!stats.configured || !prefs.usageStats || now - prefs.usageStatsSentAt < 20 * 60 * 60 * 1000L) return
+        Thread({
+            val sent = stats.appOpen(prefs.installId, "android", android.os.Build.VERSION.RELEASE, BuildConfig.VERSION_NAME)
+            if (sent) prefs.usageStatsSentAt = now
+        }, "usage-stats").apply { isDaemon = true }.start()
+    }
+
     override fun onCreate() {
         super.onCreate()
         // keep the last crash on disk (the system log isn't always available)
@@ -64,6 +76,7 @@ class App : Application() {
             logError = ::logError,
         )
         updater = AppUpdater(this).apply { start() }
+        sendUsageStats()
         Thread {
             dictionaryDatabase.deleteIncomplete()
             BundledDictionaries.installMissing(this, dictionaryDatabase)
