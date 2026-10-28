@@ -563,12 +563,14 @@ private fun VideoArea(
         }
         // over the bar, so the line stays hoverable where the bar's shading reaches up behind it
         overlay?.invoke(this, visible)
-        // with the panel put away, so is its header: the way back to the library comes top right
+        // with the panel put away, so is its header: the way back to the library comes top right,
+        // clear of the traffic lights, or top left where the window's own buttons hold the right
         AnimatedVisibility(
             visible && full,
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(400)),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)
+            modifier = Modifier.align(if (ownsFrame) Alignment.TopStart else Alignment.TopEnd)
+                .padding(top = 8.dp, start = 12.dp, end = 8.dp)
                 .onPointerEvent(PointerEventType.Enter) { overControls = true }
                 .onPointerEvent(PointerEventType.Exit) { overControls = false },
         ) {
@@ -879,7 +881,9 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, note: String?, 
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
-        TrackMenu(session)
+        // the play bar has the same menu; where the window's buttons end the header, it'd sit
+        // oddly beside them, so only macOS keeps it here
+        if (!ownsFrame) TrackMenu(session)
     }
 }
 
