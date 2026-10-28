@@ -210,7 +210,7 @@ fun main(args: Array<String>) {
             val fullscreen = isFullscreen()
             SideEffect { keys.fullscreen = fullscreen }
             if (isWindows) LaunchedEffect(windowsFullscreen) { WindowsFullscreen.set(window, windowsFullscreen) }
-            DesktopTheme(app.settings.theme) {
+            DesktopTheme(app.settings.themeFamily, app.settings.themeMode) {
                 CompositionLocalProvider(
                     LocalTrafficLights provides (isMac && !fullscreen),
                     LocalCorners provides Corners(if (fullscreen) 0.0 else MacTrafficLights.cornerRadius),

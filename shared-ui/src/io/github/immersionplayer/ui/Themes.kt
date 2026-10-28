@@ -100,6 +100,38 @@ enum class AppTheme(val label: String, val scheme: ColorScheme) {
             onBackground = Color(0xFF2B2620),
         ),
     ),
+    /** Nord's Snow Storm side: its frost blue on pale grey. */
+    NordLight(
+        "Nord Light",
+        lightColorScheme(
+            primary = Color(0xFF5E81AC),
+            onPrimary = Color.White,
+            secondary = Color(0xFFD08770),
+            tertiary = Color(0xFF8FBCBB),
+            background = Color(0xFFECEFF4),
+            surface = Color(0xFFECEFF4),
+            surfaceVariant = Color(0xFFE2E6EE),
+            onBackground = Color(0xFF2E3440),
+            onSurface = Color(0xFF2E3440),
+            onSurfaceVariant = Color(0xFF5B6476),
+        ),
+    ),
+    /** Sakura by day: the blossom pink deepened, on a blush of white. */
+    SakuraLight(
+        "Sakura Light",
+        lightColorScheme(
+            primary = Color(0xFFB5456F),
+            onPrimary = Color.White,
+            secondary = Color(0xFFA0604A),
+            tertiary = Color(0xFF3E7B5E),
+            background = Color(0xFFFBF5F7),
+            surface = Color(0xFFFBF5F7),
+            surfaceVariant = Color(0xFFF2E6EB),
+            onBackground = Color(0xFF2E2226),
+            onSurface = Color(0xFF2E2226),
+            onSurfaceVariant = Color(0xFF7A6670),
+        ),
+    ),
     /** GNOME's libadwaita: its blue accent on near-white. */
     Adwaita(
         "Adwaita",
@@ -161,6 +193,43 @@ enum class AppTheme(val label: String, val scheme: ColorScheme) {
         ),
     ),
 }
+
+/**
+ * A theme's light and dark sides, chosen between by [ThemeMode]. OLED Black is dark only, so it
+ * stays dark whatever the mode.
+ */
+enum class ThemeFamily(val label: String, val light: AppTheme?, val dark: AppTheme?) {
+    Jade("Jade", AppTheme.Celadon, AppTheme.Jade),
+    Sakura("Sakura", AppTheme.SakuraLight, AppTheme.Sakura),
+    Nord("Nord", AppTheme.NordLight, AppTheme.Nord),
+    Paper("Paper", AppTheme.Paper, AppTheme.Midnight),
+    Adwaita("Adwaita", AppTheme.Adwaita, AppTheme.AdwaitaDark),
+    Breeze("Breeze", AppTheme.Breeze, AppTheme.BreezeDark),
+    Oled("OLED Black", null, AppTheme.Oled);
+
+    /** The side to show for [mode], [systemDark] deciding Auto; a one-sided family shows its one side. */
+    fun resolve(mode: ThemeMode, systemDark: Boolean): AppTheme {
+        val wantDark = when (mode) {
+            ThemeMode.Auto -> systemDark
+            ThemeMode.Light -> false
+            ThemeMode.Dark -> true
+        }
+        return (if (wantDark) dark ?: light else light ?: dark)!!
+    }
+
+    fun supports(mode: ThemeMode) = when (mode) {
+        ThemeMode.Auto -> light != null && dark != null
+        ThemeMode.Light -> light != null
+        ThemeMode.Dark -> dark != null
+    }
+
+    companion object {
+        fun of(theme: AppTheme): ThemeFamily = entries.first { it.light == theme || it.dark == theme }
+    }
+}
+
+/** Light, dark, or whichever the system is set to. */
+enum class ThemeMode { Auto, Light, Dark }
 
 /** The themes "System" follows, by the device's light or dark setting. */
 val SystemDark = AppTheme.Jade

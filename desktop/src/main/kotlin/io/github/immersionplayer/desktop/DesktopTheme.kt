@@ -42,6 +42,8 @@ import io.github.immersionplayer.ui.AppTheme
 import io.github.immersionplayer.ui.Cog
 import io.github.immersionplayer.ui.SystemDark
 import io.github.immersionplayer.ui.SystemLight
+import io.github.immersionplayer.ui.ThemeFamily
+import io.github.immersionplayer.ui.ThemeMode
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
@@ -85,6 +87,10 @@ val HeaderStart: Dp
  * with a mouse, no 48 dp touch targets, and the colours Material would otherwise fill with its
  * default purples derived from each theme instead.
  */
+@Composable
+fun DesktopTheme(family: ThemeFamily, mode: ThemeMode, content: @Composable () -> Unit) =
+    DesktopTheme(family.resolve(mode, isSystemInDarkTheme()), content)
+
 @Composable
 fun DesktopTheme(choice: AppTheme?, content: @Composable () -> Unit) {
     val theme = choice ?: if (isSystemInDarkTheme()) SystemDark else SystemLight
