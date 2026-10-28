@@ -52,6 +52,7 @@ fun main(args: Array<String>) {
     if (args.firstOrNull() == "--bench") return bench(args[1], args.getOrNull(2)?.toInt() ?: 1920)
     val app = DesktopApp()
     MacTrafficLights.probe()
+    if (isLinux) setLinuxWindowClass()
     Thread({ app.prepareDictionaries() }, "dictionary-setup").apply { isDaemon = true }.start()
     app.updater.start()
 
@@ -353,5 +354,17 @@ private fun setDockIcon() {
     runCatching {
         val url = object {}.javaClass.getResource("/icon.png") ?: return
         java.awt.Taskbar.getTaskbar().iconImage = javax.imageio.ImageIO.read(url)
+    }
+}
+
+/**
+ * Linux docks (GNOME's among them) find a window's launcher by its WM_CLASS, which AWT names after
+ * the main class unless told otherwise. This is the launcher the .deb installs, named by jpackage
+ * from the package name. Needs java.desktop's sun.awt.X11 opened (desktop/build.gradle.kts).
+ */
+private fun setLinuxWindowClass() {
+    runCatching {
+        val toolkit = java.awt.Toolkit.getDefaultToolkit()
+        toolkit.javaClass.getDeclaredField("awtAppClassName").apply { isAccessible = true }.set(toolkit, "immersion-player-Immersion_Player")
     }
 }

@@ -58,6 +58,8 @@ compose.desktop {
         mainClass = "io.github.immersionplayer.desktop.MainKt"
         // dev: find a system libmpv (Homebrew on macOS). Packaged builds bundle their own.
         jvmArgs += listOf("-Djna.library.path=/opt/homebrew/lib:/usr/local/lib:/usr/lib")
+        // so Main can name the window after its launcher, for the dock (setLinuxWindowClass)
+        if (System.getProperty("os.name").lowercase().contains("linux")) jvmArgs += "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED"
         // ./gradlew :desktop:run -PappArgs="--bench video.mkv 1920" (split on '|' so paths may hold spaces)
         (project.findProperty("mpvOptions") as String?)?.let { jvmArgs += "-Dmpv.options=$it" }
         if (project.hasProperty("stats")) jvmArgs += "-Dimmersion.stats=1"
