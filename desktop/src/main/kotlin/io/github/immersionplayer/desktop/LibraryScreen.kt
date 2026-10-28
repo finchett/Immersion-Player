@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -111,6 +112,16 @@ fun LibraryHeader(
         .toList().reversed()
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            // at the top there's nothing to go back up to; where no traffic lights fill the
+            // corner, it says where you are instead of standing empty
+            if (above.isEmpty() && ownsFrame) {
+                Text(
+                    "Library",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             above.forEachIndexed { i, dir ->
                 if (i > 0) Text("/", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
                 TextAction(
