@@ -100,6 +100,66 @@ enum class AppTheme(val label: String, val scheme: ColorScheme) {
             onBackground = Color(0xFF2B2620),
         ),
     ),
+    /** GNOME's libadwaita: its blue accent on near-white. */
+    Adwaita(
+        "Adwaita",
+        lightColorScheme(
+            primary = Color(0xFF1C71D8),
+            onPrimary = Color.White,
+            secondary = Color(0xFFE66100),
+            tertiary = Color(0xFF26A269),
+            background = Color(0xFFFAFAFB),
+            surface = Color(0xFFFAFAFB),
+            surfaceVariant = Color(0xFFEBEBED),
+            onBackground = Color(0xFF333338),
+            onSurface = Color(0xFF333338),
+            onSurfaceVariant = Color(0xFF707075),
+        ),
+    ),
+    AdwaitaDark(
+        "Adwaita Dark",
+        darkColorScheme(
+            primary = Color(0xFF78AEED),
+            secondary = Color(0xFFFFA348),
+            tertiary = Color(0xFF8FF0A4),
+            background = Color(0xFF222226),
+            surface = Color(0xFF222226),
+            surfaceVariant = Color(0xFF2E2E32),
+            onBackground = Color(0xFFFFFFFF),
+            onSurface = Color(0xFFFFFFFF),
+            onSurfaceVariant = Color(0xFFADADB1),
+        ),
+    ),
+    /** KDE Plasma's Breeze: its cyan-blue highlight on cool grey. */
+    Breeze(
+        "Breeze",
+        lightColorScheme(
+            primary = Color(0xFF2980B9),
+            onPrimary = Color.White,
+            secondary = Color(0xFFF67400),
+            tertiary = Color(0xFF27AE60),
+            background = Color(0xFFEFF0F1),
+            surface = Color(0xFFEFF0F1),
+            surfaceVariant = Color(0xFFE3E5E7),
+            onBackground = Color(0xFF232629),
+            onSurface = Color(0xFF232629),
+            onSurfaceVariant = Color(0xFF6E7880),
+        ),
+    ),
+    BreezeDark(
+        "Breeze Dark",
+        darkColorScheme(
+            primary = Color(0xFF3DAEE9),
+            secondary = Color(0xFFF67400),
+            tertiary = Color(0xFF27AE60),
+            background = Color(0xFF202326),
+            surface = Color(0xFF202326),
+            surfaceVariant = Color(0xFF292C30),
+            onBackground = Color(0xFFFCFCFC),
+            onSurface = Color(0xFFFCFCFC),
+            onSurfaceVariant = Color(0xFFA1A9B1),
+        ),
+    ),
 }
 
 /** The themes "System" follows, by the device's light or dark setting. */
