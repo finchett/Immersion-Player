@@ -120,8 +120,21 @@ fun SettingsSidebar(
     val update by app.updater.state.collectAsState()
     Row(Modifier.width(SidebarWidth).fillMaxHeight()) {
         Column(Modifier.weight(1f).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant)) {
-            Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(end = 10.dp), contentAlignment = Alignment.CenterEnd) {
-                TextAction("‹", onClick = onBack, style = MaterialTheme.typography.titleLarge)
+            Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(end = 10.dp)) {
+                // the traffic lights fill the left of this header on macOS; elsewhere it says where you are
+                if (!LocalTrafficLights.current) {
+                    Text(
+                        "Settings",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.align(Alignment.CenterStart).padding(start = 14.dp),
+                    )
+                }
+                TextAction(
+                    "‹",
+                    onClick = onBack,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
             }
             Column(Modifier.padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsPane.entries.forEach { entry ->

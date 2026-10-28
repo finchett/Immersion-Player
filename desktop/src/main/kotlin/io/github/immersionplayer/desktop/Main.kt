@@ -69,10 +69,17 @@ fun main(args: Array<String>) {
         }
         val keys = remember { PlayerKeys() }
 
-        fun toggleFullscreen() {
-            windowState.placement =
-                if (windowState.placement == WindowPlacement.Fullscreen) WindowPlacement.Floating else WindowPlacement.Fullscreen
+        // Windows' placement full screen keeps the title bar, so there WindowsFullscreen does it
+        var windowsFullscreen by remember { mutableStateOf(false) }
+        fun isFullscreen() = if (isWindows) windowsFullscreen else windowState.placement == WindowPlacement.Fullscreen
+        fun setFullscreen(on: Boolean) {
+            if (isWindows) {
+                windowsFullscreen = on
+            } else {
+                windowState.placement = if (on) WindowPlacement.Fullscreen else WindowPlacement.Floating
+            }
         }
+        fun toggleFullscreen() = setFullscreen(!isFullscreen())
         keys.onToggleFullscreen = ::toggleFullscreen
 
         fun openVideo(video: File, from: File?) {
@@ -86,7 +93,7 @@ fun main(args: Array<String>) {
             session?.close()
             session = null
             keys.peeking = false
-            if (windowState.placement == WindowPlacement.Fullscreen) windowState.placement = WindowPlacement.Floating
+            if (isFullscreen()) setFullscreen(false)
             screen = Screen.Library(current.from)
         }
 
@@ -146,7 +153,7 @@ fun main(args: Array<String>) {
                 Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
                 Key.Escape -> when {
                     keys.onDismiss != null -> keys.onDismiss?.invoke()
-                    windowState.placement == WindowPlacement.Fullscreen -> toggleFullscreen()
+                    isFullscreen() -> toggleFullscreen()
                     else -> closeVideo()
                 }
                 else -> return false
@@ -191,8 +198,9 @@ fun main(args: Array<String>) {
                     MacTrafficLights.apply(lightsVisible, lightCenter, title)
                 }
             }
-            val fullscreen = windowState.placement == WindowPlacement.Fullscreen
+            val fullscreen = isFullscreen()
             SideEffect { keys.fullscreen = fullscreen }
+            if (isWindows) LaunchedEffect(windowsFullscreen) { WindowsFullscreen.set(window, windowsFullscreen) }
             DesktopTheme(app.settings.theme) {
                 CompositionLocalProvider(
                     LocalTrafficLights provides (isMac && !fullscreen),
