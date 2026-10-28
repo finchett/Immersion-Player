@@ -844,8 +844,9 @@ private fun SettingRow(
                             style = if (detailMono) MaterialTheme.typography.bodySmall.copy(fontFamily = Mono)
                             else MaterialTheme.typography.bodySmall,
                             color = muted,
-                            maxLines = 1,
-                            overflow = TextOverflow.MiddleEllipsis,
+                            // a path keeps to one line, losing its middle; a sentence wraps
+                            maxLines = if (detailMono) 1 else Int.MAX_VALUE,
+                            overflow = if (detailMono) TextOverflow.MiddleEllipsis else TextOverflow.Clip,
                         )
                     }
                 }
