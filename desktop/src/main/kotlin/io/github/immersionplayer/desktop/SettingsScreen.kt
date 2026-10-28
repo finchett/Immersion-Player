@@ -848,7 +848,7 @@ private fun ToggleRow(title: String, detail: String?, checked: Boolean, onChange
 
 /** The small switch of the design, rather than Material's finger-sized one. */
 @Composable
-private fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val knob by animateDpAsState(if (checked) 16.dp else 2.dp, label = "knob")
     val track by animateColorAsState(
@@ -975,7 +975,7 @@ private fun Arrow(glyph: String, enabled: Boolean, onClick: () -> Unit) {
 
 /** A theme as a tile of its own colours; [theme] null is the one that follows the system. */
 @Composable
-private fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val fill = theme?.scheme?.background
     val sample = theme?.scheme?.onBackground ?: Color(0xFF6E8A7D)
@@ -1022,7 +1022,7 @@ private fun Swatch(label: String, theme: AppTheme?, selected: Boolean, modifier:
 }
 
 @Composable
-private fun Keycap(text: String) {
+internal fun Keycap(text: String) {
     val scheme = MaterialTheme.colorScheme
     Text(
         text,

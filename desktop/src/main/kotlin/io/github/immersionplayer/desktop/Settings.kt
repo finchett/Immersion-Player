@@ -184,6 +184,11 @@ class Settings(node: String = "io/github/immersionplayer") {
         if (value == null) prefs.remove("library_root") else prefs.put("library_root", value)
     }
 
+    /** Whether the welcome has run; anyone who'd picked a library before it existed has seen enough. */
+    var onboarded by mutableStateOf(prefs.getBoolean("onboarded", libraryRoot != null))
+        private set
+    fun finishOnboarding() { onboarded = true; prefs.putBoolean("onboarded", true) }
+
     fun isBundledInstalled(name: String) = prefs.getBoolean("bundled:$name", false)
     fun setBundledInstalled(name: String) = prefs.putBoolean("bundled:$name", true)
 

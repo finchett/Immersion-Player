@@ -46,6 +46,8 @@ private sealed interface Screen {
     data class Library(val folder: File?) : Screen
     data class Player(val video: File, val from: File?) : Screen
     data class Settings(val from: Screen) : Screen
+    /** The first launch's welcome and setup. */
+    data object Welcome : Screen
 }
 
 fun main(args: Array<String>) {
@@ -63,7 +65,13 @@ fun main(args: Array<String>) {
         // a video passed on the command line ("Open with…") opens straight away
         val initial = remember { args.firstOrNull()?.let(::File)?.takeIf { it.isFile } }
         var screen by remember {
-            mutableStateOf<Screen>(if (initial != null) Screen.Player(initial, initial.parentFile) else Screen.Library(null))
+            mutableStateOf(
+                when {
+                    initial != null -> Screen.Player(initial, initial.parentFile)
+                    !app.settings.onboarded -> Screen.Welcome
+                    else -> Screen.Library(null)
+                },
+            )
         }
         var session by remember {
             mutableStateOf(initial?.let { PlayerSession(app.settings, player.value, it) })
@@ -224,7 +232,7 @@ fun main(args: Array<String>) {
                     AnimatedContent(
                         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                         targetState = screen,
-                        contentKey = { if (it is Screen.Player) it else Screen.Library::class },
+                        contentKey = { if (it is Screen.Player || it is Screen.Welcome) it else Screen.Library::class },
                         transitionSpec = {
                             if (targetState is Screen.Player) Motion.intoPlayer() else Motion.outOfPlayer()
                         },
@@ -235,6 +243,11 @@ fun main(args: Array<String>) {
                                 PlayerScreen(app, it, keys, onBack = ::closeVideo, onOpenVideo = { next -> openVideo(next, s.from) })
                             }
                             DisposableEffect(s) { onDispose { if (screen != s) sessions.remove(s) } }
+                        } else if (s is Screen.Welcome) {
+                            Onboarding(app, onFinish = {
+                                app.settings.finishOnboarding()
+                                screen = Screen.Library(null)
+                            })
                         } else {
                             JustUpdated(app)
                             Browse(
