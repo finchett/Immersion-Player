@@ -110,7 +110,14 @@ fun SettingsHeader(pane: SettingsPane) {
  * left), the panes, and the version at the foot.
  */
 @Composable
-fun SettingsSidebar(pane: SettingsPane, onPane: (SettingsPane) -> Unit, onBack: () -> Unit) {
+fun SettingsSidebar(
+    app: DesktopApp,
+    pane: SettingsPane,
+    onPane: (SettingsPane) -> Unit,
+    onBack: () -> Unit,
+    onRestartToUpdate: () -> Unit = {},
+) {
+    val update by app.updater.state.collectAsState()
     Row(Modifier.width(SidebarWidth).fillMaxHeight()) {
         Column(Modifier.weight(1f).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant)) {
             Box(Modifier.fillMaxWidth().height(HeaderHeight).padding(end = 10.dp), contentAlignment = Alignment.CenterEnd) {
@@ -133,11 +140,21 @@ fun SettingsSidebar(pane: SettingsPane, onPane: (SettingsPane) -> Unit, onBack: 
                 Column {
                     Text("Immersion Player", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Text(
-                        "Version $APP_VERSION",
+                        "Version $APP_VERSION" + if (update == UpdateState.UpToDate) " · latest" else "",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    (update as? UpdateState.Downloading)?.let { state ->
+                        Text(
+                            "Getting ${state.version}… ${(state.progress * 100).toInt()}%",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+            }
+            if (update is UpdateState.Ready || update is UpdateState.Available) {
+                Box(Modifier.padding(start = 12.dp, bottom = 14.dp)) { UpdatePill(app, onRestartToUpdate) }
             }
         }
         VerticalDivider(color = MaterialTheme.colorScheme.hairline)

@@ -52,6 +52,7 @@ fun main(args: Array<String>) {
     val app = DesktopApp()
     MacTrafficLights.probe()
     Thread({ app.prepareDictionaries() }, "dictionary-setup").apply { isDaemon = true }.start()
+    app.updater.start()
 
     application {
         val windowState = rememberWindowState(width = 1440.dp, height = 860.dp)
@@ -156,13 +157,16 @@ fun main(args: Array<String>) {
         val appIcon = painterResource("icon.png")
         LaunchedEffect(Unit) { setDockIcon() }
 
+        // a staged update goes in once this has quit (Updater's shutdown hook)
+        fun quit() {
+            session?.close()
+            if (player.isInitialized()) player.value.destroy()
+            exitApplication()
+        }
+
         val title = (screen as? Screen.Player)?.video?.nameWithoutExtension ?: "Immersion Player"
         Window(
-            onCloseRequest = {
-                session?.close()
-                if (player.isInitialized()) player.value.destroy()
-                exitApplication()
-            },
+            onCloseRequest = ::quit,
             state = windowState,
             title = title,
             icon = appIcon,
@@ -216,11 +220,16 @@ fun main(args: Array<String>) {
                             }
                             DisposableEffect(s) { onDispose { if (screen != s) sessions.remove(s) } }
                         } else {
+                            JustUpdated(app)
                             Browse(
                                 app = app,
                                 screen = s,
                                 navigate = { screen = it },
                                 onOpenVideo = { video, from -> openVideo(video, from) },
+                                onRestartToUpdate = {
+                                    app.updater.restartAfterQuit()
+                                    quit()
+                                },
                             )
                         }
                     }
@@ -265,7 +274,13 @@ private val slide = Motion.slide
  * library, moving between folders slides the body under a header that stays put.
  */
 @Composable
-private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, onOpenVideo: (File, File?) -> Unit) {
+private fun Browse(
+    app: DesktopApp,
+    screen: Screen,
+    navigate: (Screen) -> Unit,
+    onOpenVideo: (File, File?) -> Unit,
+    onRestartToUpdate: () -> Unit,
+) {
     // which settings pane is open: kept out of Screen so switching pane doesn't animate the screen
     var pane by remember { mutableStateOf(SettingsPane.General) }
     // the folder the library is in, kept so it still shows it while it fades out under settings
@@ -278,7 +293,9 @@ private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, 
                 header = { SettingsHeader(pane) },
                 body = { SettingsBody(app, pane) },
                 // the panes live in a sidebar that runs the whole height, under the lights
-                leading = { SettingsSidebar(pane, onPane = { pane = it }, onBack = { navigate(library) }) },
+                leading = {
+                    SettingsSidebar(app, pane, onPane = { pane = it }, onBack = { navigate(library) }, onRestartToUpdate)
+                },
             )
         } else {
             Chrome(
@@ -287,6 +304,7 @@ private fun Browse(app: DesktopApp, screen: Screen, navigate: (Screen) -> Unit, 
                         app, library.folder,
                         onOpenFolder = { navigate(Screen.Library(it)) },
                         onOpenSettings = { navigate(Screen.Settings(library)) },
+                        onRestartToUpdate = onRestartToUpdate,
                     )
                 },
                 body = {

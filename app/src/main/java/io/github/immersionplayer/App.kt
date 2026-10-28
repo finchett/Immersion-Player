@@ -11,6 +11,7 @@ import io.github.immersionplayer.subs.SubtitleLoader
 import io.github.immersionplayer.ui.AnkiCards
 import io.github.immersionplayer.ui.Appearance
 import io.github.immersionplayer.ui.ThumbnailStore
+import io.github.immersionplayer.update.AppUpdater
 
 class App : Application() {
     lateinit var prefs: Prefs
@@ -28,6 +29,8 @@ class App : Application() {
     lateinit var thumbnails: ThumbnailStore
         private set
     lateinit var anki: AnkiCards
+        private set
+    lateinit var updater: AppUpdater
         private set
 
     /** Appends a non-fatal error to files/errors.log (the system log isn't always available). */
@@ -60,6 +63,7 @@ class App : Application() {
             mediaDir = java.io.File(cacheDir, "anki"),
             logError = ::logError,
         )
+        updater = AppUpdater(this).apply { start() }
         Thread {
             dictionaryDatabase.deleteIncomplete()
             BundledDictionaries.installMissing(this, dictionaryDatabase)

@@ -109,7 +109,7 @@ class ScreensTest {
                         Chrome(
                             header = { SettingsHeader(pane) },
                             body = { SettingsBody(app, pane) },
-                            leading = { SettingsSidebar(pane, onPane = { pane = it }, onBack = {}) },
+                            leading = { SettingsSidebar(app, pane, onPane = { pane = it }, onBack = {}) },
                         )
                     }
                 }

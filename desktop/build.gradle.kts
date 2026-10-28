@@ -10,7 +10,22 @@ kotlin {
     jvmToolchain(17)
 }
 
+val appVersion = providers.gradleProperty("appVersion").get()
+
+// APP_VERSION, from gradle.properties, so the app knows which release it is
+val writeBuildInfo by tasks.registering {
+    val out = layout.buildDirectory.dir("generated/buildinfo")
+    inputs.property("version", appVersion)
+    outputs.dir(out)
+    doLast {
+        val file = out.get().file("io/github/immersionplayer/desktop/BuildInfo.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText("package io.github.immersionplayer.desktop\n\nconst val APP_VERSION = \"$appVersion\"\n")
+    }
+}
+
 sourceSets.main {
+    kotlin.srcDir(writeBuildInfo)
     // Compose code shared with the Android app, compiled here against JetBrains Compose
     kotlin.srcDir("../shared-ui/src")
     // bundled dictionaries (JMdict), read as resources under dictionaries/
@@ -55,7 +70,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Immersion Player"
-            packageVersion = "0.4.0"
+            packageVersion = appVersion
             description = "Japanese video player with a built-in dictionary"
             copyright = "MPL-2.0"
             modules("java.instrument", "java.prefs", "java.sql", "jdk.unsupported")
@@ -92,7 +107,7 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bu
 // ad-hoc signed again after that edit, next to an Applications link.
 val packageMacRelease by tasks.registering(Exec::class) {
     dependsOn("createDistributable")
-    val version = "0.4.0"
+    val version = appVersion
     val app = layout.buildDirectory.dir("compose/binaries/main/app/Immersion Player.app")
     val out = layout.buildDirectory.file("release/Immersion-Player-$version-macos-arm64.dmg")
     inputs.dir(app)
