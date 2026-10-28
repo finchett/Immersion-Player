@@ -83,21 +83,15 @@ jobs:
           sudo mkdir -p /usr/share/applications /usr/share/desktop-directories
           sudo apt-get install -yq ./dist/*.deb xvfb ffmpeg imagemagick
           ffmpeg -v error -f lavfi -i testsrc=duration=20:size=640x360:rate=24 -c:v libx264 test.mkv
-          # a virtual display and no GPU: where OpenGL frames come back blank, the player has to
-          # notice and switch to software, so the screenshot shows the test pattern, not black
+          # a virtual display and no GPU: the player passes over llvmpipe's emulated OpenGL for
+          # software, so the screenshot shows the test pattern whole, not black or seamed
           xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
             "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app.log 2>&1 &
             sleep 25
             import -window root shot.png
             kill %1' || true
-          # the same forced to software, to compare against
-          xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
-            JAVA_TOOL_OPTIONS=-Dimmersion.renderer=sw "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app-sw.log 2>&1 &
-            sleep 25
-            import -window root shot-sw.png
-            kill %1' || true
-          grep "^video:" app-sw.log || true
           cat app.log
+          grep "^video:" app.log
           cat ~/.local/share/immersion-player/errors.log 2>/dev/null || true
           ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/immersion-player/errors.log 2>/dev/null
           # the video takes the left of the window: its average brightness, 0 for black
@@ -108,7 +102,7 @@ jobs:
         if: always()
         with:
           name: linux-playback
-          path: shot*.png
+          path: shot.png
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64

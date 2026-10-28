@@ -34,9 +34,11 @@ import java.util.concurrent.Semaphore
  * straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces the
  * software one.
  *
- * A context can be made and still read back nothing: on Linux without a GPU (Mesa's llvmpipe on a
- * virtual display) every frame came back as zeros. mpv's frames are opaque, so a frame whose
- * alpha is all zero is one that never arrived; after a few of those the player drops GL and
+ * Without a GPU, OpenGL is only emulated on the CPU (Mesa's llvmpipe and the like): slower than
+ * mpv's own software renderer, and on llvmpipe it left seams through the picture, so such a
+ * renderer is passed over for software ([SOFTWARE_GL]). And a context can be made and still read
+ * back nothing, as llvmpipe did on a virtual display once. mpv's frames are opaque, so a frame
+ * whose alpha is all zero is one that never arrived; after a few of those the player drops GL and
  * carries on in software ([checkGlFrame]).
  */
 class MpvPlayer {
@@ -132,8 +134,17 @@ class MpvPlayer {
     }
 
     private fun createRenderContext() {
-        if (System.getProperty("immersion.renderer") != "sw") {
-            OffscreenGl.create()?.let { context ->
+        val forced = System.getProperty("immersion.renderer")
+        if (forced != "sw") {
+            // a CPU-emulated OpenGL only when asked for by name (=gl)
+            OffscreenGl.create()?.takeIf { context ->
+                val emulated = SOFTWARE_GL.any { it in context.renderer.lowercase() }
+                if (emulated && forced != "gl") {
+                    System.err.println("video: passing over ${context.renderer}, OpenGL without a GPU")
+                    context.destroy()
+                }
+                !emulated || forced == "gl"
+            }?.let { context ->
                 gl = context
                 val initParams = Memory(16).apply {
                     setPointer(0, CallbackReference.getFunctionPointer(getProcAddress))
@@ -400,3 +411,6 @@ class MpvPlayer {
 
 /** Blank GL frames in a row before the player gives up on GL; one alone could be a fluke of timing. */
 private const val BLANK_FRAMES = 3
+
+/** OpenGL renderers that run on the CPU, by a part of their names: no better than mpv's software one. */
+private val SOFTWARE_GL = listOf("llvmpipe", "softpipe", "swiftshader", "basic render", "gdi generic", "software rasterizer")
