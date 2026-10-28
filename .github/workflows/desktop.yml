@@ -90,6 +90,13 @@ jobs:
             sleep 25
             import -window root shot.png
             kill %1' || true
+          # the same forced to software, to compare against
+          xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
+            JAVA_TOOL_OPTIONS=-Dimmersion.renderer=sw "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app-sw.log 2>&1 &
+            sleep 25
+            import -window root shot-sw.png
+            kill %1' || true
+          grep "^video:" app-sw.log || true
           cat app.log
           cat ~/.local/share/immersion-player/errors.log 2>/dev/null || true
           ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/immersion-player/errors.log 2>/dev/null
@@ -101,7 +108,7 @@ jobs:
         if: always()
         with:
           name: linux-playback
-          path: shot.png
+          path: shot*.png
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64

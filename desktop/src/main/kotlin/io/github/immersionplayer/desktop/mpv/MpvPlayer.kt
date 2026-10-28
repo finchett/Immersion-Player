@@ -153,6 +153,7 @@ class MpvPlayer {
             createRenderContext(MpvLib.RENDER_PARAM_API_TYPE to cString("sw"))
                 ?: error("mpv_render_context_create failed")
         }
+        System.err.println("video: " + (gl?.let { "OpenGL on ${it.renderer}" } ?: "software"))
         lib.mpv_render_context_set_update_callback(renderContext, updateCallback, null)
     }
 
