@@ -2,6 +2,7 @@ package io.github.immersionplayer.desktop.mpv
 
 import com.sun.jna.CallbackReference
 import com.sun.jna.Memory
+import com.sun.jna.Platform
 import com.sun.jna.Pointer
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_END_FILE
 import io.github.immersionplayer.desktop.mpv.MpvLib.Companion.EVENT_FILE_LOADED
@@ -32,7 +33,10 @@ import java.util.concurrent.Semaphore
  * EGL), and each frame is read back into the bitmap: that's what runs GLSL shaders such as
  * Anime4K. If that context can't be made, it falls back to the software render API, which draws
  * straight into the bitmap and works the same on every OS. -Dimmersion.renderer=sw forces the
- * software one.
+ * software one, and =gl the GPU one.
+ *
+ * Off macOS the software one is the default for now: the OpenGL path has only been tried on
+ * machines without a GPU, where on Linux it drew black frames.
  */
 class MpvPlayer {
     private val lib = MpvLib.INSTANCE
@@ -127,7 +131,8 @@ class MpvPlayer {
     }
 
     private fun createRenderContext() {
-        if (System.getProperty("immersion.renderer") != "sw") {
+        val renderer = System.getProperty("immersion.renderer") ?: if (Platform.isMac()) "gl" else "sw"
+        if (renderer != "sw") {
             OffscreenGl.create()?.let { context ->
                 gl = context
                 val initParams = Memory(16).apply {
