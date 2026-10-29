@@ -159,7 +159,7 @@ fun LibraryBody(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, on
             }
         }
     } else {
-        FolderContents(app, current, isRoot = current == locate(app, null).first, onOpenFolder, onOpenVideo)
+        FolderContents(app, current, onOpenFolder, onOpenVideo)
     }
 }
 
@@ -167,14 +167,14 @@ fun LibraryBody(app: DesktopApp, folder: File?, onOpenFolder: (File) -> Unit, on
 private fun FolderContents(
     app: DesktopApp,
     folder: File,
-    isRoot: Boolean,
     onOpenFolder: (File) -> Unit,
     onOpenVideo: (File) -> Unit,
 ) {
     var listing by remember(folder) { mutableStateOf<Listing?>(null) }
     LaunchedEffect(folder) { listing = withContext(Dispatchers.IO) { list(folder) } }
     val shown = listing ?: return
-    val title = if (isRoot) "Your library" else app.settings.title(folder.name)
+    // the library's own folder by its name too, as every folder below it is; the header says Library
+    val title = app.settings.title(folder.name).ifEmpty { "Your library" }
     val tidy = app.settings.tidyNames
     val videoTitles = remember(shown, tidy) {
         if (tidy) Titles.episodes(shown.videos.map { it.name }) else shown.videos.map { it.nameWithoutExtension }

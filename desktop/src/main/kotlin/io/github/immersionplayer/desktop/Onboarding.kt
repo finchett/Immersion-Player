@@ -76,6 +76,7 @@ import io.github.immersionplayer.dictionary.DictionaryCatalog
 import io.github.immersionplayer.dictionary.DictionaryInfo
 import io.github.immersionplayer.library.isVideoName
 import io.github.immersionplayer.ui.AppTheme
+import io.github.immersionplayer.update.Updates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -410,7 +411,7 @@ private fun ColumnScope.DoneStep(app: DesktopApp) {
         Text("Found a bug, or wish it did something? ", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         TextAction(
             "Tell us on GitHub ↗",
-            onClick = { openInBrowser(ISSUES_PAGE) },
+            onClick = { openInBrowser(Updates.ISSUES_PAGE) },
             color = scheme.primary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -687,5 +688,4 @@ private fun countVideos(folder: File): Int =
     folder.walkTopDown().maxDepth(4).filter { it.isFile && isVideoName(it.name) }.take(MAX_COUNT).count()
 
 private const val MAX_COUNT = 999
-private const val ISSUES_PAGE = "https://github.com/finchett/Immersion-Player/issues"
 private const val ANKICONNECT_PAGE = "https://ankiweb.net/shared/info/2055492159"
