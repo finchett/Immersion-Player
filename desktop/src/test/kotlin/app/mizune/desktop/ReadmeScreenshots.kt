@@ -130,6 +130,8 @@ class ReadmeScreenshots {
                         }
                     }
                 }
+                // the picture filling its area (pan & scan), so a wide film isn't mostly black bars
+                app.settings.updateVideoFill(true)
                 // the line and its first word, looked up on its own
                 waitUntil(timeoutMillis = 20_000) { session.primary.value?.cues.orEmpty().isNotEmpty() }
                 val alone = session.primary.value!!.cues.indexOfFirst { it.text.startsWith("私は物心") }
@@ -158,6 +160,7 @@ class ReadmeScreenshots {
                 waitForIdle()
                 shot("over-video")
                 app.settings.updatePanelHidden(false)
+                app.settings.updateVideoFill(false)
             }
         } finally {
             session.close()
