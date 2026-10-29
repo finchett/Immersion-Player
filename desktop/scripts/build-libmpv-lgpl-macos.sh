@@ -31,13 +31,13 @@ make install
 cd "$work"
 curl -sSfL "https://github.com/mpv-player/mpv/archive/refs/tags/v$MPV.tar.gz" | tar xz
 cd "mpv-$MPV"
-# libmpv only: no player, manual or scripting, and no Swift (the app draws mpv's frames itself)
+# libmpv only: no player, manual or scripting. Swift stays (as Homebrew builds it): mpv's Mac
+# clipboard code needs it
 PKG_CONFIG_PATH="$prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
     meson setup build --prefix="$prefix" --libdir=lib --buildtype=release \
     -Dgpl=false -Dlibmpv=true -Dcplayer=false \
     -Dmanpage-build=disabled -Dhtml-build=disabled -Dpdf-build=disabled \
-    -Dlua=disabled -Djavascript=disabled \
-    -Dswift-build=disabled -Dmacos-cocoa-cb=disabled -Dmacos-media-player=disabled
+    -Dlua=disabled -Djavascript=disabled
 meson install -C build
 
 echo "built $(ls "$prefix/lib/libmpv"*.dylib | head -1) without GPL code"
