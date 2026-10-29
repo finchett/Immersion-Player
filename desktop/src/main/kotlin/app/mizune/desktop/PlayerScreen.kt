@@ -48,6 +48,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.input.key.Key
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -148,6 +149,8 @@ class PlayerKeys {
     var onDismiss: (() -> Unit)? = null
     /** What a key just changed, said briefly over the video. */
     var notice by mutableStateOf<Notice?>(null)
+    /** Takes every key while the first-play tutorial is up, so none reaches the player. */
+    var onTutorialKey: ((Key) -> Unit)? = null
 }
 
 /** A [PlayerKeys.notice]. Each is its own object, so saying the same thing twice shows it again. */
@@ -339,6 +342,7 @@ fun PlayerScreen(
     val shape = if (rounded) RoundedCornerShape(corners.cardRadius) else RectangleShape
     val gap = if (rounded) corners.cardGap else 0.dp
 
+    Box(Modifier.fillMaxSize()) {
     BoxWithConstraints(Modifier.fillMaxSize().background(gutter).padding(gap)) {
         val totalWidth = maxWidth
         var panelFraction by remember { mutableFloatStateOf(settings.panelFraction.coerceIn(0.2f, 0.6f)) }
@@ -427,6 +431,19 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+    // the first video: how to work the player, over it, paused until it's done
+    if (!settings.playerTutorialSeen) {
+        LaunchedEffect(Unit) { session.pause() }
+        PlayerTutorial(
+            keys,
+            ankiEnabled = settings.ankiEnabled,
+            onFinish = {
+                settings.updatePlayerTutorialSeen(true)
+                session.play()
+            },
+        )
+    }
     }
 }
 

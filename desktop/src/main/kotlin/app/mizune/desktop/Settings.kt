@@ -214,6 +214,11 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
         prefs.get("install_id", null) ?: java.util.UUID.randomUUID().toString().also { prefs.put("install_id", it) }
     }
 
+    /** Whether the first-play tutorial has been through (PlayerTutorial); Settings › Keyboard brings it back. */
+    var playerTutorialSeen by mutableStateOf(prefs.getBoolean("player_tutorial_seen", false))
+        private set
+    fun updatePlayerTutorialSeen(value: Boolean) { playerTutorialSeen = value; prefs.putBoolean("player_tutorial_seen", value) }
+
     fun isBundledInstalled(name: String) = prefs.getBoolean("bundled:$name", false)
     fun setBundledInstalled(name: String) = prefs.putBoolean("bundled:$name", true)
 
