@@ -101,8 +101,10 @@ Download from the [latest release](https://github.com/finchett/Immersion-Player/
 - **Windows (x64, Windows 10 or newer):** run the `.msi`. It installs for you alone, so it doesn't
   need an administrator. It isn't signed yet, so SmartScreen may stop it the first time: choose
   **More info**, then **Run anyway**.
-- **Linux (x64, Ubuntu 24.04, Debian 13 or newer):** install the `.deb` with
-  `sudo apt install ./Immersion-Player-*-linux-x64.deb`, which brings libmpv along.
+- **Linux (x64):** the `.AppImage` runs on any distribution from about 2022 on (Ubuntu 22.04,
+  Debian 12, Fedora 36 and newer) and carries everything it needs: make it executable and open it.
+  On Ubuntu 24.04 or Debian 13 and newer there's also a `.deb`, installed with
+  `sudo apt install ./Immersion-Player-*-linux-x64.deb`, which uses the system's libmpv.
 
 On the Mac and Android new versions install themselves. On Windows and Linux the app tells you
 when one is out and links to it; installing in place is coming.
@@ -414,8 +416,9 @@ licences. Changes to its files have to stay under MPL-2.0, with their source ava
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
 On Windows and macOS, the mpv and FFmpeg it bundles are LGPL builds, so those apps are MPL-2.0
-with LGPL libraries. On Android they are, for now, GPL builds, so that app as built today is
-distributed under the GPL as a whole, which MPL-2.0 allows; an LGPL build is planned for it too.
+with LGPL libraries. On Android and in the Linux AppImage they are, for now, GPL builds, so those as
+built today are distributed under the GPL as a whole, which MPL-2.0 allows; LGPL builds are planned
+for them too.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
@@ -430,12 +433,15 @@ distributed under the GPL as a whole, which MPL-2.0 allows; an LGPL build is pla
   permissive licences. `release.sh --try` builds with Homebrew's GPL libmpv instead.
 - **libmpv and FFmpeg** (Windows build, from
   [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild)): LGPL-2.1+, built without
-  their GPL parts (`-Dgpl=false`, which CI checks). The Linux package uses the system's own libmpv.
+  their GPL parts (`-Dgpl=false`, which CI checks). The Linux .deb uses the system's own libmpv.
 - **Tesseract on Windows** (from [UB Mannheim's build](https://github.com/UB-Mannheim/tesseract)):
   Apache-2.0, with the libraries it loads: Leptonica (BSD-2-Clause), libarchive (BSD), OpenSSL's
   libcrypto (Apache-2.0), and the zlib, bzip2, xz, zstd, lz4, libjpeg, libpng, libtiff, libwebp,
   giflib, OpenJPEG, JBIG-KIT, LERC, libdeflate, libb2, expat and libiconv libraries under their own
   permissive or LGPL licences, and MinGW's runtime (libgcc, libstdc++, winpthreads).
+- **libmpv, FFmpeg, Tesseract and their libraries** (Linux AppImage, from Ubuntu 22.04's packages,
+  gathered by [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)): GPL for mpv and FFmpeg as
+  Ubuntu builds them; the rest under their own licences, as Ubuntu distributes them.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
 - **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public
