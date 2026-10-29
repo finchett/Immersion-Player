@@ -108,3 +108,74 @@ jobs:
           name: linux-x64
           path: dist/*.deb
           if-no-files-found: error
+
+  # an AppImage for any Linux at least as new as Ubuntu 22.04 (its glibc), carrying its own libmpv
+  # and libtesseract, unlike the .deb, which takes the system's
+  linux-appimage:
+    runs-on: ubuntu-22.04
+    env:
+      ORG_GRADLE_PROJECT_analyticsMeasurementId: ${{ secrets.ANALYTICS_MEASUREMENT_ID }}
+      ORG_GRADLE_PROJECT_analyticsApiSecret: ${{ secrets.ANALYTICS_API_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq libmpv1 libtesseract4 file
+          ./gradlew --configure-on-demand --no-daemon :desktop:createDistributable
+      - name: AppImage
+        run: |
+          version=$(sed -n 's/^appVersion=//p' gradle.properties)
+          mkdir -p AppDir/opt dist
+          cp -r desktop/build/compose/binaries/main/app/immersion-player AppDir/opt/
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          # libmpv and libtesseract, and every library they load that a desktop can't be counted on to have
+          APPIMAGE_EXTRACT_AND_RUN=1 OUTPUT="dist/Immersion-Player-$version-linux-x64.AppImage" \
+            ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+              --desktop-file desktop/appimage/immersion-player.desktop \
+              --icon-file desktop/src/main/resources/icon.png --icon-filename immersion-player \
+              --custom-apprun desktop/appimage/AppRun \
+              --library /usr/lib/x86_64-linux-gnu/libmpv.so.1 \
+              --library /usr/lib/x86_64-linux-gnu/libtesseract.so.4 \
+              --output appimage
+          ls -la dist
+      - name: Play something on a clean Fedora
+        # a different distribution from the one it was built on, with only a desktop's usual libraries
+        run: |
+          sudo apt-get install -yq ffmpeg
+          ffmpeg -v error -f lavfi -i testsrc=duration=20:size=640x360:rate=24 -c:v libx264 test.mkv
+          docker run --rm -v "$PWD:/w" -w /w fedora:41 bash -c '
+            set -e
+            dnf -y -q install xorg-x11-server-Xvfb xorg-x11-xauth which ImageMagick \
+              libXext libXrender libXtst libXi libXrandr freetype fontconfig dejavu-sans-fonts \
+              mesa-libGL mesa-libEGL mesa-dri-drivers alsa-lib > /dev/null
+            ./dist/*.AppImage --appimage-extract > /dev/null
+            # every bundled library finds what it needs
+            missing=$(for lib in squashfs-root/usr/lib/*.so*; do LD_LIBRARY_PATH=squashfs-root/usr/lib ldd "$lib" | grep "not found" || true; done)
+            if [ -n "$missing" ]; then echo "$missing"; exit 1; fi
+            xvfb-run -a -s "-screen 0 1280x800x24" bash -c "
+              ./squashfs-root/AppRun /w/test.mkv > app.log 2>&1 &
+              sleep 30
+              import -window root shot-appimage.png
+              kill %1" || true
+            cat app.log
+            grep "^video:" app.log
+            ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log
+            brightness=$(convert shot-appimage.png -crop 50%x100%+0+0 -colorspace gray -format "%[fx:mean]" info:)
+            echo "video area brightness: $brightness"
+            awk -v b="$brightness" "BEGIN { exit !(b > 0.1) }"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-appimage-playback
+          path: shot-appimage.png

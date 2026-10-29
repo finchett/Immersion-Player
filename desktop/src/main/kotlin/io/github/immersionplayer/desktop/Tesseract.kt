@@ -22,8 +22,9 @@ internal interface TesseractLib : Library {
 
     companion object {
         val INSTANCE: TesseractLib by lazy {
-            // as with libmpv, Linux has the plain name only with the -dev package
-            val names = bundled()?.let(::listOf) ?: listOf("tesseract", "libtesseract.so.5")
+            // as with libmpv, Linux has the plain name only with the -dev package; 4 is what the
+            // AppImage bundles, from Ubuntu 22.04
+            val names = bundled()?.let(::listOf) ?: listOf("tesseract", "libtesseract.so.5", "libtesseract.so.4")
             names.drop(1).fold(runCatching { Native.load(names[0], TesseractLib::class.java) }) { loaded, name ->
                 loaded.recoverCatching { Native.load(name, TesseractLib::class.java) }
             }.getOrThrow()

@@ -1,0 +1,6 @@
+#!/bin/sh
+# The AppImage's entry point: the jpackage app in opt/, with the libmpv and libtesseract bundled
+# in usr/lib found first (the app loads them by name; see MpvLib and Tesseract.kt).
+HERE="$(dirname "$(readlink -f "$0")")"
+export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$HERE/opt/immersion-player/bin/Immersion Player" "$@"
