@@ -429,6 +429,11 @@ planned for every platform, after which the apps are MPL-2.0 with LGPL libraries
 - **libmpv and FFmpeg** (Windows build, from
   [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake)): GPL. The Linux
   package uses the system's own libmpv.
+- **Tesseract on Windows** (from [UB Mannheim's build](https://github.com/UB-Mannheim/tesseract)):
+  Apache-2.0, with the libraries it loads: Leptonica (BSD-2-Clause), libarchive (BSD), OpenSSL's
+  libcrypto (Apache-2.0), and the zlib, bzip2, xz, zstd, lz4, libjpeg, libpng, libtiff, libwebp,
+  giflib, OpenJPEG, JBIG-KIT, LERC, libdeflate, libb2, expat and libiconv libraries under their own
+  permissive or LGPL licences, and MinGW's runtime (libgcc, libstdc++, winpthreads).
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
 - **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public
