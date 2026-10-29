@@ -137,7 +137,8 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bu
 // jpackage's app doesn't notice the bundled libraries changing (Homebrew's for a try, CI's for a
 // release), so it's packaged again whenever they do; without this a release once kept a GPL libmpv
 tasks.matching { it.name == "createDistributable" }.configureEach {
-    inputs.dir(layout.buildDirectory.dir("native")).withPropertyName("nativeLibraries").optional()
+    // a tree rather than a dir: the AppImage's build has no build/native, where a tree is just empty
+    inputs.files(fileTree(layout.buildDirectory.dir("native"))).withPropertyName("nativeLibraries")
 }
 
 // The release .dmg: the app jpackage builds, with the real (0.x) version written into Info.plist,
