@@ -344,8 +344,10 @@ gh release edit v0.6.0 --draft=false  # publishing is what sends the update
 ```
 
 The version lives in `gradle.properties` (`appVersion`), and Android's versionCode is derived
-from it. The feed is signed with `~/.keystores/immersion-update.pem`, whose public half is in
-`core`'s `Updates`. Back that key up: installed apps accept no other.
+from it. The feed is signed with `~/.keystores/mizune-update.pem`, whose public half is in
+`core`'s `Updates`, and release APKs with `~/.keystores/mizune.jks` (`-PmizuneKeystore` points at
+`mizune.properties`). Back both up: installed apps accept no other feed key, and Android won't
+update an app across another signing key.
 
 ### Tests
 
