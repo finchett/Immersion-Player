@@ -7,6 +7,16 @@
 set -euo pipefail
 
 out="$1"
+
+# a bundle made already (CI's LGPL libmpv, by this same script): taken as it is
+if [ -n "${LIBMPV_BUNDLE:-}" ]; then
+    rm -rf "$out"
+    mkdir -p "$out"
+    cp "$LIBMPV_BUNDLE"/*.dylib "$out/"
+    echo "took $(ls "$out" | wc -l | tr -d ' ') libraries from $LIBMPV_BUNDLE into $out"
+    exit 0
+fi
+
 entries=("${LIBMPV:-/opt/homebrew/lib/libmpv.2.dylib}" "${LIBTESSERACT:-/opt/homebrew/lib/libtesseract.5.dylib}")
 rm -rf "$out"
 mkdir -p "$out"
