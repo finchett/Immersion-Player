@@ -20,13 +20,17 @@ export PKG_CONFIG_PATH="$prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PAT
 
 sudo apt-get update -q
 sudo apt-get install -yq --no-install-recommends \
-    build-essential git meson ninja-build nasm pkg-config python3 \
+    build-essential git ninja-build nasm pkg-config python3 python3-pip \
     libdav1d-dev libva-dev libvdpau-dev libdrm-dev \
     libass-dev libfreetype-dev libfribidi-dev libharfbuzz-dev libfontconfig-dev \
     liblcms2-dev libuchardet-dev zlib1g-dev libjpeg-dev \
     libasound2-dev libpulse-dev \
     libx11-dev libxext-dev libxpresent-dev libxrandr-dev libxss-dev libxinerama-dev libxv-dev \
     libegl-dev libgl-dev libgbm-dev libwayland-dev wayland-protocols libxkbcommon-dev
+# 22.04's Meson (0.61) is older than libplacebo and mpv need
+python3 -m pip install --quiet --user meson
+export PATH="$HOME/.local/bin:$PATH"
+meson --version
 
 cd "$work"
 git clone -q --depth 1 --branch "$LIBPLACEBO" --recurse-submodules https://github.com/haasn/libplacebo.git
