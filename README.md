@@ -415,10 +415,10 @@ You may use, modify, sell and redistribute it, and combine it with other code un
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
-On Windows and macOS, the mpv and FFmpeg it bundles are LGPL builds, so those apps are MPL-2.0
-with LGPL libraries. On Android and in the Linux AppImage they are, for now, GPL builds, so those as
-built today are distributed under the GPL as a whole, which MPL-2.0 allows; LGPL builds are planned
-for them too.
+On Windows, macOS and in the Linux AppImage, the mpv and FFmpeg it bundles are LGPL builds, so
+those are MPL-2.0 with LGPL libraries. On Android they are, for now, GPL builds, so that app as built
+today is distributed under the GPL as a whole, which MPL-2.0 allows; an LGPL build is planned for it
+too.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
@@ -439,9 +439,10 @@ for them too.
   libcrypto (Apache-2.0), and the zlib, bzip2, xz, zstd, lz4, libjpeg, libpng, libtiff, libwebp,
   giflib, OpenJPEG, JBIG-KIT, LERC, libdeflate, libb2, expat and libiconv libraries under their own
   permissive or LGPL licences, and MinGW's runtime (libgcc, libstdc++, winpthreads).
-- **libmpv, FFmpeg, Tesseract and their libraries** (Linux AppImage, from Ubuntu 22.04's packages,
-  gathered by [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)): GPL for mpv and FFmpeg as
-  Ubuntu builds them; the rest under their own licences, as Ubuntu distributes them.
+- **libmpv, FFmpeg and libplacebo** (Linux AppImage): LGPL-2.1+, built in CI without their GPL parts
+  (`desktop/scripts/build-libmpv-lgpl-linux.sh`; mpv with `-Dgpl=false`, which CI checks). Tesseract
+  and the other libraries they load come from Ubuntu 22.04's packages, gathered by
+  [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy), under their own licences.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
 - **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public
