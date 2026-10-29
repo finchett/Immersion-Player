@@ -202,7 +202,7 @@ fun SettingsBody(app: DesktopApp, pane: SettingsPane, onRestartToUpdate: () -> U
                 SettingsPane.Playback -> PlaybackPane(app)
                 SettingsPane.Appearance -> AppearancePane(app)
                 SettingsPane.Anki -> AnkiPane(app)
-                SettingsPane.Keyboard -> KeyboardPane()
+                SettingsPane.Keyboard -> KeyboardPane(app.settings)
                 SettingsPane.About -> AboutPane(app, onRestartToUpdate)
             }
         }
@@ -717,7 +717,18 @@ private fun AnkiPane(app: DesktopApp) {
 private fun seconds(value: Double) = "%s s".format(value.toString().removeSuffix(".0"))
 
 @Composable
-private fun KeyboardPane() {
+private fun KeyboardPane(settings: Settings) {
+    Section("Tutorial") {
+        Card {
+            SettingRow(
+                "Player tutorial",
+                if (settings.playerTutorialSeen) "The short tour of the player shown the first time a video opens"
+                else "Shows the next time a video opens",
+            ) {
+                if (settings.playerTutorialSeen) SmallButton("Show again") { settings.updatePlayerTutorialSeen(false) }
+            }
+        }
+    }
     Section("In the player") {
         Card {
             KEYS.forEachIndexed { index, key ->

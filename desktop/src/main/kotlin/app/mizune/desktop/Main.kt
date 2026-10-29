@@ -114,6 +114,10 @@ fun main(args: Array<String>) {
 
         fun onKey(event: KeyEvent): Boolean {
             val current = session.takeIf { screen is Screen.Player } ?: return false
+            keys.onTutorialKey?.let { tutorial ->
+                if (event.type == KeyEventType.KeyDown) tutorial(event.key)
+                return true
+            }
             if (event.key == Key.I) {
                 keys.peeking = event.type == KeyEventType.KeyDown
                 return true

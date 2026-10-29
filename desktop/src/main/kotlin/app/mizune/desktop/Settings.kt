@@ -106,8 +106,8 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
         private set
     /** Whether Anime4K runs its lighter networks, with Auto settled. */
     val anime4kFast: Boolean get() = Anime4K.fast(anime4kPreset, Anime4K.hardware)
-    /** Video and panel as separate rounded cards with a gap between them. */
-    var roundedCorners by mutableStateOf(prefs.getBoolean("rounded_corners", false))
+    /** Video and panel as separate rounded cards with a gap between them; on by default on macOS. */
+    var roundedCorners by mutableStateOf(prefs.getBoolean("rounded_corners", isMac))
         private set
     /** Language being studied: its subtitles are the line. */
     var targetLanguage by mutableStateOf(prefs.get("target_language", "ja"))
@@ -213,6 +213,11 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
     val installId: String by lazy {
         prefs.get("install_id", null) ?: java.util.UUID.randomUUID().toString().also { prefs.put("install_id", it) }
     }
+
+    /** Whether the first-play tutorial has been through (PlayerTutorial); Settings › Keyboard brings it back. */
+    var playerTutorialSeen by mutableStateOf(prefs.getBoolean("player_tutorial_seen", false))
+        private set
+    fun updatePlayerTutorialSeen(value: Boolean) { playerTutorialSeen = value; prefs.putBoolean("player_tutorial_seen", value) }
 
     fun isBundledInstalled(name: String) = prefs.getBoolean("bundled:$name", false)
     fun setBundledInstalled(name: String) = prefs.putBoolean("bundled:$name", true)
