@@ -24,13 +24,23 @@ jobs:
           java-version: 17
       - name: libmpv
         shell: pwsh
-        # shinchiro's build, the one mpv's own site points Windows users to
+        # zhongfly's LGPL build: mpv and FFmpeg without their GPL parts, so the app isn't bound
+        # to the GPL as a whole (README, Licence)
         run: |
-          $url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261021/mpv-dev-x86_64-20261021-git-e471496c56.7z"
+          $url = "https://github.com/zhongfly/mpv-winbuild/releases/download/2026-10-28-dc4b285c93/mpv-dev-lgpl-x86_64-20261028-git-dc4b285c93.7z"
           Invoke-WebRequest $url -OutFile mpv-dev.7z
           7z x mpv-dev.7z -ompv-dev libmpv-2.dll
           New-Item -ItemType Directory -Force desktop/build/native/windows-x64 | Out-Null
           Copy-Item mpv-dev/libmpv-2.dll desktop/build/native/windows-x64/
+      - name: libmpv plays a video
+        shell: bash
+        env:
+          IMMERSION_TEST_MPV: "1"
+        run: |
+          IMMERSION_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64" \
+            ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i | grep -E "^\s*(mpv|ffmpeg|configuration):|MpvPlaybackTest" || true
+          # -i only to show the versions; the result decides
+          ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*'
       - name: Build
         shell: bash
         run: |
