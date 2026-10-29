@@ -5,7 +5,7 @@
 # in the Android libmpv workflow, which publishes them as their own release.
 set -eu
 TAG="2026-09-17"
-URL="https://github.com/finchett/Immersion-Player/releases/download/android-libmpv-lgpl-$TAG/android-arm64-libmpv.zip"
+URL="https://github.com/finchett/Mizune/releases/download/android-libmpv-lgpl-$TAG/android-arm64-libmpv.zip"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/app/src/main/jniLibs"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

@@ -11,6 +11,6 @@ plist="$staging/$(basename "$app")/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" -c "Set :CFBundleVersion $version" "$plist"
 codesign --force --deep --sign - "$staging/$(basename "$app")"
 ln -s /Applications "$staging/Applications"
-hdiutil create -volname "Immersion Player" -srcfolder "$staging" -ov -format UDZO "$out" >/dev/null
+hdiutil create -volname "Mizune" -srcfolder "$staging" -ov -format UDZO "$out" >/dev/null
 rm -rf "$staging"
 echo "$out ($(du -h "$out" | cut -f1))"

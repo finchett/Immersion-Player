@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Mizune
+Comment=Japanese video player with a built-in dictionary
+Exec=mizune %f
+Icon=mizune
+Categories=AudioVideo;Video;Education;
+MimeType=video/x-matroska;video/mp4;video/webm;video/x-msvideo;video/quicktime;
+Terminal=false
+# the window's class, so docks put it under this launcher (setLinuxWindowClass in Main.kt)
+StartupWMClass=mizune-Mizune

@@ -5,11 +5,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Release signing. Point `immersionKeystore` (in ~/.gradle/gradle.properties or -P) at a
+// Release signing. Point `mizuneKeystore` (in ~/.gradle/gradle.properties or -P) at a
 // properties file holding storeFile/storePassword/keyAlias/keyPassword. Without it, release
 // builds fall back to the debug key so the project still builds for everyone else.
 fun loadKeystoreProps(): Properties? {
-    val path = project.findProperty("immersionKeystore") as String? ?: return null
+    val path = project.findProperty("mizuneKeystore") as String? ?: return null
     val propsFile = file(path)
     if (!propsFile.isFile) return null
     val loaded = Properties()
@@ -24,11 +24,11 @@ val appVersion = providers.gradleProperty("appVersion").get()
 val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
 
 android {
-    namespace = "io.github.immersionplayer"
+    namespace = "app.mizune"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.immersionplayer"
+        applicationId = "app.mizune"
         minSdk = 30
         targetSdk = 36
         versionCode = appVersionCode

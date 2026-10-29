@@ -11,8 +11,8 @@
 # http://localhost:8765 instead, and creates nothing on GitHub, to try the update on this Mac
 # from the version installed in /Applications first.
 #
-# Needs the release keys in ~/.keystores: immersion-player.properties (Android, see
-# app/build.gradle.kts) and immersion-update.pem (the feed; its public half is in core's Updates).
+# Needs the release keys in ~/.keystores: mizune.properties (Android, see
+# app/build.gradle.kts) and mizune-update.pem (the feed; its public half is in core's Updates).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,11 +21,11 @@ if [ "${1:-}" = "--try" ]; then try=1; shift; fi
 notes="${1:?usage: release.sh [--try] <release notes.md>}"
 version="${APP_VERSION:-$(sed -n 's/^appVersion=//p' gradle.properties)}"
 tag="v$version"
-repo="finchett/Immersion-Player"
-feed_key="$HOME/.keystores/immersion-update.pem"
-android_key="$HOME/.keystores/immersion-player.properties"
-# the certificate every release APK has been signed with (0.1 onwards); Android won't update across another
-android_signer="6af52571097c89fc700401a99e2d8f7a0a9ec39393802b0d928f7ff9cc0db762"
+repo="finchett/Mizune"
+feed_key="$HOME/.keystores/mizune-update.pem"
+android_key="$HOME/.keystores/mizune.properties"
+# the certificate every release APK has been signed with (1.0 onwards); Android won't update across another
+android_signer="6130587b879dc47a247cdf629e62b5408d761965cf71f9c01a0a56b4428c5345"
 apksigner="$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/*/apksigner | tail -1)"
 
 die() { echo "release: $*" >&2; exit 1; }
@@ -43,9 +43,9 @@ rm -rf "$out"
 mkdir -p "$out"
 
 # from CI, built from this same commit: Windows and Linux, and the Mac's libmpv without GPL code
-msi="$out/Immersion-Player-$version-windows-x64.msi"
-deb="$out/Immersion-Player-$version-linux-x64.deb"
-appimage="$out/Immersion-Player-$version-linux-x64.AppImage"
+msi="$out/Mizune-$version-windows-x64.msi"
+deb="$out/Mizune-$version-linux-x64.deb"
+appimage="$out/Mizune-$version-linux-x64.AppImage"
 if [ "$try" = 0 ]; then
     commit="$(git rev-parse HEAD)"
     run="$(gh run list --repo "$repo" --workflow desktop.yml --commit "$commit" --event push --limit 1 --json databaseId -q '.[0].databaseId')"
@@ -65,13 +65,13 @@ else
     echo "--try: the Mac app bundles Homebrew's libmpv, a GPL build; releases take CI's LGPL one"
 fi
 
-./gradlew -PappVersion="$version" -PimmersionKeystore="$android_key" :app:assembleRelease :desktop:packageMacRelease
+./gradlew -PappVersion="$version" -PmizuneKeystore="$android_key" :app:assembleRelease :desktop:packageMacRelease
 rm -rf "$out/libmpv"
 
-apk="$out/immersion-player-$version-arm64.apk"
-dmg="$out/Immersion-Player-$version-macos-arm64.dmg"
+apk="$out/mizune-$version-arm64.apk"
+dmg="$out/Mizune-$version-macos-arm64.dmg"
 cp app/build/outputs/apk/release/app-release.apk "$apk"
-cp "desktop/build/release/Immersion-Player-$version-macos-arm64.dmg" "$dmg"
+cp "desktop/build/release/Mizune-$version-macos-arm64.dmg" "$dmg"
 "$apksigner" verify --print-certs "$apk" | grep -q "SHA-256 digest: $android_signer" || die "$apk isn't signed with the release key"
 
 # the feed: the version, each platform's file with its size and SHA-256, and the notes the apps show as What's new
@@ -103,14 +103,14 @@ if [ "$try" = 1 ]; then
 
 Built $version into $out. To update the installed app to it:
   python3 -m http.server 8765 --directory $out
-  JAVA_TOOL_OPTIONS=-Dimmersion.updateFeed=$base/update.json "/Applications/Immersion Player.app/Contents/MacOS/Immersion Player"
+  JAVA_TOOL_OPTIONS=-Dmizune.updateFeed=$base/update.json "/Applications/Mizune.app/Contents/MacOS/Mizune"
 It downloads in the background; "What's new in $version" appears in the library header once it's ready.
 EOF
     exit 0
 fi
 
 gh release create "$tag" --repo "$repo" --draft --target "$(git rev-parse HEAD)" \
-    --title "Immersion Player $version" --notes-file "$notes" \
+    --title "Mizune $version" --notes-file "$notes" \
     "$apk" "$dmg" "$msi" "$deb" "$appimage" "$out/update.json" "$out/update.json.sig"
 cat <<EOF
 
