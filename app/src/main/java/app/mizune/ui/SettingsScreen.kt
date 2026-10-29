@@ -293,7 +293,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                         }
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    SettingRow("Gesture guide", "The short guide shown the first time you open a video.") {
+                    SettingRow("Player tutorial", "The short tour of the gestures shown the first time you open a video.") {
                         OutlinedButton(onClick = { app.prefs.gestureGuideSeen = false }) { Text("Show again") }
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
