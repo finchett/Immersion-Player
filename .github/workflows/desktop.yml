@@ -37,10 +37,11 @@ jobs:
         env:
           IMMERSION_TEST_MPV: "1"
         run: |
-          IMMERSION_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64" \
-            ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i | grep -E "^\s*(mpv|ffmpeg|configuration):|MpvPlaybackTest" || true
-          # -i only to show the versions; the result decides
-          ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*'
+          export IMMERSION_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64"
+          ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i > mpv-test.log 2>&1 || { cat mpv-test.log; exit 1; }
+          grep -E "^\s*(mpv|ffmpeg|configuration):" mpv-test.log
+          # and it's the build without GPL code
+          grep -q -- "-Dgpl=false" mpv-test.log
       - name: Build
         shell: bash
         run: |
