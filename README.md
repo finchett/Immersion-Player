@@ -415,9 +415,10 @@ You may use, modify, sell and redistribute it, and combine it with other code un
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
-The mpv and FFmpeg it bundles are, for now, GPL builds, so the Android, macOS and Windows apps as built
-today are distributed under the GPL as a whole, which MPL-2.0 allows. LGPL builds of both are
-planned for every platform, after which the apps are MPL-2.0 with LGPL libraries.
+The mpv and FFmpeg it bundles are, for now, GPL builds, so the Android, macOS and Windows apps
+and the Linux AppImage as built today are distributed under the GPL as a whole, which MPL-2.0
+allows. LGPL builds of both are planned for every platform, after which the apps are MPL-2.0 with
+LGPL libraries.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
@@ -430,7 +431,10 @@ planned for every platform, after which the apps are MPL-2.0 with LGPL libraries
   x264 and x265.
 - **libmpv and FFmpeg** (Windows build, from
   [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake)): GPL. The Linux
-  package uses the system's own libmpv.
+  .deb uses the system's own libmpv.
+- **libmpv, FFmpeg, Tesseract and their libraries** (Linux AppImage, from Ubuntu 22.04's packages,
+  gathered by [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)): GPL for mpv and FFmpeg as
+  Ubuntu builds them; the rest under their own licences, as Ubuntu distributes them.
 - **Compose Multiplatform, JNA, sqlite-jdbc** (desktop): Apache-2.0 / Apache-2.0 or LGPL-2.1 /
   Apache-2.0.
 - **Anime4K** shaders (bundled, desktop): MIT, © bloc97; the AutoDownscalePre ones are public
