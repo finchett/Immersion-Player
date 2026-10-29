@@ -2,19 +2,19 @@
 
 <img src="desktop/src/main/resources/icon.png" width="120" alt="">
 
-# Immersion Player
+# Mizune
 
 **Learn Japanese from the shows you love.**
 
 A video player with a Japanese dictionary built into the subtitles.<br>
 Point at a word and it's looked up. Step back a line and hear it again. Keep the ones you want as Anki cards.
 
-[![Download for Mac](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-245D4E?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-245D4E?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux%20(.deb)-245D4E?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
-[![Download for Android](https://img.shields.io/badge/Download-Android-245D4E?style=for-the-badge&logo=android&logoColor=white)](https://github.com/finchett/Immersion-Player/releases/latest)
+[![Download for Mac](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-245D4E?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/finchett/Mizune/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-245D4E?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/finchett/Mizune/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux%20(.deb)-245D4E?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/finchett/Mizune/releases/latest)
+[![Download for Android](https://img.shields.io/badge/Download-Android-245D4E?style=for-the-badge&logo=android&logoColor=white)](https://github.com/finchett/Mizune/releases/latest)
 
-[![Latest release](https://img.shields.io/github/v/release/finchett/Immersion-Player?label=latest&color=8FCFB4)](https://github.com/finchett/Immersion-Player/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/finchett/Mizune?label=latest&color=8FCFB4)](https://github.com/finchett/Mizune/releases/latest)
 [![Licence: MPL-2.0](https://img.shields.io/badge/licence-MPL--2.0-8FCFB4)](LICENSE)
 ![macOS 12+](https://img.shields.io/badge/macOS-12%2B-lightgrey)
 ![Windows 10+](https://img.shields.io/badge/Windows-10%2B-lightgrey)
@@ -31,8 +31,10 @@ Point at a word and it's looked up. Step back a line and hear it again. Keep the
 
 Immersion learning works: watch a lot of Japanese you enjoy, and look up what you don't know.
 The trouble is the looking up. Pausing, copying a line into a dictionary, finding the word,
-finding your place again. Immersion Player takes all of that out. The line being spoken sits
+finding your place again. Mizune takes all of that out. The line being spoken sits
 beside the video with a word already looked up, and every other word is a click away.
+
+Mizune (水音, "the sound of water") is the girl in the icon. Before 1.0 the app was called Immersion Player.
 
 ## Features
 
@@ -92,11 +94,11 @@ Every update is signed and checked before it goes in.
 
 ## Get it
 
-Download from the [latest release](https://github.com/finchett/Immersion-Player/releases/latest).
+Download from the [latest release](https://github.com/finchett/Mizune/releases/latest).
 
 - **Mac (Apple Silicon, macOS 12 or newer):** open the `.dmg` and drag the app to Applications. It
   isn't notarised yet, so the first time, right-click it and choose **Open**, or run
-  `xattr -dr com.apple.quarantine "/Applications/Immersion Player.app"`.
+  `xattr -dr com.apple.quarantine "/Applications/Mizune.app"`.
 - **Android (arm64, Android 11 or newer):** install the `.apk`.
 - **Windows (x64, Windows 10 or newer):** run the `.msi`. It installs for you alone, so it doesn't
   need an administrator. It isn't signed yet, so SmartScreen may stop it the first time: choose
@@ -104,12 +106,12 @@ Download from the [latest release](https://github.com/finchett/Immersion-Player/
 - **Linux (x64):** the `.AppImage` runs on any distribution from about 2022 on (Ubuntu 22.04,
   Debian 12, Fedora 36 and newer) and carries everything it needs: make it executable and open it.
   On Ubuntu 24.04 or Debian 13 and newer there's also a `.deb`, installed with
-  `sudo apt install ./Immersion-Player-*-linux-x64.deb`, which uses the system's libmpv.
+  `sudo apt install ./Mizune-*-linux-x64.deb`, which uses the system's libmpv.
 
 On the Mac and Android new versions install themselves. On Windows and Linux the app tells you
 when one is out and links to it; installing in place is coming.
 
-Found a bug, or wish it did something? [Open an issue](https://github.com/finchett/Immersion-Player/issues).
+Found a bug, or wish it did something? [Open an issue](https://github.com/finchett/Mizune/issues).
 It's young and changing quickly, and feedback shapes what comes next.
 
 ### Privacy
@@ -120,7 +122,7 @@ install, your platform and system version, and the app's version. Nothing about 
 look up or add to Anki, and no account. On the desktop it starts once you've finished the
 welcome. Turn it off in the welcome, or any time under Settings › General › Privacy (Settings ›
 Privacy on Android), and nothing more is sent. The code is
-[`UsageStats`](core/src/main/kotlin/io/github/immersionplayer/stats/UsageStats.kt).
+[`UsageStats`](core/src/main/kotlin/app/mizune/stats/UsageStats.kt).
 
 ## Keys (desktop)
 
@@ -316,7 +318,7 @@ jpackage only packages for the system it runs on: an `.msi` with shinchiro's lib
 it releases.
 
 To try a first launch without touching your own settings, run a packaged build with
-`JAVA_TOOL_OPTIONS="-Duser.home=/tmp/fresh -Dimmersion.prefs=io/github/immersionplayer-fresh"`.
+`JAVA_TOOL_OPTIONS="-Duser.home=/tmp/fresh -Dmizune.prefs=app/mizune-fresh"`.
 
 ### Build: Android
 
@@ -349,17 +351,17 @@ from it. The feed is signed with `~/.keystores/immersion-update.pem`, whose publ
 
 ```sh
 ./gradlew :core:test
-IMMERSION_TEST_VIDEO=any.mkv ./gradlew :desktop:test   # drives the real player offscreen
-IMMERSION_TEST_PGS=bluray.mkv ./gradlew :desktop:test  # reads a real episode's PGS tracks
+MIZUNE_TEST_VIDEO=any.mkv ./gradlew :desktop:test   # drives the real player offscreen
+MIZUNE_TEST_PGS=bluray.mkv ./gradlew :desktop:test  # reads a real episode's PGS tracks
 ```
 
 The Matroska test checks extraction against reference files produced by ffmpeg, and skips itself
 unless you point it at a real episode:
 
 ```sh
-IMMERSION_TEST_MKV=episode.mkv \
-IMMERSION_TEST_JA_SRT=episode.ja.srt \  # ffmpeg -i episode.mkv -map 0:s:<ja> episode.ja.srt
-IMMERSION_TEST_EN_ASS=episode.en.ass \  # ffmpeg -i episode.mkv -map 0:s:<en> -c:s copy episode.en.ass
+MIZUNE_TEST_MKV=episode.mkv \
+MIZUNE_TEST_JA_SRT=episode.ja.srt \  # ffmpeg -i episode.mkv -map 0:s:<ja> episode.ja.srt
+MIZUNE_TEST_EN_ASS=episode.en.ass \  # ffmpeg -i episode.mkv -map 0:s:<en> -c:s copy episode.en.ass
 ./gradlew :core:test
 ```
 
@@ -372,7 +374,7 @@ Some phones quietly disable logcat for third-party apps, so crashes go to `files
 and lookup failures to `files/errors.log`:
 
 ```sh
-adb shell run-as io.github.immersionplayer cat files/last_crash.txt
+adb shell run-as app.mizune cat files/last_crash.txt
 ```
 
 ### Layout
@@ -410,7 +412,7 @@ desktop/    Compose Desktop
 
 ## Licence
 
-Immersion Player's own code is under the **Mozilla Public License 2.0** (see [LICENSE](LICENSE)).
+Mizune's own code is under the **Mozilla Public License 2.0** (see [LICENSE](LICENSE)).
 You may use, modify, sell and redistribute it, and combine it with other code under other
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.

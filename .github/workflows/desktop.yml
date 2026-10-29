@@ -35,9 +35,9 @@ jobs:
       - name: libmpv plays a video
         shell: bash
         env:
-          IMMERSION_TEST_MPV: "1"
+          MIZUNE_TEST_MPV: "1"
         run: |
-          export IMMERSION_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64"
+          export MIZUNE_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64"
           ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i > mpv-test.log 2>&1 || { cat mpv-test.log; exit 1; }
           grep -E "^\s*(mpv|ffmpeg|configuration):" mpv-test.log
           # and it's the build without GPL code
@@ -58,9 +58,9 @@ jobs:
       - name: Tesseract reads text with the bundled libraries
         shell: bash
         env:
-          IMMERSION_TEST_TESSERACT: "1"
+          MIZUNE_TEST_TESSERACT: "1"
         run: |
-          IMMERSION_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64" \
+          MIZUNE_TEST_RESOURCES="$PWD/desktop/build/native/windows-x64" \
             ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*TesseractTest*'
       - name: Build
         shell: bash
@@ -68,7 +68,7 @@ jobs:
           ./gradlew --configure-on-demand --no-daemon :desktop:packageMsi
           version=$(sed -n 's/^appVersion=//p' gradle.properties)
           mkdir dist
-          cp desktop/build/compose/binaries/main/msi/*.msi "dist/Immersion-Player-$version-windows-x64.msi"
+          cp desktop/build/compose/binaries/main/msi/*.msi "dist/Mizune-$version-windows-x64.msi"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
@@ -104,8 +104,11 @@ jobs:
             echo 'Depends: libmpv2 | libmpv1' >> $control
           fi
           echo 'Recommends: libtesseract5, tesseract-ocr-jpn' >> $control
+          # the app was called Immersion Player before 1.0; installing this removes that package
+          echo 'Conflicts: immersion-player' >> $control
+          echo 'Replaces: immersion-player' >> $control
           cat $control
-          dpkg-deb --root-owner-group -b unpacked "dist/Immersion-Player-$version-linux-x64.deb"
+          dpkg-deb --root-owner-group -b unpacked "dist/Mizune-$version-linux-x64.deb"
       - name: Install it and play something
         # the package installs on a clean system, and the app finds libmpv and opens a video with it
         run: |
@@ -117,14 +120,14 @@ jobs:
           # a virtual display and no GPU: the player passes over llvmpipe's emulated OpenGL for
           # software, so the screenshot shows the test pattern whole, not black or seamed
           xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
-            "/opt/immersion-player/bin/Immersion Player" "$PWD/test.mkv" > app.log 2>&1 &
+            "/opt/mizune/bin/Mizune" "$PWD/test.mkv" > app.log 2>&1 &
             sleep 25
             import -window root shot.png
             kill %1' || true
           cat app.log
           grep "^video:" app.log
-          cat ~/.local/share/immersion-player/errors.log 2>/dev/null || true
-          ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/immersion-player/errors.log 2>/dev/null
+          cat ~/.local/share/mizune/errors.log 2>/dev/null || true
+          ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/mizune/errors.log 2>/dev/null
           # the video takes the left of the window: its average brightness, 0 for black
           brightness=$(convert shot.png -crop 50%x100%+0+0 -colorspace gray -format "%[fx:mean]" info:)
           echo "video area brightness: $brightness"
@@ -157,9 +160,9 @@ jobs:
         run: desktop/scripts/build-libmpv-lgpl-linux.sh "$RUNNER_TEMP/libmpv"
       - name: libmpv plays a video
         env:
-          IMMERSION_TEST_MPV: "1"
+          MIZUNE_TEST_MPV: "1"
         run: |
-          export IMMERSION_TEST_RESOURCES="$RUNNER_TEMP/libmpv/lib" LD_LIBRARY_PATH="$RUNNER_TEMP/libmpv/lib"
+          export MIZUNE_TEST_RESOURCES="$RUNNER_TEMP/libmpv/lib" LD_LIBRARY_PATH="$RUNNER_TEMP/libmpv/lib"
           ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i > mpv-test.log 2>&1 || { cat mpv-test.log; exit 1; }
           grep -E "^\s*(mpv|ffmpeg|configuration):" mpv-test.log
           grep -q -- "-Dgpl=false" mpv-test.log
@@ -171,17 +174,17 @@ jobs:
         run: |
           version=$(sed -n 's/^appVersion=//p' gradle.properties)
           mkdir -p AppDir/opt dist
-          # the app's folder is named after the app ("Immersion Player"); inside, it's immersion-player
-          cp -r desktop/build/compose/binaries/main/app/*/ AppDir/opt/immersion-player
-          ls AppDir/opt/immersion-player/bin
+          # the app's folder is named after the app ("Mizune"); inside, it's mizune
+          cp -r desktop/build/compose/binaries/main/app/*/ AppDir/opt/mizune
+          ls AppDir/opt/mizune/bin
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
           # libmpv and libtesseract, and every library they load that a desktop can't be counted on to have
           LD_LIBRARY_PATH="$RUNNER_TEMP/libmpv/lib" \
-          APPIMAGE_EXTRACT_AND_RUN=1 OUTPUT="dist/Immersion-Player-$version-linux-x64.AppImage" \
+          APPIMAGE_EXTRACT_AND_RUN=1 OUTPUT="dist/Mizune-$version-linux-x64.AppImage" \
             ./linuxdeploy-x86_64.AppImage --appdir AppDir \
-              --desktop-file desktop/appimage/immersion-player.desktop \
-              --icon-file desktop/src/main/resources/icon.png --icon-filename immersion-player \
+              --desktop-file desktop/appimage/mizune.desktop \
+              --icon-file desktop/src/main/resources/icon.png --icon-filename mizune \
               --custom-apprun desktop/appimage/AppRun \
               --library "$RUNNER_TEMP/libmpv/lib/libmpv.so.2" \
               --library /usr/lib/x86_64-linux-gnu/libtesseract.so.4 \
@@ -245,9 +248,9 @@ jobs:
             desktop/scripts/bundle-libmpv-macos.sh "$RUNNER_TEMP/bundle"
       - name: The bundled libmpv plays a video
         env:
-          IMMERSION_TEST_MPV: "1"
+          MIZUNE_TEST_MPV: "1"
         run: |
-          export IMMERSION_TEST_RESOURCES="$RUNNER_TEMP/bundle"
+          export MIZUNE_TEST_RESOURCES="$RUNNER_TEMP/bundle"
           ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i > mpv-test.log 2>&1 || { cat mpv-test.log; exit 1; }
           grep -E "^\s*(mpv|ffmpeg|configuration):" mpv-test.log
           grep -q -- "-Dgpl=false" mpv-test.log

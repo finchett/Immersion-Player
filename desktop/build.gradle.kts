@@ -23,10 +23,10 @@ val writeBuildInfo by tasks.registering {
     inputs.property("analyticsSecret", analyticsSecret)
     outputs.dir(out)
     doLast {
-        val file = out.get().file("io/github/immersionplayer/desktop/BuildInfo.kt").asFile
+        val file = out.get().file("app/mizune/desktop/BuildInfo.kt").asFile
         file.parentFile.mkdirs()
         file.writeText(
-            "package io.github.immersionplayer.desktop\n\n" +
+            "package app.mizune.desktop\n\n" +
                 "const val APP_VERSION = \"$appVersion\"\n" +
                 "const val ANALYTICS_MEASUREMENT_ID = \"$analyticsId\"\n" +
                 "const val ANALYTICS_API_SECRET = \"$analyticsSecret\"\n",
@@ -57,36 +57,36 @@ dependencies {
 tasks.test {
     // the UI test drives real libmpv; same lookup path as the dev run
     systemProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib:/usr/lib")
-    System.getenv("IMMERSION_TEST_VIDEO")?.let { environment("IMMERSION_TEST_VIDEO", it) }
+    System.getenv("MIZUNE_TEST_VIDEO")?.let { environment("MIZUNE_TEST_VIDEO", it) }
     // a packaged build's native libraries to load instead of the system's (MpvPlaybackTest and
     // TesseractTest in CI)
-    System.getenv("IMMERSION_TEST_RESOURCES")?.let { systemProperty("compose.application.resources.dir", it) }
-    System.getenv("IMMERSION_TEST_MPV")?.let { environment("IMMERSION_TEST_MPV", it) }
-    System.getenv("IMMERSION_TEST_TESSERACT")?.let { environment("IMMERSION_TEST_TESSERACT", it) }
-    System.getenv("IMMERSION_TEST_SHOTS")?.let { environment("IMMERSION_TEST_SHOTS", it) }
+    System.getenv("MIZUNE_TEST_RESOURCES")?.let { systemProperty("compose.application.resources.dir", it) }
+    System.getenv("MIZUNE_TEST_MPV")?.let { environment("MIZUNE_TEST_MPV", it) }
+    System.getenv("MIZUNE_TEST_TESSERACT")?.let { environment("MIZUNE_TEST_TESSERACT", it) }
+    System.getenv("MIZUNE_TEST_SHOTS")?.let { environment("MIZUNE_TEST_SHOTS", it) }
     // an AnkiConnect to read note types and decks from (read only); the Anki pane is tested offline without it
-    System.getenv("IMMERSION_TEST_ANKI")?.let { environment("IMMERSION_TEST_ANKI", it) }
+    System.getenv("MIZUNE_TEST_ANKI")?.let { environment("MIZUNE_TEST_ANKI", it) }
 }
 
 compose.desktop {
     application {
-        mainClass = "io.github.immersionplayer.desktop.MainKt"
+        mainClass = "app.mizune.desktop.MainKt"
         // dev: find a system libmpv (Homebrew on macOS). Packaged builds bundle their own.
         jvmArgs += listOf("-Djna.library.path=/opt/homebrew/lib:/usr/local/lib:/usr/lib")
         // so Main can name the window after its launcher, for the dock (setLinuxWindowClass)
         if (System.getProperty("os.name").lowercase().contains("linux")) jvmArgs += "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED"
         // ./gradlew :desktop:run -PappArgs="--bench video.mkv 1920" (split on '|' so paths may hold spaces)
         (project.findProperty("mpvOptions") as String?)?.let { jvmArgs += "-Dmpv.options=$it" }
-        if (project.hasProperty("stats")) jvmArgs += "-Dimmersion.stats=1"
+        if (project.hasProperty("stats")) jvmArgs += "-Dmizune.stats=1"
         // -Prenderer=sw: mpv's software renderer instead of OpenGL, to compare the two
-        (project.findProperty("renderer") as String?)?.let { jvmArgs += "-Dimmersion.renderer=$it" }
-        if (project.hasProperty("debugLights")) jvmArgs += "-Dimmersion.debugLights=1"
-        (project.findProperty("snapTitlebar") as String?)?.let { jvmArgs += "-Dimmersion.snapTitlebar=$it" }
-        (project.findProperty("dumpFrame") as String?)?.let { jvmArgs += "-Dimmersion.dumpFrame=$it" }
+        (project.findProperty("renderer") as String?)?.let { jvmArgs += "-Dmizune.renderer=$it" }
+        if (project.hasProperty("debugLights")) jvmArgs += "-Dmizune.debugLights=1"
+        (project.findProperty("snapTitlebar") as String?)?.let { jvmArgs += "-Dmizune.snapTitlebar=$it" }
+        (project.findProperty("dumpFrame") as String?)?.let { jvmArgs += "-Dmizune.dumpFrame=$it" }
         (project.findProperty("appArgs") as String?)?.let { args += it.split('|') }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "Immersion Player"
+            packageName = "Mizune"
             packageVersion = appVersion
             description = "Japanese video player with a built-in dictionary"
             copyright = "MPL-2.0"
@@ -98,7 +98,7 @@ compose.desktop {
                 iconFile.set(project.file("icons/icon.icns"))
                 // jpackage refuses a 0.x version on macOS; packageMacRelease writes the real one
                 packageVersion = "1.0.0"
-                bundleID = "io.github.immersionplayer.desktop"
+                bundleID = "app.mizune.desktop"
                 appCategory = "public.app-category.education"
                 minimumSystemVersion = "12.0"
             }
@@ -108,12 +108,12 @@ compose.desktop {
                 perUserInstall = true
                 // the same for every release, so a new installer replaces the old version
                 upgradeUuid = "17ce85a1-57a0-4e4e-9c09-549dfad03d7d"
-                menuGroup = "Immersion Player"
+                menuGroup = "Mizune"
                 shortcut = true
             }
             linux {
                 iconFile.set(project.file("src/main/resources/icon.png"))
-                packageName = "immersion-player"
+                packageName = "mizune"
                 appCategory = "Video"
                 menuGroup = "AudioVideo;Video;Education"
             }
@@ -140,8 +140,8 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bu
 val packageMacRelease by tasks.registering(Exec::class) {
     dependsOn("createDistributable")
     val version = appVersion
-    val app = layout.buildDirectory.dir("compose/binaries/main/app/Immersion Player.app")
-    val out = layout.buildDirectory.file("release/Immersion-Player-$version-macos-arm64.dmg")
+    val app = layout.buildDirectory.dir("compose/binaries/main/app/Mizune.app")
+    val out = layout.buildDirectory.file("release/Mizune-$version-macos-arm64.dmg")
     inputs.dir(app)
     inputs.file("scripts/package-dmg-macos.sh")
     inputs.property("version", version)

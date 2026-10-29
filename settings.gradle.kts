@@ -18,5 +18,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ImmersionPlayer"
+rootProject.name = "Mizune"
 include(":app", ":core", ":desktop")
