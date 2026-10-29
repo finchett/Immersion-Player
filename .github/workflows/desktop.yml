@@ -103,7 +103,8 @@ jobs:
           else
             echo 'Depends: libmpv2 | libmpv1' >> $control
           fi
-          echo 'Recommends: libtesseract5, tesseract-ocr-jpn' >> $control          cat $control
+          echo 'Recommends: libtesseract5, tesseract-ocr-jpn' >> $control
+          cat $control
           dpkg-deb --root-owner-group -b unpacked "dist/Mizune-$version-linux-x64.deb"
       - name: Install it and play something
         # the package installs on a clean system, and the app finds libmpv and opens a video with it
