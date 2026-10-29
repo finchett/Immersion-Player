@@ -177,7 +177,7 @@ fun PlayerTutorial(
 private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
     val scheme = MaterialTheme.colorScheme
     // as tall as the tallest step, so the buttons stay put from one to the next
-    Column(Modifier.fillMaxWidth().heightIn(min = 184.dp)) {
+    Column(Modifier.fillMaxWidth().heightIn(min = 214.dp)) {
         val (title, body) = when (step) {
             TutorialStep.Words -> "Look up any word" to
                 "Click a word in the line and its meaning opens beside the video. Drag across a few " +
@@ -198,8 +198,9 @@ private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
             TutorialStep.Words -> if (ankiEnabled) Hint(listOf("A"), "Save the word as an Anki card")
             TutorialStep.Lines -> Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Hint(listOf("←", "→"), "The previous or next line")
+                Hint(listOf("H", "L"), "The same, on the home row")
+                Hint(listOf("J", "K"), "Previous or next, stopping when it ends")
                 Hint(listOf(";"), "Hear this line again")
-                Hint(listOf("J", "K"), "The same, stopping when the line ends")
             }
             TutorialStep.Peek -> Hint(listOf("I"), "Hold to peek, let go to hide")
             TutorialStep.Playback -> Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -211,6 +212,7 @@ private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Hint(listOf("S"), "Put the panel away")
                     Hint(listOf("F"), "Full screen")
+                    Hint(listOf("Z"), "Fill the area, or fit it all")
                     Hint(listOf("Esc"), "Back to your library")
                 }
             }
