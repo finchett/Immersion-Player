@@ -27,7 +27,11 @@ jobs:
       - name: Build
         run: |
           sudo apt-get update -q
-          sudo apt-get install -yq meson ninja-build nasm autoconf automake libtool pkg-config gperf python3-jsonschema
+          sudo apt-get install -yq ninja-build nasm autoconf automake libtool pkg-config gperf python3-jsonschema python3-pip
+          # a current Meson: fontconfig wants 1.11, newer than Ubuntu's
+          pip install --quiet --user --break-system-packages meson
+          export PATH="$HOME/.local/bin:$PATH"
+          meson --version
           scripts/build-libmpv-lgpl-android.sh "$RUNNER_TEMP/libs"
           cd "$RUNNER_TEMP/libs" && zip -q "$GITHUB_WORKSPACE/android-arm64-libmpv.zip" *.so
       - uses: actions/upload-artifact@v4
