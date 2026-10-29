@@ -1,21 +1,20 @@
 #!/bin/sh
-# Downloads the pinned mpv-android release and extracts its arm64 native libraries
-# (libmpv, ffmpeg, and the JNI glue that app/src/main/java/is/xyz/mpv/MPVLib.kt binds to).
+# Downloads the Android app's native libraries (libmpv, FFmpeg, and the JNI glue that
+# app/src/main/java/is/xyz/mpv/MPVLib.kt binds to), arm64, into app/src/main/jniLibs. They're
+# mpv-android's, at the tag below, built without GPL code by scripts/build-libmpv-lgpl-android.sh
+# in the Android libmpv workflow, which publishes them as their own release.
 set -eu
-
 TAG="2026-09-17"
-APK="app-default-arm64-v8a-release.apk"
-URL="https://github.com/mpv-android/mpv-android/releases/download/$TAG/$APK"
+URL="https://github.com/finchett/Immersion-Player/releases/download/android-libmpv-lgpl-$TAG/android-arm64-libmpv.zip"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/app/src/main/jniLibs"
-
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-
-echo "Downloading mpv-android $TAG…"
-curl -fL -o "$tmp/$APK" "$URL"
-unzip -q -o "$tmp/$APK" 'lib/arm64-v8a/*' -d "$tmp"
+echo "Downloading mpv-android $TAG's libraries, built without GPL code…"
+curl -fL -o "$tmp/libs.zip" "$URL"
+mkdir -p "$tmp/arm64-v8a"
+unzip -q -o "$tmp/libs.zip" -d "$tmp/arm64-v8a"
 mkdir -p "$DEST"
 rm -rf "$DEST/arm64-v8a"
-mv "$tmp/lib/arm64-v8a" "$DEST/"
+mv "$tmp/arm64-v8a" "$DEST/"
 echo "Extracted to $DEST/arm64-v8a:"
 ls "$DEST/arm64-v8a"
