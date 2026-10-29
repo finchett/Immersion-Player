@@ -131,7 +131,9 @@ jobs:
         run: |
           version=$(sed -n 's/^appVersion=//p' gradle.properties)
           mkdir -p AppDir/opt dist
-          cp -r desktop/build/compose/binaries/main/app/immersion-player AppDir/opt/
+          # the app's folder is named after the app ("Immersion Player"); inside, it's immersion-player
+          cp -r desktop/build/compose/binaries/main/app/*/ AppDir/opt/immersion-player
+          ls AppDir/opt/immersion-player/bin
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
           # libmpv and libtesseract, and every library they load that a desktop can't be counted on to have

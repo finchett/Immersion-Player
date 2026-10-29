@@ -52,6 +52,7 @@ cp "desktop/build/release/Immersion-Player-$version-macos-arm64.dmg" "$dmg"
 # Windows and Linux, built by CI from this same commit
 msi="$out/Immersion-Player-$version-windows-x64.msi"
 deb="$out/Immersion-Player-$version-linux-x64.deb"
+appimage="$out/Immersion-Player-$version-linux-x64.AppImage"
 if [ "$try" = 0 ]; then
     commit="$(git rev-parse HEAD)"
     run="$(gh run list --repo "$repo" --workflow desktop.yml --commit "$commit" --event push --limit 1 --json databaseId -q '.[0].databaseId')"
@@ -60,13 +61,14 @@ if [ "$try" = 0 ]; then
     gh run watch "$run" --repo "$repo" --exit-status > /dev/null || die "the Windows and Linux builds failed: gh run view $run --repo $repo"
     gh run download "$run" --repo "$repo" -n windows-x64 -D "$out"
     gh run download "$run" --repo "$repo" -n linux-x64 -D "$out"
-    [ -f "$msi" ] && [ -f "$deb" ] || die "the builds didn't produce $msi and $deb (is appVersion $version on main?)"
+    gh run download "$run" --repo "$repo" -n linux-x64-appimage -D "$out"
+    [ -f "$msi" ] && [ -f "$deb" ] && [ -f "$appimage" ] || die "the builds didn't produce $msi, $deb and $appimage (is appVersion $version on main?)"
 fi
 
 # the feed: the version, each platform's file with its size and SHA-256, and the notes the apps show as What's new
-python3 - "$version" "$repo" "$tag" "$base" "$notes" "$dmg" "$apk" "$msi" "$deb" > "$out/update.json" <<'PY'
+python3 - "$version" "$repo" "$tag" "$base" "$notes" "$dmg" "$apk" "$msi" "$deb" "$appimage" > "$out/update.json" <<'PY'
 import hashlib, json, os, sys
-version, repo, tag, base, notes, dmg, apk, msi, deb = sys.argv[1:]
+version, repo, tag, base, notes, dmg, apk, msi, deb, appimage = sys.argv[1:]
 def asset(path):
     name = os.path.basename(path)
     with open(path, "rb") as f:
@@ -78,7 +80,9 @@ print(json.dumps({
     "notes": open(notes, encoding="utf-8").read(),
     "assets": {
         platform: asset(path)
-        for platform, path in (("macos-arm64", dmg), ("android-arm64", apk), ("windows-x64", msi), ("linux-x64", deb))
+        for platform, path in (
+            ("macos-arm64", dmg), ("android-arm64", apk), ("windows-x64", msi), ("linux-x64", deb), ("linux-x64-appimage", appimage),
+        )
         if os.path.exists(path)
     },
 }, indent=2, ensure_ascii=False))
@@ -98,7 +102,7 @@ fi
 
 gh release create "$tag" --repo "$repo" --draft --target "$(git rev-parse HEAD)" \
     --title "Immersion Player $version" --notes-file "$notes" \
-    "$apk" "$dmg" "$msi" "$deb" "$out/update.json" "$out/update.json.sig"
+    "$apk" "$dmg" "$msi" "$deb" "$appimage" "$out/update.json" "$out/update.json.sig"
 cat <<EOF
 
 Drafted $tag. Check it on GitHub, then publish it to send the update:
