@@ -158,7 +158,7 @@ jobs:
               mesa-libGL mesa-libEGL mesa-dri-drivers alsa-lib \
               libgpg-error libusb1 pipewire-jack-audio-connection-kit-libs > /dev/null
             # (those last three linuxdeploy leaves to the system on purpose, JACK so it matches the
-            # sound server; every Fedora desktop has them, a bare container doesn't)
+            # sound server; every Fedora desktop has them, a bare container does not)
             ./dist/*.AppImage --appimage-extract > /dev/null
             # every bundled library finds what it needs
             missing=$(for lib in squashfs-root/usr/lib/*.so*; do LD_LIBRARY_PATH=squashfs-root/usr/lib ldd "$lib" | grep "not found" || true; done)
