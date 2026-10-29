@@ -13,7 +13,18 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
 import app.mizune.ui.AppTheme
+import app.mizune.ui.TutorialLines
+import app.mizune.ui.TutorialPeek
+import app.mizune.ui.TutorialPlayback
+import app.mizune.ui.TutorialWords
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -114,6 +125,37 @@ class PlayerTutorialTest {
                 // part way into each picture's loop, where something's happening
                 mainClock.advanceTimeBy(1600)
                 shoot(it.name.lowercase() + if (dark) "-dark" else "")
+            }
+        }
+    }
+
+    /** Android's pictures (shared, with a finger) render at moments through each loop. */
+    @Test
+    fun touchPicturesRender() = runDesktopComposeUiTest(width = 480, height = 200) {
+        mainClock.autoAdvance = false
+        var picture by mutableStateOf(0)
+        setContent {
+            DesktopTheme(AppTheme.Celadon) {
+                key(picture) {
+                    Box(Modifier.size(480.dp, 200.dp).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+                        when (picture) {
+                            0 -> TutorialWords(touch = true)
+                            1 -> TutorialLines(touch = true)
+                            2 -> TutorialPeek(touch = true)
+                            else -> TutorialPlayback(touch = true)
+                        }
+                    }
+                }
+            }
+        }
+        val names = listOf("words", "lines", "peek", "playback")
+        names.forEachIndexed { index, name ->
+            picture = index
+            var at = 0L
+            for (moment in listOf(700L, 1800L, 2500L, 3300L, 4500L, 6300L)) {
+                mainClock.advanceTimeBy(moment - at)
+                at = moment
+                shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "touch-$name-$moment.png")) }
             }
         }
     }
