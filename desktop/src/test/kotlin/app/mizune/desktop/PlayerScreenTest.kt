@@ -102,7 +102,7 @@ class PlayerScreenTest {
         Files.createSymbolicLink(File(dir, "Lesson 02.mkv").toPath(), videoSource.absoluteFile.toPath())
 
         Preferences.userRoot().node(node).removeNode()
-        val app = DesktopApp(File(dir, "data").apply { mkdirs() }, File(dir, "cache"), Settings(node))
+        val app = DesktopApp(File(dir, "data").apply { mkdirs() }, File(dir, "cache"), Settings(node).apply { updatePlayerTutorialSeen(true) })
         val player = MpvPlayer()
         player.property("mute", "yes")
         val session = PlayerSession(app.settings, player, video)

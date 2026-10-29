@@ -70,7 +70,7 @@ class ImageSubtitleTest {
         Files.createSymbolicLink(link.toPath(), video!!.absoluteFile.toPath())
         val node = "app/mizune-pgs-test"
         Preferences.userRoot().node(node).removeNode()
-        val app = DesktopApp(File(dir, "data").apply { mkdirs() }, File(dir, "cache"), Settings(node))
+        val app = DesktopApp(File(dir, "data").apply { mkdirs() }, File(dir, "cache"), Settings(node).apply { updatePlayerTutorialSeen(true) })
         app.settings.updatePeekLanguage("en")
         val player = MpvPlayer().apply { property("mute", "yes") }
         val session = PlayerSession(app.settings, player, link)

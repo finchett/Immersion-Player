@@ -77,6 +77,8 @@ class ReadmeScreenshots {
         val node = "app/mizune-readme"
         Preferences.userRoot().node(node).removeNode()
         val settings = Settings(node).apply {
+            // the first-play tutorial would cover the player
+            updatePlayerTutorialSeen(true)
             updateLibraryRoot(library.path)
             updatePeekLanguage("en")
             savePosition(sintel.absolutePath, 420.0, 888.0)
