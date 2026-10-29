@@ -704,7 +704,7 @@ private fun Controls(
         }
         LineButtons(app, session, color = muted, hoverColor = white)
         LineStopButton(app, session, color = muted, hoverColor = white)
-        TrackMenu(session, onMenu, color = muted, hoverColor = white)
+        TrackMenu(app.settings, session, onMenu, color = muted, hoverColor = white)
         ShaderMenu(app, session, onMenu)
         PanelButton(app, color = muted, hoverColor = white)
         if (!isMac) FullscreenButton(keys, color = muted, hoverColor = white)
@@ -903,13 +903,17 @@ private fun PanelHeader(app: DesktopApp, session: PlayerSession, note: String?, 
         }
         // the play bar has the same menu; where the window's buttons end the header, it'd sit
         // oddly beside them, so only macOS keeps it here
-        if (!ownsFrame) TrackMenu(session)
+        if (!ownsFrame) TrackMenu(app.settings, session)
     }
 }
 
-/** The cog: corrects the automatic audio and subtitle choices for this video, which remembers them. */
+/**
+ * The cog: corrects the automatic audio and subtitle choices for this video, which remembers them,
+ * and fits the picture or fills the area with it (Z, or ⌘ + scroll).
+ */
 @Composable
 private fun TrackMenu(
+    settings: Settings,
     session: PlayerSession,
     onMenu: (Boolean) -> Unit = {},
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -920,7 +924,6 @@ private fun TrackMenu(
     val tracks by session.tracks.collectAsState()
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
-    if (tracks.isEmpty() && audioTracks.isEmpty()) return
     var open by remember { mutableStateOf(false) }
     fun show(value: Boolean) {
         open = value
@@ -942,12 +945,16 @@ private fun TrackMenu(
             )
             @Composable
             fun divider() = HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            MenuHeading("Picture · Z switches")
+            item("Fit the whole picture", !settings.videoFill) { settings.updateVideoFill(false) }
+            item("Fill the area, cropping the edges", settings.videoFill) { settings.updateVideoFill(true) }
             if (audioTracks.isNotEmpty()) {
+                divider()
                 MenuHeading("Audio")
                 audioTracks.forEach { track -> item(track.label, track.id == audioTrack) { session.selectAudio(track) } }
             }
             if (tracks.isEmpty()) return@DropdownMenu
-            if (audioTracks.isNotEmpty()) divider()
+            divider()
             MenuHeading("Subtitles to study")
             tracks.forEach { track -> item(trackLabel(track), track === primary) { session.selectPrimary(track) } }
             divider()
