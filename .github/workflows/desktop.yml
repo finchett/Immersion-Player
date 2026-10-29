@@ -141,7 +141,7 @@ jobs:
           if-no-files-found: error
 
   # an AppImage for any Linux at least as new as Ubuntu 22.04 (its glibc), carrying its own libmpv
-  # and libtesseract, unlike the .deb, which takes the system's
+  # (built here, without GPL code) and libtesseract, unlike the .deb, which takes the system's
   linux-appimage:
     runs-on: ubuntu-22.04
     env:
@@ -153,10 +153,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Build FFmpeg and libmpv
+        run: desktop/scripts/build-libmpv-lgpl-linux.sh "$RUNNER_TEMP/libmpv"
+      - name: libmpv plays a video
+        env:
+          IMMERSION_TEST_MPV: "1"
+        run: |
+          export IMMERSION_TEST_RESOURCES="$RUNNER_TEMP/libmpv/lib" LD_LIBRARY_PATH="$RUNNER_TEMP/libmpv/lib"
+          ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i > mpv-test.log 2>&1 || { cat mpv-test.log; exit 1; }
+          grep -E "^\s*(mpv|ffmpeg|configuration):" mpv-test.log
+          grep -q -- "-Dgpl=false" mpv-test.log
       - name: Build
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -yq libmpv1 libtesseract4 file
+          sudo apt-get install -yq libtesseract4 file
           ./gradlew --configure-on-demand --no-daemon :desktop:createDistributable
       - name: AppImage
         run: |
@@ -168,12 +177,13 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
           # libmpv and libtesseract, and every library they load that a desktop can't be counted on to have
+          LD_LIBRARY_PATH="$RUNNER_TEMP/libmpv/lib" \
           APPIMAGE_EXTRACT_AND_RUN=1 OUTPUT="dist/Immersion-Player-$version-linux-x64.AppImage" \
             ./linuxdeploy-x86_64.AppImage --appdir AppDir \
               --desktop-file desktop/appimage/immersion-player.desktop \
               --icon-file desktop/src/main/resources/icon.png --icon-filename immersion-player \
               --custom-apprun desktop/appimage/AppRun \
-              --library /usr/lib/x86_64-linux-gnu/libmpv.so.1 \
+              --library "$RUNNER_TEMP/libmpv/lib/libmpv.so.2" \
               --library /usr/lib/x86_64-linux-gnu/libtesseract.so.4 \
               --output appimage
           ls -la dist
