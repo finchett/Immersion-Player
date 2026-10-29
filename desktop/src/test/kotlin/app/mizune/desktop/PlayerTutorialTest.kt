@@ -152,7 +152,7 @@ class PlayerTutorialTest {
         names.forEachIndexed { index, name ->
             picture = index
             var at = 0L
-            for (moment in listOf(900L, 1600L, 2300L, 2900L, 3500L)) {
+            for (moment in listOf(700L, 1800L, 2500L, 3300L, 4500L, 6300L)) {
                 mainClock.advanceTimeBy(moment - at)
                 at = moment
                 shots?.let { ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(it, "touch-$name-$moment.png")) }

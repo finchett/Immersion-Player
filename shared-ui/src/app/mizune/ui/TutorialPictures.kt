@@ -1,5 +1,6 @@
 package app.mizune.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -8,6 +9,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -188,19 +194,19 @@ private val LineHeight = 38.dp
 private val LinesWidth = 230.dp
 
 /**
- * The panel's lines, moving to the next and back again: by → and ←, then ; replaying the one
- * it's on, or with [touch] by a finger swiping the panel left and then right.
+ * The lines moving to the next and back again: by → and ← in the panel's list, with ; replaying
+ * the one it's on, or with [touch] by a finger swiping across the panel, below the line.
  */
 @Composable
-fun TutorialLines(touch: Boolean) {
+fun TutorialLines(touch: Boolean) = if (touch) PanelSwipe() else LinesByKeys()
+
+@Composable
+private fun LinesByKeys() {
     val t = loop(4400)
     val scheme = MaterialTheme.colorScheme
-    // when the line changes, and what's pressing or swiping meanwhile
-    val forward = if (touch) 0.28f else 0.20f
-    val backward = if (touch) 0.64f else 0.48f
-    val current = if (t in forward..backward) 2 else 1
+    val current = if (t in 0.20f..0.48f) 2 else 1
     val top by animateDpAsState(LineHeight * current, tween(260), label = "current")
-    val flash = if (touch) 0f else swell(t, 0.74f, 0.77f, 0.80f, 0.92f)
+    val flash = swell(t, 0.74f, 0.77f, 0.80f, 0.92f)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(30.dp)) {
         Box(Modifier.width(LinesWidth)) {
             Box(
@@ -220,37 +226,82 @@ fun TutorialLines(touch: Boolean) {
                     }
                 }
             }
-            if (touch) {
-                // a swipe left for the next line, then right for the one before
-                val left = part(t, 0.14f, 0.30f)
-                val right = part(t, 0.50f, 0.66f)
-                val swiping = t < 0.40f
-                val x = if (swiping) 0.78f - 0.56f * left else 0.22f + 0.56f * right
-                val start = if (swiping) 0.78f else 0.22f
-                val alpha = if (swiping) swell(t, 0.10f, 0.14f, 0.30f, 0.36f) else swell(t, 0.46f, 0.50f, 0.66f, 0.72f)
-                Swipe(
-                    from = LinesWidth * start,
-                    to = LinesWidth * x,
-                    y = LineHeight * 1.5f,
-                    modifier = Modifier.alpha(alpha),
-                )
-            } else {
-                // replaying: a little ↻ by the line
-                Text(
-                    "↻",
-                    fontSize = 16.sp,
-                    color = scheme.primary,
-                    modifier = Modifier.align(Alignment.TopEnd).offset(x = (-10).dp, y = top + 8.dp).alpha(flash),
-                )
+            // replaying: a little ↻ by the line
+            Text(
+                "↻",
+                fontSize = 16.sp,
+                color = scheme.primary,
+                modifier = Modifier.align(Alignment.TopEnd).offset(x = (-10).dp, y = top + 8.dp).alpha(flash),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DemoKey("←", swell(t, 0.46f, 0.48f, 0.52f, 0.55f) > 0.5f)
+            DemoKey(";", swell(t, 0.72f, 0.74f, 0.78f, 0.81f) > 0.5f)
+            DemoKey("→", swell(t, 0.18f, 0.20f, 0.24f, 0.27f) > 0.5f)
+        }
+    }
+}
+
+/** Each line's looked-up word, as the panel shows it under the line. */
+private val Entries = mapOf(
+    1 to Triple("天気", "てんき", "weather; the elements"),
+    2 to Triple("散歩", "さんぽ", "a walk; a stroll"),
+)
+private val PanelWidth = 250.dp
+private val PanelHeight = 156.dp
+
+/**
+ * The study panel, with the line along its top and the looked-up word below: a finger swipes left
+ * across the panel (not the line, which is for looking words up) and the next line slides in,
+ * then right and the one before comes back.
+ */
+@Composable
+private fun PanelSwipe() {
+    val t = loop(4400)
+    val scheme = MaterialTheme.colorScheme
+    val current = if (t in 0.28f..0.64f) 2 else 1
+    val shape = RoundedCornerShape(14.dp)
+    Box(Modifier.size(PanelWidth, PanelHeight).clip(shape).background(scheme.surface).border(1.dp, scheme.onSurface.copy(alpha = 0.11f), shape)) {
+        AnimatedContent(
+            targetState = current,
+            transitionSpec = {
+                val sign = if (targetState > initialState) 1 else -1
+                (slideInHorizontally(tween(300)) { sign * it / 2 } + fadeIn(tween(220))) togetherWith
+                    (slideOutHorizontally(tween(300)) { -sign * it / 2 } + fadeOut(tween(160)))
+            },
+            label = "line",
+        ) { index ->
+            Column(Modifier.fillMaxWidth()) {
+                Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
+                    Text(Lines[index], fontSize = 17.sp, color = scheme.onSurface)
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(scheme.onSurface.copy(alpha = 0.09f)))
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val (word, reading, meaning) = Entries.getValue(index)
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(word, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+                        Text(reading, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    }
+                    Text(meaning, style = MaterialTheme.typography.bodySmall, color = scheme.onSurface)
+                    Box(Modifier.width(150.dp).height(6.dp).clip(CircleShape).background(scheme.onSurface.copy(alpha = 0.08f)))
+                    Box(Modifier.width(104.dp).height(6.dp).clip(CircleShape).background(scheme.onSurface.copy(alpha = 0.08f)))
+                }
             }
         }
-        if (!touch) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DemoKey("←", swell(t, 0.46f, 0.48f, 0.52f, 0.55f) > 0.5f)
-                DemoKey(";", swell(t, 0.72f, 0.74f, 0.78f, 0.81f) > 0.5f)
-                DemoKey("→", swell(t, 0.18f, 0.20f, 0.24f, 0.27f) > 0.5f)
-            }
-        }
+        // a swipe left for the next line, then right for the one before, across the word below the line
+        val left = part(t, 0.14f, 0.30f)
+        val right = part(t, 0.50f, 0.66f)
+        val first = t < 0.40f
+        val start = if (first) 0.80f else 0.20f
+        val x = if (first) 0.80f - 0.60f * left else 0.20f + 0.60f * right
+        Swipe(
+            from = PanelWidth * start,
+            to = PanelWidth * x,
+            y = 112.dp,
+            width = PanelWidth,
+            height = PanelHeight,
+            modifier = Modifier.alpha(if (first) swell(t, 0.10f, 0.14f, 0.30f, 0.36f) else swell(t, 0.46f, 0.50f, 0.66f, 0.72f)),
+        )
     }
 }
 
@@ -301,91 +352,152 @@ fun TutorialPeek(touch: Boolean) {
 
 /**
  * A little video that Space pauses and plays again, or with [touch] that a tap pauses, a
- * double-tap at its right edge moves on 5 s and then 10 s, and another tap plays.
+ * double-tap at its right edge moves on 5 s and then 10 s, another tap plays, and a pinch fills
+ * the area with the picture and then fits it again.
  */
 @Composable
-fun TutorialPlayback(touch: Boolean) {
-    val t = loop(if (touch) 4800 else 4000)
-    val scheme = MaterialTheme.colorScheme
-    val pauseAt = if (touch) 0.22f else 0.30f
-    val playAt = if (touch) 0.84f else 0.70f
+fun TutorialPlayback(touch: Boolean) = if (touch) VideoGestures() else VideoBySpace()
+
+@Composable
+private fun VideoBySpace() {
+    val t = loop(4000)
+    val playing = t !in 0.30f..0.70f
+    val played = minOf(t, 0.30f) + maxOf(0f, t - 0.70f)
+    val first = swell(t, 0.28f, 0.30f, 0.34f, 0.37f)
+    val second = swell(t, 0.68f, 0.70f, 0.74f, 0.77f)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        VideoTile(playing, popped = first > 0.5f || second > 0.5f, progress = 0.12f + played * 0.6f, scene = null) {}
+        Spacer(Modifier.height(14.dp))
+        DemoKey("Space", first > 0.5f || second > 0.5f, width = 150.dp)
+    }
+}
+
+@Composable
+private fun VideoGestures() {
+    val t = loop(7000)
+    val pauseAt = 0.10f
+    val playAt = 0.42f
     val playing = t !in pauseAt..playAt
     val played = minOf(t, pauseAt) + maxOf(0f, t - playAt)
     // a double-tap at the right edge jumps on, and on again with the second tap
     val skips = when {
-        !touch -> 0
-        t >= 0.62f -> 2
-        t >= 0.56f -> 1
+        t >= 0.28f -> 2
+        t >= 0.24f -> 1
         else -> 0
     }
-    val progress = 0.12f + played * 0.6f + skips * 0.07f
-    val first = swell(t, pauseAt - 0.02f, pauseAt, pauseAt + 0.04f, pauseAt + 0.07f)
-    val second = swell(t, playAt - 0.02f, playAt, playAt + 0.04f, playAt + 0.07f)
-    val pop by animateFloatAsState(if (first > 0.5f || second > 0.5f) 1f else 0f, tween(180), label = "pop")
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier.size(184.dp, 98.dp).clip(RoundedCornerShape(12.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF2E4A42), Color(0xFF16231F)))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.size(44.dp).scale(1f + 0.12f * pop)) {
-                drawCircle(Color.White.copy(alpha = 0.18f + 0.1f * pop))
-                val u = size.width / 44f
-                if (playing) {
-                    // pause: two bars
-                    drawRoundRect(Color.White, Offset(15 * u, 13 * u), Size(5 * u, 18 * u), CornerRadius(1.5f * u))
-                    drawRoundRect(Color.White, Offset(24 * u, 13 * u), Size(5 * u, 18 * u), CornerRadius(1.5f * u))
-                } else {
-                    drawPath(
-                        Path().apply {
-                            moveTo(17 * u, 12 * u)
-                            lineTo(32 * u, 22 * u)
-                            lineTo(17 * u, 32 * u)
-                            close()
-                        },
-                        Color.White,
-                    )
-                }
-            }
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp).height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) {
-                Box(Modifier.fillMaxWidth(progress).height(3.dp).background(scheme.primary.copy(alpha = 0.9f).compositeOver(Color.White)))
-            }
-            if (touch) {
-                // what the double-tap did, by the edge it was tapped at
-                Text(
-                    if (skips == 2) "+10 s" else "+5 s",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 12.dp)
-                        .alpha(swell(t, 0.56f, 0.58f, 0.74f, 0.80f)),
-                )
-                // the taps: the middle to pause, the right edge twice, the middle to play
-                val edge = t in 0.48f..0.72f
-                Finger(
-                    pressed = if (edge) swell(t, 0.54f, 0.56f, 0.57f, 0.59f) + swell(t, 0.60f, 0.62f, 0.63f, 0.65f)
-                    else maxOf(first, second),
-                    ripple = when {
-                        edge && t < 0.60f -> part(t, 0.56f, 0.68f)
-                        edge -> part(t, 0.62f, 0.72f)
-                        t < 0.5f -> part(t, pauseAt, pauseAt + 0.12f)
-                        else -> part(t, playAt, playAt + 0.12f)
+    val first = swell(t, pauseAt - 0.01f, pauseAt, pauseAt + 0.02f, pauseAt + 0.04f)
+    val second = swell(t, playAt - 0.01f, playAt, playAt + 0.02f, playAt + 0.04f)
+    // pinched out the picture fills the area, pinched in it fits again
+    val out = part(t, 0.56f, 0.68f)
+    val back = part(t, 0.82f, 0.94f)
+    val fill = out * (1 - back)
+    VideoTile(playing, popped = first > 0.5f || second > 0.5f, progress = 0.10f + played * 0.55f + skips * 0.07f, scene = fill) {
+        // what the double-tap did
+        Text(
+            if (skips == 2) "+10 s" else "+5 s",
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 12.dp).alpha(swell(t, 0.24f, 0.25f, 0.36f, 0.40f)),
+        )
+        // the taps: the middle to pause, the right edge twice, the middle to play
+        val edge = t in 0.18f..0.36f
+        Finger(
+            pressed = if (edge) swell(t, 0.23f, 0.24f, 0.245f, 0.255f) + swell(t, 0.27f, 0.28f, 0.285f, 0.295f) else maxOf(first, second),
+            ripple = when {
+                edge && t < 0.27f -> part(t, 0.24f, 0.30f)
+                edge -> part(t, 0.28f, 0.34f)
+                t < 0.3f -> part(t, pauseAt, pauseAt + 0.06f)
+                else -> part(t, playAt, playAt + 0.06f)
+            },
+            modifier = Modifier.align(if (edge) Alignment.CenterEnd else Alignment.Center)
+                .offset(x = if (edge) (-14).dp else 30.dp, y = if (edge) 6.dp else 14.dp)
+                .alpha(
+                    maxOf(
+                        swell(t, pauseAt - 0.05f, pauseAt - 0.02f, pauseAt + 0.03f, pauseAt + 0.06f),
+                        swell(t, 0.19f, 0.21f, 0.31f, 0.34f),
+                        swell(t, playAt - 0.05f, playAt - 0.02f, playAt + 0.03f, playAt + 0.06f),
+                    ),
+                ),
+        )
+        // two fingers, apart for the fill and together again for the fit
+        val spread = if (t < 0.75f) 12.dp + 30.dp * out else 42.dp - 30.dp * back
+        val pinching = maxOf(swell(t, 0.52f, 0.56f, 0.68f, 0.72f), swell(t, 0.78f, 0.82f, 0.94f, 0.98f))
+        for (sign in listOf(-1, 1)) {
+            Finger(
+                pressed = 1f,
+                ripple = 0f,
+                modifier = Modifier.align(Alignment.Center).offset(x = spread * sign, y = spread * 0.45f * sign).alpha(pinching),
+            )
+        }
+    }
+}
+
+/**
+ * The little video: a play or pause sign in the middle and its progress along the bottom. With a
+ * [scene] it shows a 4:3 picture, fitted with bars at the sides at 0 and filling the area at 1.
+ */
+@Composable
+private fun VideoTile(
+    playing: Boolean,
+    popped: Boolean,
+    progress: Float,
+    scene: Float?,
+    over: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val pop by animateFloatAsState(if (popped) 1f else 0f, tween(180), label = "pop")
+    Box(
+        Modifier.size(184.dp, 98.dp).clip(RoundedCornerShape(12.dp))
+            .background(if (scene == null) Brush.linearGradient(listOf(Color(0xFF2E4A42), Color(0xFF16231F))) else Brush.linearGradient(listOf(Color.Black, Color.Black))),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (scene != null) {
+            Canvas(Modifier.fillMaxSize()) {
+                // fitted, the picture is as tall as the area; filling, as wide, its top and bottom cut off
+                val fit = Size(size.height * 4 / 3, size.height)
+                val full = Size(size.width, size.width * 3 / 4)
+                val w = fit.width + (full.width - fit.width) * scene
+                val h = fit.height + (full.height - fit.height) * scene
+                val left = (size.width - w) / 2
+                val top = (size.height - h) / 2
+                drawRect(Brush.verticalGradient(listOf(Color(0xFF4F8A79), Color(0xFF24463D)), startY = top, endY = top + h), Offset(left, top), Size(w, h))
+                drawCircle(Color(0xFFF2C46D).copy(alpha = 0.95f), radius = h * 0.11f, center = Offset(left + w * 0.72f, top + h * 0.32f))
+                drawPath(
+                    Path().apply {
+                        moveTo(left, top + h * 0.78f)
+                        quadraticTo(left + w * 0.35f, top + h * 0.56f, left + w * 0.62f, top + h * 0.74f)
+                        quadraticTo(left + w * 0.82f, top + h * 0.86f, left + w, top + h * 0.66f)
+                        lineTo(left + w, top + h)
+                        lineTo(left, top + h)
+                        close()
                     },
-                    modifier = Modifier.align(if (edge) Alignment.CenterEnd else Alignment.Center)
-                        .offset(x = if (edge) (-14).dp else 30.dp, y = if (edge) 6.dp else 14.dp)
-                        .alpha(
-                            maxOf(
-                                swell(t, pauseAt - 0.08f, pauseAt - 0.04f, pauseAt + 0.06f, pauseAt + 0.12f),
-                                swell(t, 0.48f, 0.52f, 0.66f, 0.72f),
-                                swell(t, playAt - 0.08f, playAt - 0.04f, playAt + 0.06f, playAt + 0.12f),
-                            ),
-                        ),
+                    Color(0xFF16302A),
                 )
             }
         }
-        if (!touch) {
-            Spacer(Modifier.height(14.dp))
-            DemoKey("Space", first > 0.5f || second > 0.5f, width = 150.dp)
+        Canvas(Modifier.size(44.dp).scale(1f + 0.12f * pop)) {
+            drawCircle(Color.White.copy(alpha = 0.18f + 0.1f * pop))
+            val u = size.width / 44f
+            if (playing) {
+                // pause: two bars
+                drawRoundRect(Color.White, Offset(15 * u, 13 * u), Size(5 * u, 18 * u), CornerRadius(1.5f * u))
+                drawRoundRect(Color.White, Offset(24 * u, 13 * u), Size(5 * u, 18 * u), CornerRadius(1.5f * u))
+            } else {
+                drawPath(
+                    Path().apply {
+                        moveTo(17 * u, 12 * u)
+                        lineTo(32 * u, 22 * u)
+                        lineTo(17 * u, 32 * u)
+                        close()
+                    },
+                    Color.White,
+                )
+            }
         }
+        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp).height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) {
+            Box(Modifier.fillMaxWidth(progress.coerceAtMost(1f)).height(3.dp).background(primary.copy(alpha = 0.9f).compositeOver(Color.White)))
+        }
+        over()
     }
 }
 
@@ -446,12 +558,12 @@ private fun Finger(pressed: Float, ripple: Float, modifier: Modifier, hold: Floa
     }
 }
 
-/** A finger drawn across from [from] to [to] at height [y], with a fading trail behind it. */
+/** A finger drawn across a [width] × [height] area from [from] to [to] at [y], with a fading trail behind it. */
 @Composable
-private fun Swipe(from: Dp, to: Dp, y: Dp, modifier: Modifier) {
+private fun Swipe(from: Dp, to: Dp, y: Dp, width: Dp, height: Dp, modifier: Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     Box(modifier) {
-        Canvas(Modifier.width(LinesWidth).height(LineHeight * 3)) {
+        Canvas(Modifier.width(width).height(height)) {
             val a = Offset(from.toPx(), y.toPx())
             val b = Offset(to.toPx(), y.toPx())
             drawLine(
