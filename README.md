@@ -321,7 +321,7 @@ To try a first launch without touching your own settings, run a packaged build w
 ### Build: Android
 
 ```sh
-./scripts/fetch-libmpv.sh          # pinned mpv-android release, extracts its native libs
+./scripts/fetch-libmpv.sh          # mpv-android's native libs, built without GPL code (Android libmpv workflow)
 echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -415,18 +415,17 @@ You may use, modify, sell and redistribute it, and combine it with other code un
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
-On Windows, macOS and in the Linux AppImage, the mpv and FFmpeg it bundles are LGPL builds, so
-those are MPL-2.0 with LGPL libraries. On Android they are, for now, GPL builds, so that app as built
-today is distributed under the GPL as a whole, which MPL-2.0 allows; an LGPL build is planned for it
-too.
+The mpv and FFmpeg it bundles are LGPL builds on every platform (Windows, macOS, Linux and
+Android), built without their GPL parts, so every app is MPL-2.0 with LGPL libraries.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
   [rikaitan-import](https://github.com/Ajatt-Tools/rikaitan-import).
 - **mpv-android** (`MPVLib.kt`, JNI glue): MIT, © Ilya Zhuravlev and sfan5; see
   `app/src/main/java/is/xyz/mpv/LICENSE`.
-- **libmpv and FFmpeg** (prebuilt, fetched by `scripts/fetch-libmpv.sh`): GPL-2.0+/LGPL-2.1+ as
-  built by mpv-android.
+- **libmpv and FFmpeg** (Android, fetched by `scripts/fetch-libmpv.sh`): LGPL-2.1+, mpv-android's
+  build run in CI without their GPL parts (`scripts/build-libmpv-lgpl-android.sh`: FFmpeg without
+  `--enable-gpl`, `--enable-version3` or mbedtls, mpv with `-Dgpl=false`).
 - **libmpv and FFmpeg** (macOS build): LGPL-2.1+, built in CI without their GPL parts
   (`desktop/scripts/build-libmpv-lgpl-macos.sh`; mpv with `-Dgpl=false`, which CI checks), with
   Homebrew's dav1d, libass, libplacebo and the libraries they use, under their own LGPL or more

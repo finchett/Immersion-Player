@@ -1,0 +1,54 @@
+# Android's native libraries without GPL code (scripts/build-libmpv-lgpl-android.sh): most of an
+# hour, so only when the build itself changes. On main they're published as a release of their own,
+# which scripts/fetch-libmpv.sh downloads; it's never marked latest, so the app's update feed
+# (releases/latest) doesn't see it.
+name: Android libmpv
+
+on:
+  push:
+    branches: [main]
+    paths: [scripts/build-libmpv-lgpl-android.sh, .github/workflows/android-libmpv.yml]
+  pull_request:
+    paths: [scripts/build-libmpv-lgpl-android.sh, .github/workflows/android-libmpv.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq ninja-build nasm autoconf automake libtool pkg-config gperf python3-jsonschema python3-pip
+          # a current Meson: fontconfig wants 1.11, newer than Ubuntu's
+          pip install --quiet --user --break-system-packages meson
+          export PATH="$HOME/.local/bin:$PATH"
+          meson --version
+          scripts/build-libmpv-lgpl-android.sh "$RUNNER_TEMP/libs"
+          cd "$RUNNER_TEMP/libs" && zip -q "$GITHUB_WORKSPACE/android-arm64-libmpv.zip" *.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64-libmpv
+          path: android-arm64-libmpv.zip
+          if-no-files-found: error
+      - name: Publish for fetch-libmpv.sh
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="android-libmpv-lgpl-$(sed -n 's/^TAG="\(.*\)"/\1/p' scripts/build-libmpv-lgpl-android.sh)"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" android-arm64-libmpv.zip --clobber
+          else
+            gh release create "$tag" android-arm64-libmpv.zip --latest=false --prerelease \
+              --title "Android libmpv without GPL code ($tag)" \
+              --notes "mpv-android's native libraries built without GPL code, for scripts/fetch-libmpv.sh. Not an app release."
+          fi
