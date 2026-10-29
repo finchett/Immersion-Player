@@ -28,7 +28,7 @@ class UpdatesTest {
     fun readsTheAssets() {
         val release = Updates.parse(String(manifest))
         assertEquals("0.5.0", release.version)
-        assertEquals("Immersion-Player-0.5.0-macos-arm64.dmg", release.assets.getValue("macos-arm64").name)
+        assertEquals("Mizune-0.5.0-macos-arm64.dmg", release.assets.getValue("macos-arm64").name)
         assertEquals(3L, release.assets.getValue("android-arm64").size)
         assertEquals("", release.notes)
     }

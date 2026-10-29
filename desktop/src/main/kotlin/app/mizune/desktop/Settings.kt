@@ -18,39 +18,28 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.prefs.Preferences
 
-/**
- * Where the app keeps its database and caches, per OS convention. Before 1.0 the app was called
- * Immersion Player and kept them under that name; the first launch since moves them across.
- */
+/** Where the app keeps its database and caches, per OS convention. */
 object AppDirs {
     val data: File by lazy {
         val home = System.getProperty("user.home")
         val os = System.getProperty("os.name").lowercase()
-        val parent = when {
-            os.contains("mac") -> File(home, "Library/Application Support")
-            os.contains("win") -> File(System.getenv("APPDATA") ?: "$home/AppData/Roaming")
-            else -> File(System.getenv("XDG_DATA_HOME") ?: "$home/.local/share")
+        val dir = when {
+            os.contains("mac") -> File(home, "Library/Application Support/Mizune")
+            os.contains("win") -> File(System.getenv("APPDATA") ?: "$home/AppData/Roaming", "Mizune")
+            else -> File(System.getenv("XDG_DATA_HOME") ?: "$home/.local/share", "mizune")
         }
-        if (os.contains("mac") || os.contains("win")) movedIn(parent, "Immersion Player", "Mizune")
-        else movedIn(parent, "immersion-player", "mizune")
+        dir.apply { mkdirs() }
     }
 
     val cache: File by lazy {
         val os = System.getProperty("os.name").lowercase()
         val home = System.getProperty("user.home")
-        when {
-            os.contains("mac") -> movedIn(File(home, "Library/Caches"), "Immersion Player", "Mizune")
-            os.contains("win") -> File(data, "cache").apply { mkdirs() }
-            else -> movedIn(File(System.getenv("XDG_CACHE_HOME") ?: "$home/.cache"), "immersion-player", "mizune")
+        val dir = when {
+            os.contains("mac") -> File(home, "Library/Caches/Mizune")
+            os.contains("win") -> File(data, "cache")
+            else -> File(System.getenv("XDG_CACHE_HOME") ?: "$home/.cache", "mizune")
         }
-    }
-
-    /** [parent]/[name], made, or renamed from [old] when only that exists. */
-    internal fun movedIn(parent: File, old: String, name: String): File {
-        val dir = File(parent, name)
-        val before = File(parent, old)
-        if (!dir.exists() && before.isDirectory) before.renameTo(dir)
-        return dir.apply { mkdirs() }
+        dir.apply { mkdirs() }
     }
 }
 
@@ -59,8 +48,8 @@ object AppDirs {
  * ~/.java on Linux). Settings the UI reads are Compose state so changes apply immediately.
  * -Dmizune.prefs=<node> keeps a separate set in place of the app's own, to try a first launch.
  */
-class Settings(node: String = System.getProperty("mizune.prefs") ?: NODE) {
-    private val prefs = Preferences.userRoot().node(node).also { if (node == NODE) carryOver(it) }
+class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune") {
+    private val prefs = Preferences.userRoot().node(node)
     private val videos = prefs.node("videos")
 
     /**
@@ -256,26 +245,4 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: NODE) {
     private fun key(path: String): String =
         MessageDigest.getInstance("SHA-1").digest(path.toByteArray())
             .joinToString("") { "%02x".format(it) }
-
-    companion object {
-        const val NODE = "app/mizune"
-
-        /** Immersion Player's node, before 1.0's rename. */
-        private const val OLD_NODE = "io/github/immersionplayer"
-
-        /** Copies Immersion Player's settings into [prefs] the first time it's used, so nothing's lost. */
-        internal fun carryOver(prefs: Preferences, old: String = OLD_NODE) {
-            runCatching {
-                val root = Preferences.userRoot()
-                if (prefs.keys().isNotEmpty() || prefs.childrenNames().isNotEmpty() || !root.nodeExists(old)) return
-                copy(root.node(old), prefs)
-                prefs.flush()
-            }
-        }
-
-        private fun copy(from: Preferences, to: Preferences) {
-            for (key in from.keys()) from.get(key, null)?.let { to.put(key, it) }
-            for (child in from.childrenNames()) copy(from.node(child), to.node(child))
-        }
-    }
 }

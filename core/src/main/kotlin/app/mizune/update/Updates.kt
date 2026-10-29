@@ -33,7 +33,7 @@ object Updates {
 
     /** Public halves of the release keys (P-256, X.509, base64). Add the new one here before retiring an old one. */
     private val KEYS = listOf(
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDV2/PZWIw9VCxiBgeTVzPdTbN22KuwFFISJapNc93RTsYp88UeBeg5Pd6Nlm7MZ+ku95EXcUU6Baltuo0etYMQ==",
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdGaZAO7GQEearNktf1TEA2sMeLTGpJqpt9hadBCb59uecaSDMb/NwoyWFFjOLR8QAvtTw7SIQyzIv3xeUW5FOA==",
     )
 
     /**

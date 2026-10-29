@@ -11,8 +11,8 @@
 # http://localhost:8765 instead, and creates nothing on GitHub, to try the update on this Mac
 # from the version installed in /Applications first.
 #
-# Needs the release keys in ~/.keystores: immersion-player.properties (Android, see
-# app/build.gradle.kts) and immersion-update.pem (the feed; its public half is in core's Updates).
+# Needs the release keys in ~/.keystores: mizune.properties (Android, see
+# app/build.gradle.kts) and mizune-update.pem (the feed; its public half is in core's Updates).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,10 +22,10 @@ notes="${1:?usage: release.sh [--try] <release notes.md>}"
 version="${APP_VERSION:-$(sed -n 's/^appVersion=//p' gradle.properties)}"
 tag="v$version"
 repo="finchett/Mizune"
-feed_key="$HOME/.keystores/immersion-update.pem"
-android_key="$HOME/.keystores/immersion-player.properties"
-# the certificate every release APK has been signed with (0.1 onwards); Android won't update across another
-android_signer="6af52571097c89fc700401a99e2d8f7a0a9ec39393802b0d928f7ff9cc0db762"
+feed_key="$HOME/.keystores/mizune-update.pem"
+android_key="$HOME/.keystores/mizune.properties"
+# the certificate every release APK has been signed with (1.0 onwards); Android won't update across another
+android_signer="6130587b879dc47a247cdf629e62b5408d761965cf71f9c01a0a56b4428c5345"
 apksigner="$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/*/apksigner | tail -1)"
 
 die() { echo "release: $*" >&2; exit 1; }

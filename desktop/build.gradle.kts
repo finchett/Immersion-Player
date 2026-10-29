@@ -107,7 +107,7 @@ compose.desktop {
                 // into the user's own folder, so neither installing nor updating asks for an admin
                 perUserInstall = true
                 // the same for every release, so a new installer replaces the old version
-                upgradeUuid = "17ce85a1-57a0-4e4e-9c09-549dfad03d7d"
+                upgradeUuid = "5cff6d00-174d-47ce-bc07-a91650e3fd5f"
                 menuGroup = "Mizune"
                 shortcut = true
             }
