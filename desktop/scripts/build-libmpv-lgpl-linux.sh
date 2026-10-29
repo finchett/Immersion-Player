@@ -41,7 +41,12 @@ meson setup build --prefix="$prefix" --libdir=lib --buildtype=release \
 meson install -C build
 
 cd "$work"
-curl -sSfL "https://ffmpeg.org/releases/ffmpeg-$FFMPEG.tar.xz" | tar xJ
+# ffmpeg.org, retried, and FFmpeg's own GitHub mirror if it stays out of reach
+mkdir "ffmpeg-$FFMPEG"
+curl -sSfL --retry 5 --retry-delay 10 --retry-all-errors "https://ffmpeg.org/releases/ffmpeg-$FFMPEG.tar.xz" -o ffmpeg.tar.xz \
+    && tar xJf ffmpeg.tar.xz --strip-components=1 -C "ffmpeg-$FFMPEG" \
+    || curl -sSfL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n$FFMPEG.tar.gz" \
+        | tar xz --strip-components=1 -C "ffmpeg-$FFMPEG"
 cd "ffmpeg-$FFMPEG"
 ./configure --prefix="$prefix" --enable-shared --disable-static \
     --disable-programs --disable-doc --disable-debug \
@@ -52,7 +57,7 @@ make -j"$jobs"
 make install
 
 cd "$work"
-curl -sSfL "https://github.com/mpv-player/mpv/archive/refs/tags/v$MPV.tar.gz" | tar xz
+curl -sSfL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/mpv-player/mpv/archive/refs/tags/v$MPV.tar.gz" | tar xz
 cd "mpv-$MPV"
 # libmpv only: no player, manual or scripting
 meson setup build --prefix="$prefix" --libdir=lib --buildtype=release \
