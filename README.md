@@ -413,9 +413,9 @@ You may use, modify, sell and redistribute it, and combine it with other code un
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
-On Windows, the mpv and FFmpeg it bundles are LGPL builds, so that app is MPL-2.0 with LGPL
-libraries. On Android and macOS they are, for now, GPL builds, so those apps as built today are
-distributed under the GPL as a whole, which MPL-2.0 allows; LGPL builds are planned for them too.
+On Windows and macOS, the mpv and FFmpeg it bundles are LGPL builds, so those apps are MPL-2.0
+with LGPL libraries. On Android they are, for now, GPL builds, so that app as built today is
+distributed under the GPL as a whole, which MPL-2.0 allows; an LGPL build is planned for it too.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
@@ -424,8 +424,10 @@ distributed under the GPL as a whole, which MPL-2.0 allows; LGPL builds are plan
   `app/src/main/java/is/xyz/mpv/LICENSE`.
 - **libmpv and FFmpeg** (prebuilt, fetched by `scripts/fetch-libmpv.sh`): GPL-2.0+/LGPL-2.1+ as
   built by mpv-android.
-- **libmpv, FFmpeg and their libraries** (macOS build, copied from Homebrew): GPL, including
-  x264 and x265.
+- **libmpv and FFmpeg** (macOS build): LGPL-2.1+, built in CI without their GPL parts
+  (`desktop/scripts/build-libmpv-lgpl-macos.sh`; mpv with `-Dgpl=false`, which CI checks), with
+  Homebrew's dav1d, libass, libplacebo and the libraries they use, under their own LGPL or more
+  permissive licences. `release.sh --try` builds with Homebrew's GPL libmpv instead.
 - **libmpv and FFmpeg** (Windows build, from
   [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild)): LGPL-2.1+, built without
   their GPL parts (`-Dgpl=false`, which CI checks). The Linux package uses the system's own libmpv.

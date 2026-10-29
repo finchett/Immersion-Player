@@ -127,6 +127,8 @@ val bundleLibmpv by tasks.registering(Exec::class) {
     val out = layout.buildDirectory.dir("native/macos-arm64")
     onlyIf { System.getProperty("os.name").lowercase().contains("mac") }
     inputs.file("scripts/bundle-libmpv-macos.sh")
+    // a ready bundle to take instead (release.sh, with CI's LGPL libmpv): a different one is a rebuild
+    inputs.property("bundle", System.getenv("LIBMPV_BUNDLE") ?: "")
     outputs.dir(out)
     commandLine("scripts/bundle-libmpv-macos.sh", out.get().asFile.path)
 }

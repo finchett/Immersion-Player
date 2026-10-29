@@ -139,3 +139,35 @@ jobs:
           name: linux-x64
           path: dist/*.deb
           if-no-files-found: error
+
+  # libmpv for the Mac without GPL code: FFmpeg and mpv built here, then bundled as the Mac app
+  # bundles it, and checked to play. scripts/release.sh takes the bundle from this job.
+  macos-libmpv:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build FFmpeg and libmpv
+        run: desktop/scripts/build-libmpv-lgpl-macos.sh "$RUNNER_TEMP/libmpv"
+      - name: Bundle them as the app does
+        run: |
+          brew install --quiet tesseract
+          LIBMPV="$RUNNER_TEMP/libmpv/lib/libmpv.2.dylib" LIBMPV_PREFIX="$RUNNER_TEMP/libmpv" \
+            desktop/scripts/bundle-libmpv-macos.sh "$RUNNER_TEMP/bundle"
+      - name: The bundled libmpv plays a video
+        env:
+          IMMERSION_TEST_MPV: "1"
+        run: |
+          export IMMERSION_TEST_RESOURCES="$RUNNER_TEMP/bundle"
+          ./gradlew --configure-on-demand --no-daemon :desktop:test --tests '*MpvPlaybackTest*' -i > mpv-test.log 2>&1 || { cat mpv-test.log; exit 1; }
+          grep -E "^\s*(mpv|ffmpeg|configuration):" mpv-test.log
+          grep -q -- "-Dgpl=false" mpv-test.log
+          tar -C "$RUNNER_TEMP/bundle" -czf macos-arm64-libmpv.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-libmpv
+          path: macos-arm64-libmpv.tar.gz
+          if-no-files-found: error
