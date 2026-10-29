@@ -73,6 +73,15 @@ dmg="$out/Mizune-$version-macos-arm64.dmg"
 cp app/build/outputs/apk/release/app-release.apk "$apk"
 cp "desktop/build/release/Mizune-$version-macos-arm64.dmg" "$dmg"
 "$apksigner" verify --print-certs "$apk" | grep -q "SHA-256 digest: $android_signer" || die "$apk isn't signed with the release key"
+# a release's Mac app carries CI's libmpv without GPL code, never one left from an earlier build
+if [ "$try" = 0 ]; then
+    mount="$(mktemp -d)"
+    hdiutil attach -noverify -nobrowse -readonly -mountpoint "$mount" "$dmg" > /dev/null 2>&1 || die "can't open $dmg"
+    lgpl=0
+    strings "$mount/Mizune.app/Contents/app/resources/libmpv.2.dylib" | grep -q -- "-Dgpl=false" && lgpl=1
+    hdiutil detach -quiet "$mount"
+    [ "$lgpl" = 1 ] || die "$dmg carries a libmpv built with GPL code"
+fi
 
 # the feed: the version, each platform's file with its size and SHA-256, and the notes the apps show as What's new
 python3 - "$version" "$repo" "$tag" "$base" "$notes" "$dmg" "$apk" "$msi" "$deb" "$appimage" > "$out/update.json" <<'PY'

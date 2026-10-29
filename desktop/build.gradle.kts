@@ -134,6 +134,11 @@ val bundleLibmpv by tasks.registering(Exec::class) {
 }
 
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bundleLibmpv) }
+// jpackage's app doesn't notice the bundled libraries changing (Homebrew's for a try, CI's for a
+// release), so it's packaged again whenever they do; without this a release once kept a GPL libmpv
+tasks.matching { it.name == "createDistributable" }.configureEach {
+    inputs.dir(layout.buildDirectory.dir("native")).withPropertyName("nativeLibraries").optional()
+}
 
 // The release .dmg: the app jpackage builds, with the real (0.x) version written into Info.plist,
 // ad-hoc signed again after that edit, next to an Applications link.
