@@ -2,6 +2,8 @@
 # Copies Homebrew's libmpv and libtesseract (subtitle OCR), and every Homebrew library they load, into $1,
 # rewrites their load paths to @loader_path so they find each other there, and ad-hoc signs them (Apple Silicon refuses to
 # load unsigned code). The result doesn't need Homebrew at run time.
+# LIBMPV picks another libmpv, such as the LGPL one build-libmpv-lgpl-macos.sh makes; LIBMPV_PREFIX is where that one's
+# own libraries (its FFmpeg) live, so they're followed and copied too.
 set -euo pipefail
 
 out="$1"
@@ -9,8 +11,10 @@ entries=("${LIBMPV:-/opt/homebrew/lib/libmpv.2.dylib}" "${LIBTESSERACT:-/opt/hom
 rm -rf "$out"
 mkdir -p "$out"
 
-# Homebrew libraries a library loads: by full path, or by @rpath/ (some formulae, like webp, link that way)
-homebrew_deps() { otool -L "$1" | tail -n +2 | awk '{print $1}' | grep -E '^/opt/homebrew|^/usr/local|^@rpath/' || true; }
+# Homebrew libraries a library loads: by full path, or by @rpath/ (some formulae, like webp, link that way); and
+# LIBMPV_PREFIX's, when given
+own="${LIBMPV_PREFIX:+|^$LIBMPV_PREFIX}"
+homebrew_deps() { otool -L "$1" | tail -n +2 | awk '{print $1}' | grep -E "^/opt/homebrew|^/usr/local|^@rpath/$own" || true; }
 
 # where a dependency of $1 really is; an @rpath/ one sits next to $1 in Homebrew, or in its lib folder
 resolve() {
@@ -49,7 +53,7 @@ for f in "$out"/*.dylib; do
 done
 
 # nothing may still point into Homebrew, or at an @rpath the app doesn't set
-leftover=$(for f in "$out"/*.dylib; do otool -L "$f" | tail -n +2 | grep -E '/opt/homebrew|/usr/local|@rpath/' | sed "s|^|$(basename "$f"): |" || true; done)
+leftover=$(for f in "$out"/*.dylib; do otool -L "$f" | tail -n +2 | grep -E "/opt/homebrew|/usr/local|@rpath/$own" | sed "s|^|$(basename "$f"): |" || true; done)
 if [ -n "$leftover" ]; then
     echo "error: libraries still reference Homebrew or @rpath:" >&2
     echo "$leftover" >&2
