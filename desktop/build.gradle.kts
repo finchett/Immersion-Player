@@ -58,6 +58,11 @@ tasks.test {
     // the UI test drives real libmpv; same lookup path as the dev run
     systemProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib:/usr/lib")
     System.getenv("IMMERSION_TEST_VIDEO")?.let { environment("IMMERSION_TEST_VIDEO", it) }
+    // a packaged build's native libraries to load instead of the system's (MpvPlaybackTest and
+    // TesseractTest in CI)
+    System.getenv("IMMERSION_TEST_RESOURCES")?.let { systemProperty("compose.application.resources.dir", it) }
+    System.getenv("IMMERSION_TEST_MPV")?.let { environment("IMMERSION_TEST_MPV", it) }
+    System.getenv("IMMERSION_TEST_TESSERACT")?.let { environment("IMMERSION_TEST_TESSERACT", it) }
     System.getenv("IMMERSION_TEST_SHOTS")?.let { environment("IMMERSION_TEST_SHOTS", it) }
     // an AnkiConnect to read note types and decks from (read only); the Anki pane is tested offline without it
     System.getenv("IMMERSION_TEST_ANKI")?.let { environment("IMMERSION_TEST_ANKI", it) }
@@ -122,6 +127,8 @@ val bundleLibmpv by tasks.registering(Exec::class) {
     val out = layout.buildDirectory.dir("native/macos-arm64")
     onlyIf { System.getProperty("os.name").lowercase().contains("mac") }
     inputs.file("scripts/bundle-libmpv-macos.sh")
+    // a ready bundle to take instead (release.sh, with CI's LGPL libmpv): a different one is a rebuild
+    inputs.property("bundle", System.getenv("LIBMPV_BUNDLE") ?: "")
     outputs.dir(out)
     commandLine("scripts/bundle-libmpv-macos.sh", out.get().asFile.path)
 }

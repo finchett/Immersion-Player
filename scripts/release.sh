@@ -38,18 +38,11 @@ if [ "$try" = 0 ]; then
     ! gh release view "$tag" --repo "$repo" >/dev/null 2>&1 || die "$tag already exists"
 fi
 
-./gradlew -PappVersion="$version" -PimmersionKeystore="$android_key" :app:assembleRelease :desktop:packageMacRelease
-
 if [ "$try" = 1 ]; then out="dist/try-$version"; base="http://localhost:8765"; else out="dist/$tag"; base="https://github.com/$repo/releases/download/$tag"; fi
 rm -rf "$out"
 mkdir -p "$out"
-apk="$out/immersion-player-$version-arm64.apk"
-dmg="$out/Immersion-Player-$version-macos-arm64.dmg"
-cp app/build/outputs/apk/release/app-release.apk "$apk"
-cp "desktop/build/release/Immersion-Player-$version-macos-arm64.dmg" "$dmg"
-"$apksigner" verify --print-certs "$apk" | grep -q "SHA-256 digest: $android_signer" || die "$apk isn't signed with the release key"
 
-# Windows and Linux, built by CI from this same commit
+# from CI, built from this same commit: Windows and Linux, and the Mac's libmpv without GPL code
 msi="$out/Immersion-Player-$version-windows-x64.msi"
 deb="$out/Immersion-Player-$version-linux-x64.deb"
 appimage="$out/Immersion-Player-$version-linux-x64.AppImage"
@@ -57,13 +50,29 @@ if [ "$try" = 0 ]; then
     commit="$(git rev-parse HEAD)"
     run="$(gh run list --repo "$repo" --workflow desktop.yml --commit "$commit" --event push --limit 1 --json databaseId -q '.[0].databaseId')"
     [ -n "$run" ] || die "no Desktop builds run for $commit; it starts when the commit reaches main"
-    echo "Waiting for the Windows and Linux builds (run $run)…"
-    gh run watch "$run" --repo "$repo" --exit-status > /dev/null || die "the Windows and Linux builds failed: gh run view $run --repo $repo"
+    echo "Waiting for the CI builds (run $run)…"
+    gh run watch "$run" --repo "$repo" --exit-status > /dev/null || die "the CI builds failed: gh run view $run --repo $repo"
     gh run download "$run" --repo "$repo" -n windows-x64 -D "$out"
     gh run download "$run" --repo "$repo" -n linux-x64 -D "$out"
     gh run download "$run" --repo "$repo" -n linux-x64-appimage -D "$out"
     [ -f "$msi" ] && [ -f "$deb" ] && [ -f "$appimage" ] || die "the builds didn't produce $msi, $deb and $appimage (is appVersion $version on main?)"
+    gh run download "$run" --repo "$repo" -n macos-arm64-libmpv -D "$out/libmpv"
+    mkdir -p "$out/libmpv/bundle"
+    tar -xzf "$out/libmpv/macos-arm64-libmpv.tar.gz" -C "$out/libmpv/bundle"
+    # the Mac app bundles this in place of Homebrew's GPL libmpv (bundle-libmpv-macos.sh)
+    export LIBMPV_BUNDLE="$PWD/$out/libmpv/bundle"
+else
+    echo "--try: the Mac app bundles Homebrew's libmpv, a GPL build; releases take CI's LGPL one"
 fi
+
+./gradlew -PappVersion="$version" -PimmersionKeystore="$android_key" :app:assembleRelease :desktop:packageMacRelease
+rm -rf "$out/libmpv"
+
+apk="$out/immersion-player-$version-arm64.apk"
+dmg="$out/Immersion-Player-$version-macos-arm64.dmg"
+cp app/build/outputs/apk/release/app-release.apk "$apk"
+cp "desktop/build/release/Immersion-Player-$version-macos-arm64.dmg" "$dmg"
+"$apksigner" verify --print-certs "$apk" | grep -q "SHA-256 digest: $android_signer" || die "$apk isn't signed with the release key"
 
 # the feed: the version, each platform's file with its size and SHA-256, and the notes the apps show as What's new
 python3 - "$version" "$repo" "$tag" "$base" "$notes" "$dmg" "$apk" "$msi" "$deb" "$appimage" > "$out/update.json" <<'PY'

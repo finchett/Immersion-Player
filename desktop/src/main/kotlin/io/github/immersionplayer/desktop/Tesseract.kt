@@ -30,10 +30,14 @@ internal interface TesseractLib : Library {
             }.getOrThrow()
         }
 
-        /** The libtesseract packaged with the app, if this is a packaged build; else the system's. */
+        /**
+         * The libtesseract packaged with the app, if this is a packaged build; else the system's.
+         * On Windows its libraries (Leptonica and the image codecs) sit beside it, where loading it
+         * by its full path finds them.
+         */
         private fun bundled(): String? {
             val dir = System.getProperty("compose.application.resources.dir") ?: return null
-            return File(dir, "libtesseract.5.dylib").takeIf { it.isFile }?.path
+            return listOf("libtesseract.5.dylib", "libtesseract-5.dll").map { File(dir, it) }.firstOrNull { it.isFile }?.path
         }
     }
 }

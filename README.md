@@ -415,10 +415,10 @@ You may use, modify, sell and redistribute it, and combine it with other code un
 licences. Changes to its files have to stay under MPL-2.0, with their source available. Releases
 up to 0.4 were GPL-3.0-or-later, and copies of those stay so.
 
-The mpv and FFmpeg it bundles are, for now, GPL builds, so the Android, macOS and Windows apps
-and the Linux AppImage as built today are distributed under the GPL as a whole, which MPL-2.0
-allows. LGPL builds of both are planned for every platform, after which the apps are MPL-2.0 with
-LGPL libraries.
+On Windows and macOS, the mpv and FFmpeg it bundles are LGPL builds, so those apps are MPL-2.0
+with LGPL libraries. On Android and in the Linux AppImage they are, for now, GPL builds, so those as
+built today are distributed under the GPL as a whole, which MPL-2.0 allows; LGPL builds are planned
+for them too.
 
 - **JMdict** (bundled): © Electronic Dictionary Research and Development Group, under
   [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html). Yomitan conversion by
@@ -427,11 +427,18 @@ LGPL libraries.
   `app/src/main/java/is/xyz/mpv/LICENSE`.
 - **libmpv and FFmpeg** (prebuilt, fetched by `scripts/fetch-libmpv.sh`): GPL-2.0+/LGPL-2.1+ as
   built by mpv-android.
-- **libmpv, FFmpeg and their libraries** (macOS build, copied from Homebrew): GPL, including
-  x264 and x265.
+- **libmpv and FFmpeg** (macOS build): LGPL-2.1+, built in CI without their GPL parts
+  (`desktop/scripts/build-libmpv-lgpl-macos.sh`; mpv with `-Dgpl=false`, which CI checks), with
+  Homebrew's dav1d, libass, libplacebo and the libraries they use, under their own LGPL or more
+  permissive licences. `release.sh --try` builds with Homebrew's GPL libmpv instead.
 - **libmpv and FFmpeg** (Windows build, from
-  [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake)): GPL. The Linux
-  .deb uses the system's own libmpv.
+  [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild)): LGPL-2.1+, built without
+  their GPL parts (`-Dgpl=false`, which CI checks). The Linux .deb uses the system's own libmpv.
+- **Tesseract on Windows** (from [UB Mannheim's build](https://github.com/UB-Mannheim/tesseract)):
+  Apache-2.0, with the libraries it loads: Leptonica (BSD-2-Clause), libarchive (BSD), OpenSSL's
+  libcrypto (Apache-2.0), and the zlib, bzip2, xz, zstd, lz4, libjpeg, libpng, libtiff, libwebp,
+  giflib, OpenJPEG, JBIG-KIT, LERC, libdeflate, libb2, expat and libiconv libraries under their own
+  permissive or LGPL licences, and MinGW's runtime (libgcc, libstdc++, winpthreads).
 - **libmpv, FFmpeg, Tesseract and their libraries** (Linux AppImage, from Ubuntu 22.04's packages,
   gathered by [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)): GPL for mpv and FFmpeg as
   Ubuntu builds them; the rest under their own licences, as Ubuntu distributes them.
