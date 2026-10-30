@@ -180,7 +180,7 @@ private fun StepText(step: TutorialStep, ankiEnabled: Boolean, keyMap: KeyMap) {
             TutorialStep.Words -> if (ankiEnabled) Hint(keyMap.caps(PlayerAction.AddCard), "Save the word as an Anki card")
             TutorialStep.Lines -> Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 // each action's first key, then its second, as the user has them
-                fun second(action: PlayerAction) = keyMap.keysFor(action).getOrNull(1)?.caps.orEmpty()
+                fun second(action: PlayerAction) = listOfNotNull(keyMap.keysFor(action).getOrNull(1)?.label)
                 Hint(keyMap.caps(PlayerAction.PreviousLine) + keyMap.caps(PlayerAction.NextLine), "The previous or next line")
                 Hint(second(PlayerAction.PreviousLine) + second(PlayerAction.NextLine), "The same")
                 Hint(keyMap.caps(PlayerAction.PreviousLineStop) + keyMap.caps(PlayerAction.NextLineStop), "Previous or next, stopping when it ends")

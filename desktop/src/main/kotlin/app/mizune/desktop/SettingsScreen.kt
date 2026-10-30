@@ -74,6 +74,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -783,7 +785,7 @@ private fun KeyboardPane(settings: Settings) {
  * × to take it off, + to add a second. A key another action had moves over, and the row says so.
  */
 @Composable
-private fun PlayerKeyList(settings: Settings) {
+internal fun PlayerKeyList(settings: Settings) {
     val map = settings.keyMap
     // the key being set (an action and which of its keys), and what to say in a row after a change
     var recording by remember { mutableStateOf<Pair<PlayerAction, Int>?>(null) }
@@ -808,7 +810,8 @@ private fun PlayerKeyList(settings: Settings) {
                 val keys = map.keysFor(action)
                 keys.forEachIndexed { slot, binding ->
                     KeyButton(
-                        binding.caps,
+                        // one keycap a key, so ⇧← doesn't read as two
+                        listOf(binding.label),
                         recording = recording == action to slot,
                         onClick = { recording = action to slot; said = null },
                         onRemove = { settings.updateKeyMap(map.unbind(action, slot)); said = null },
@@ -879,7 +882,7 @@ private fun KeyRow(action: String, note: String?, highlight: Boolean = false, ke
 
 /**
  * One of an action's keys, as keycaps ([caps] null: the + for adding one). Clicked, it waits for a
- * key, taking it with whatever modifiers are held; Esc cancels. Hovered, it offers an × to remove it.
+ * key, taking it with whatever modifiers are held; Esc cancels. Hovered, an × on its corner removes it.
  */
 @Composable
 private fun KeyButton(
@@ -894,56 +897,73 @@ private fun KeyButton(
     val hovered by interaction.collectIsHoveredAsState()
     val focus = remember { FocusRequester() }
     val scheme = MaterialTheme.colorScheme
-    LaunchedEffect(recording) { if (recording) focus.requestFocus() }
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(7.dp))
-            .border(1.dp, if (recording) scheme.primary else if (hovered) scheme.controlLine else Color.Transparent, RoundedCornerShape(7.dp))
-            .hoverable(interaction)
-            .focusRequester(focus)
-            .onFocusChanged { if (recording && !it.isFocused) onCancel() }
-            .onPreviewKeyEvent { event ->
-                if (!recording) return@onPreviewKeyEvent false
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
-                when {
-                    // a modifier on its own: wait for the key it goes with
-                    event.key in MODIFIER_KEYS -> Unit
-                    event.key == Key.Escape -> onCancel()
-                    else -> onKey(KeyBinding(event.key, event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed))
+    // whether it has had focus since it started waiting: requestFocus reports it unfocused on the
+    // way, which isn't the user clicking elsewhere
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(recording) {
+        focused = false
+        if (recording) focus.requestFocus()
+    }
+    // the × sits over the key's corner, so the key and it are hovered as one
+    Box(Modifier.hoverable(interaction)) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(7.dp))
+                .border(1.dp, if (recording) scheme.primary else if (hovered) scheme.controlLine else Color.Transparent, RoundedCornerShape(7.dp))
+                .focusRequester(focus)
+                // clicking elsewhere stops it waiting; focus anywhere inside (the clickable's) counts
+                .onFocusChanged { state ->
+                    if (state.hasFocus) focused = true else if (recording && focused) onCancel()
                 }
-                true
+                .onPreviewKeyEvent { event ->
+                    if (!recording) return@onPreviewKeyEvent false
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                    when {
+                        // a modifier on its own: wait for the key it goes with
+                        event.key in MODIFIER_KEYS -> Unit
+                        event.key == Key.Escape -> onCancel()
+                        else -> onKey(KeyBinding(event.key, event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed))
+                    }
+                    true
+                }
+                .focusable()
+                .clickable(interaction, indication = null, onClick = onClick)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when {
+                recording -> Text(
+                    "Press a key…",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.primary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+                caps == null -> Text(
+                    "+",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant.copy(alpha = if (hovered) 1f else 0.5f),
+                    modifier = Modifier.widthIn(min = 22.dp).padding(horizontal = 6.dp, vertical = 3.dp),
+                    textAlign = TextAlign.Center,
+                )
+                else -> caps.forEach { Keycap(it) }
             }
-            .focusable()
-            .clickable(interaction, indication = null, onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        when {
-            recording -> Text(
-                "Press a key…",
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.primary,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-            )
-            caps == null -> Text(
-                "+",
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant.copy(alpha = if (hovered) 1f else 0.5f),
-                modifier = Modifier.widthIn(min = 22.dp).padding(horizontal = 6.dp, vertical = 3.dp),
-                textAlign = TextAlign.Center,
-            )
-            else -> {
-                caps.forEach { Keycap(it) }
-                if (hovered && onRemove != null) {
-                    Text(
-                        "×",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onSurfaceVariant,
-                        modifier = Modifier.clip(CircleShape).clickable(onClick = onRemove).padding(horizontal = 4.dp),
-                    )
-                }
+        }
+        if (hovered && !recording && caps != null && onRemove != null) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .size(15.dp)
+                    .clip(CircleShape)
+                    .background(scheme.onSurfaceVariant)
+                    .clickable(onClick = onRemove)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .semantics { contentDescription = "Remove" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("×", fontSize = 11.sp, lineHeight = 11.sp, color = scheme.surface)
             }
         }
     }

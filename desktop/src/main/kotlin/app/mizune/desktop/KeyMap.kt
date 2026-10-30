@@ -88,8 +88,8 @@ class KeyMap private constructor(private val keys: Map<PlayerAction, List<KeyBin
 
     fun keysFor(action: PlayerAction): List<KeyBinding> = keys[action].orEmpty()
 
-    /** The first key for [action], as keycaps; empty if it has none. */
-    fun caps(action: PlayerAction): List<String> = keysFor(action).firstOrNull()?.caps.orEmpty()
+    /** The first key for [action] as one keycap (modifiers and all), or none if it has none. */
+    fun caps(action: PlayerAction): List<String> = listOfNotNull(label(action))
 
     /** The first key for [action] in a line of text, or null if it has none. */
     fun label(action: PlayerAction): String? = keysFor(action).firstOrNull()?.label
