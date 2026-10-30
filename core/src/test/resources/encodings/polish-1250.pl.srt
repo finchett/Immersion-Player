@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:02,500
+Czeœæ, jak siê dziœ masz?
+
+2
+00:00:03,000 --> 00:00:05,500
+Dobrze, dziêkujê bardzo.
+
+3
+00:00:06,000 --> 00:00:08,500
+Chcesz iœæ razem do szko³y?
+
+4
+00:00:09,000 --> 00:00:11,500
+Nie wiem, co powiedzieæ.
+
+5
+00:00:12,000 --> 00:00:14,500
+Poczekaj chwilê, proszê!
+
+6
+00:00:15,000 --> 00:00:17,500
+Nie o to mi chodzi³o.
+
+7
+00:00:18,000 --> 00:00:20,500
+Zobaczymy siê jutro rano.
+
+8
+00:00:21,000 --> 00:00:23,500
+Dlaczego mi wczeœniej nie powiedzia³eœ?

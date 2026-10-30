@@ -42,6 +42,7 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.mizune.desktop.mpv.MpvPlayer
+import app.mizune.subs.SubtitleEncoding
 import app.mizune.ui.Motion
 import kotlinx.coroutines.delay
 import java.io.File
@@ -63,6 +64,8 @@ fun main(args: Array<String>) {
     Thread({ app.prepareDictionaries() }, "dictionary-setup").apply { isDaemon = true }.start()
     app.updater.start()
     app.startUsageStats()
+    // without them old subtitle files come out as junk; CI fails on this line
+    SubtitleEncoding.missing().takeIf { it.isNotEmpty() }?.let { System.err.println("subtitles: missing code pages ${it.joinToString()}") }
 
     application {
         val windowState = rememberWindowState(width = 1440.dp, height = 860.dp)

@@ -173,15 +173,16 @@ private fun DrawScope.drawHighlight(layout: TextLayoutResult, range: IntRange, c
     }
 }
 
-private fun characterAt(layout: TextLayoutResult, position: Offset, length: Int): Int? {
+internal fun characterAt(layout: TextLayoutResult, position: Offset, length: Int): Int? {
     if (length == 0) return null
     val line = layout.getLineForVerticalPosition(position.y)
     if (position.x < layout.getLineLeft(line) - 8 || position.x > layout.getLineRight(line) + 8) return null
-    var offset = layout.getOffsetForPosition(position).coerceIn(0, length - 1)
-    // getOffsetForPosition returns the nearest caret; step back if the tap is on the previous character
-    if (offset > 0 && position.x < layout.getBoundingBox(offset).left) offset--
-    if (offset < length - 1 && position.x > layout.getBoundingBox(offset).right) offset++
-    return offset
+    val offset = layout.getOffsetForPosition(position).coerceIn(0, length - 1)
+    // getOffsetForPosition returns the nearest caret, and the character tapped may be on either side
+    // of it: the previous one is to the left in Japanese but to the right in Arabic or Hebrew
+    return listOf(offset, offset - 1, offset + 1).firstOrNull { index ->
+        index in 0 until length && layout.getBoundingBox(index).let { position.x >= it.left && position.x <= it.right }
+    } ?: offset
 }
 
 @Composable

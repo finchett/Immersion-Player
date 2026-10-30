@@ -10,6 +10,7 @@ import app.mizune.stats.UsageStats
 import app.mizune.subs.EmbeddedSubtitleCache
 import app.mizune.subs.ImageSubtitles
 import app.mizune.subs.MatroskaSubtitleExtractor
+import app.mizune.subs.SubtitleEncoding
 import app.mizune.subs.SubtitleFiles
 import app.mizune.subs.SubtitleTrack
 import app.mizune.ui.AnkiCards
@@ -147,7 +148,10 @@ class DesktopApp(
 
     /** Sidecar subtitles next to [video], and the text tracks embedded in a Matroska file in languages they don't cover. */
     fun loadSubtitles(video: File): List<SubtitleTrack> {
-        val sidecars = sidecarsFor(video).mapNotNull { SubtitleFiles.parseSidecar(it.name, it.readText()) }
+        val languages = listOfNotNull(settings.targetLanguage, settings.peekLanguage)
+        val sidecars = sidecarsFor(video).mapNotNull {
+            SubtitleFiles.parseSidecar(it.name, SubtitleEncoding.decode(it.readBytes(), it.name, languages))
+        }
         if (!SubtitleFiles.isMatroska(video.name)) return sidecars
         val embedded = runCatching {
             subtitleCache.load(identity(video)) {
