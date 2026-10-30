@@ -29,7 +29,8 @@ Immersion Player.
   dictionary can be added.
 - **Line by line.** Go back or forward a line, or replay the current one. The video can also
   pause at the end of every line.
-- **Peek.** Hold **i**, or hold the line on Android, to see the line in English.
+- **Peek.** Hold **i**, or hold the line on Android, to see the line in a language you know:
+  English or any of eighteen others. It can also be turned off.
 - **Anki cards.** Press **a**, or tap **+** on Android, to add the word with its sentence, the
   line's audio, a short clip or a still, the reading as furigana and its pitch accent. Works
   with any note type.
@@ -42,7 +43,8 @@ Immersion Player.
 - **Updates.** New versions download in the background and are checked against a signature
   before they install.
 
-The first launch takes you through setup: theme, video folder, dictionaries and Anki.
+The first launch takes you through setup: theme, peek language, video folder, dictionaries and
+Anki.
 
 | | |
 |---|---|
@@ -88,7 +90,7 @@ on Android). The code is in [`UsageStats`](core/src/main/kotlin/app/mizune/stats
 | h / l | previous / next line, and keep playing |
 | j / k | previous / next line, and stop at its end |
 | ; | replay this line and stop at its end |
-| hold i, or hold the line | show the English line |
+| hold i, or hold the line | show the line in the peek language |
 | y / o | 5 s back / forward |
 | n / m | subtitles 0.1 s earlier / later |
 | u | stop at the end of every line, on or off |
@@ -121,7 +123,7 @@ The app shows these once, on first run.
 | Video (paused) | tap or drag the bottom line | seek |
 | Line | tap a word | look it up |
 | Line | drag across the text | look up the selection |
-| Line | hold | show the English line |
+| Line | hold | show the line in the peek language |
 | Panel | swipe sideways | previous / next line |
 | Panel | tap | play / pause |
 | Panel | double-tap | stop at the end of every line, on or off |
@@ -130,7 +132,8 @@ The app shows these once, on first run.
 
 ## Limitations
 
-- Picture subtitles can only be read in English and Japanese.
+- Picture subtitles can only be read in English and Japanese. Other peek languages need text
+  subtitles.
 - Subtitle files next to a video aren't found when the video is opened from another app.
 - Lookups only undo Japanese conjugation.
 - Android: arm64 and phone layouts only.

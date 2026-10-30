@@ -61,6 +61,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -75,18 +76,20 @@ import app.mizune.anki.AnkiConnect
 import app.mizune.dictionary.DictionaryCatalog
 import app.mizune.dictionary.DictionaryInfo
 import app.mizune.library.isVideoName
+import app.mizune.subs.SubtitleFiles
 import app.mizune.ui.AppTheme
 import app.mizune.update.Updates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
 
 /**
  * The first launch: a hello, then the few things worth choosing before the first video (a look,
- * the video folder, dictionaries, Anki), then a thank-you. Everything here can be changed later in
+ * the peek language, the video folder, dictionaries, Anki), then a thank-you. Everything here can be changed later in
  * Settings, so every step can be skipped.
  */
 @Composable
@@ -127,6 +130,7 @@ fun Onboarding(app: DesktopApp, onFinish: () -> Unit, start: OnboardingStep = On
                         when (shown) {
                             OnboardingStep.Welcome -> WelcomeStep(onStart = { go(OnboardingStep.Look) })
                             OnboardingStep.Look -> LookStep(app)
+                            OnboardingStep.Peek -> PeekStep(app)
                             OnboardingStep.Videos -> VideosStep(app)
                             OnboardingStep.Dictionaries -> DictionariesStep(app, picked.value) { picked.value = it }
                             OnboardingStep.Anki -> AnkiStep(app)
@@ -163,7 +167,7 @@ fun Onboarding(app: DesktopApp, onFinish: () -> Unit, start: OnboardingStep = On
     }
 }
 
-enum class OnboardingStep { Welcome, Look, Videos, Dictionaries, Anki, Done }
+enum class OnboardingStep { Welcome, Look, Peek, Videos, Dictionaries, Anki, Done }
 
 /** The ticked dictionaries not installed and not already on their way. */
 private fun toInstall(picked: Set<String>, installed: List<DictionaryInfo>, installs: Map<String, DesktopApp.CatalogInstall>) =
@@ -190,7 +194,7 @@ private fun ColumnScope.WelcomeStep(onStart: () -> Unit) {
 
 @Composable
 private fun ColumnScope.LookStep(app: DesktopApp) {
-    Eyebrow("Step 1 of 4")
+    Eyebrow("Step 1 of 5")
     Headline("Pick a look")
     Spacer(Modifier.height(10.dp))
     Body("Your eyes, your call. Auto follows your computer's light and dark mode.")
@@ -199,12 +203,56 @@ private fun ColumnScope.LookStep(app: DesktopApp) {
 }
 
 @Composable
+private fun ColumnScope.PeekStep(app: DesktopApp) {
+    val settings = app.settings
+    LaunchedEffect(Unit) {
+        // a first guess: the computer's own language, when it's one on offer
+        if (!settings.peekLanguageChosen) {
+            SubtitleFiles.codeForTag(Locale.getDefault().toLanguageTag())
+                ?.takeIf { SubtitleFiles.language(it) != null && it != settings.targetLanguage }
+                ?.let(settings::updatePeekLanguage)
+        }
+    }
+    Eyebrow("Step 2 of 5")
+    Headline("Peek in your language")
+    Spacer(Modifier.height(10.dp))
+    Body(
+        "Stuck on a line? Hold i and it shows in a language you know. Pick yours, or turn peeking " +
+            "off if you'd rather not be tempted.",
+    )
+    Spacer(Modifier.height(24.dp))
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SubtitleFiles.LANGUAGES.filter { it.code != settings.targetLanguage }.chunked(4).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { language ->
+                    LanguageTile(language.name, language.native.takeIf { it != language.name }, settings.peekLanguage == language.code, Modifier.weight(1f)) {
+                        settings.updatePeekLanguage(language.code)
+                    }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        LanguageTile("No peeking", "Holding i shows nothing. For the strong-willed.", settings.peekLanguage == null, Modifier.fillMaxWidth()) {
+            settings.updatePeekLanguage(null)
+        }
+    }
+    Spacer(Modifier.height(14.dp))
+    Text(
+        settings.peekLanguage?.let(::pictureSubtitlesNote) ?: "You can change this any time in Settings › General.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
 private fun ColumnScope.VideosStep(app: DesktopApp) {
     val settings = app.settings
     val folder = settings.libraryRoot?.let(::File)
     var count by remember(folder) { mutableStateOf<Int?>(null) }
     LaunchedEffect(folder) { if (folder != null) count = withContext(Dispatchers.IO) { countVideos(folder) } }
-    Eyebrow("Step 2 of 4")
+    Eyebrow("Step 3 of 5")
     Headline("Where do your videos live?")
     Spacer(Modifier.height(10.dp))
     Body(
@@ -259,7 +307,7 @@ private fun ColumnScope.DictionariesStep(app: DesktopApp, picked: Set<String>, o
     val setup by app.setupStatus.collectAsState()
     val installs by app.catalogInstalls.collectAsState()
     LaunchedEffect(setup, installs) { installed = withContext(Dispatchers.IO) { app.database.dictionaries() } }
-    Eyebrow("Step 3 of 4")
+    Eyebrow("Step 4 of 5")
     Headline("Choose your dictionaries")
     Spacer(Modifier.height(10.dp))
     Body("JMdict comes built in. These add more, downloaded straight from the people who make them.")
@@ -315,7 +363,7 @@ private fun ColumnScope.AnkiStep(app: DesktopApp) {
         running = withContext(Dispatchers.IO) { runCatching { AnkiConnect(settings.ankiUrl).version() }.isSuccess }
     }
     val scheme = MaterialTheme.colorScheme
-    Eyebrow("Step 4 of 4 · Optional")
+    Eyebrow("Step 5 of 5 · Optional")
     Headline("Make flashcards with Anki")
     Spacer(Modifier.height(10.dp))
     Body(
@@ -583,6 +631,51 @@ private fun DictionaryRow(
             Text(detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         }
         trailing()
+    }
+}
+
+/** A choice as a tile: [title], with a quieter [detail] under it; outlined while [selected]. */
+@Composable
+private fun LanguageTile(title: String, detail: String?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier.height(54.dp)
+            .clip(shape)
+            .background(
+                when {
+                    selected -> scheme.primary.copy(alpha = 0.12f)
+                    hovered -> scheme.onSurface.copy(alpha = 0.04f).compositeOver(scheme.surfaceVariant)
+                    else -> scheme.surfaceVariant
+                },
+            )
+            .border(1.5.dp, if (selected) scheme.primary else Color.Transparent, shape)
+            .hoverable(interaction)
+            .clickable(interaction, indication = null, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(horizontal = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = if (selected) scheme.primary else scheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (detail != null) {
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

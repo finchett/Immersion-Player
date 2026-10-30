@@ -1163,6 +1163,7 @@ private fun StudyPanel(
                     lookup = lookup,
                     textSize = app.prefs.subtitleSize,
                     peeking = peeking,
+                    peekOff = app.prefs.peekLanguage == null,
                     onHold = onHold,
                     onCharTap = onLookup,
                     onSelect = onSelect,
@@ -1240,6 +1241,8 @@ private fun CurrentLine(
     lookup: ActiveLookup?,
     textSize: Float,
     peeking: Boolean,
+    /** No peek language is set, so no translation was picked. */
+    peekOff: Boolean,
     onHold: (Boolean) -> Unit,
     onCharTap: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
@@ -1299,9 +1302,13 @@ private fun CurrentLine(
                     modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = japaneseAlpha },
                 )
                 val translation = secondary?.let { it.translationFor(cue.start, cue.end) }
-                // with no English to show, saying so only while peeking
+                // with no translation to show, saying so only while peeking
                 val english = translation ?: (if (secondary == null) {
-                    "No subtitles in your peek language. Pick a translation track under ⚙ (while paused)."
+                    if (peekOff) {
+                        "Peeking is off. Choose a peek language in Settings, or a translation track under ⚙ (while paused)."
+                    } else {
+                        "No subtitles in your peek language. Pick a translation track under ⚙ (while paused)."
+                    }
                 } else {
                     "Nothing here in your peek language."
                 }).takeIf { peeking }

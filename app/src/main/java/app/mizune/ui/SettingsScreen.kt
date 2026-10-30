@@ -219,6 +219,7 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                     LanguageRow(
                         title = "Peek language",
                         description = "Hold the line to show subtitles in this language.",
+                        note = { code -> code?.let(::pictureSubtitlesNote) },
                         selected = app.prefs.peekLanguage,
                         allowNone = true,
                     ) { app.prefs.peekLanguage = it }

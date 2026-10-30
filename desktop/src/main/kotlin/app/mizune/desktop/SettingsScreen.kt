@@ -73,6 +73,7 @@ import app.mizune.anki.CardFormats
 import app.mizune.anki.CardSource
 import app.mizune.dictionary.DictionaryInfo
 import app.mizune.dictionary.YomitanImporter
+import app.mizune.subs.ImageSubtitles
 import app.mizune.subs.SubtitleFiles
 import app.mizune.ui.AppTheme
 import app.mizune.ui.NoteTypeSource
@@ -273,7 +274,12 @@ private fun GeneralPane(app: DesktopApp) {
                 }
             }
             RowDivider()
-            SettingRow("Peek language", detail = "Hold i to show subtitles in this language", detailKey = "i") {
+            SettingRow(
+                "Peek language",
+                detail = "Hold i to show subtitles in this language",
+                detailKey = "i",
+                note = settings.peekLanguage?.let(::pictureSubtitlesNote),
+            ) {
                 LanguageSelect(settings.peekLanguage, allowNone = true, onSelect = settings::updatePeekLanguage)
             }
         }
@@ -287,6 +293,13 @@ private fun GeneralPane(app: DesktopApp) {
             )
         }
     }
+}
+
+/** Said wherever a peek language is picked, when its picture subtitles can't be read; else null. */
+fun pictureSubtitlesNote(code: String): String? {
+    if (ImageSubtitles.model(code) != null) return null
+    val name = SubtitleFiles.language(code)?.name ?: code
+    return "Picture subtitles (Blu-ray PGS) can only be read in English and Japanese for now, so $name needs text subtitles."
 }
 
 /** What the usage counts are, wherever they can be turned off. */
@@ -832,6 +845,8 @@ private fun SettingRow(
     detail: String? = null,
     detailMono: Boolean = false,
     detailKey: String? = null,
+    /** A second, quieter line under [detail]. */
+    note: String? = null,
     control: @Composable () -> Unit = {},
 ) {
     Row(
@@ -861,6 +876,14 @@ private fun SettingRow(
                         )
                     }
                 }
+            }
+            if (note != null) {
+                Text(
+                    note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
         control()
