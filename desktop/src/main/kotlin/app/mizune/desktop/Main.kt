@@ -15,6 +15,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
@@ -183,9 +184,17 @@ fun main(args: Array<String>) {
             return true
         }
 
-        // the Dock icon of a dev run; a packaged app takes it from the bundle instead
-        val appIcon = painterResource("icon.png")
-        LaunchedEffect(Unit) { setDockIcon() }
+        // the Dock icon (the bundle's is the light one, so a dark choice is set while the app runs),
+        // and the window's, which is the taskbar's on Windows and Linux
+        val settings = app.settings
+        val dark = when (settings.appIcon) {
+            AppIcon.Theme -> settings.themeFamily.resolve(settings.themeMode, isSystemInDarkTheme()) == settings.themeFamily.dark
+            AppIcon.Light -> false
+            AppIcon.Dark -> true
+        }
+        val iconName = if (dark) "icon-dark.png" else "icon.png"
+        val appIcon = painterResource(iconName)
+        LaunchedEffect(iconName) { setDockIcon(iconName) }
 
         // a staged update goes in once this has quit (Updater's shutdown hook)
         fun quit() {
@@ -400,10 +409,13 @@ private fun folderTransition(from: Screen.Library, to: Screen.Library): ContentT
             (from.folder == null || to.folder.path.startsWith(from.folder.path + File.separator)),
     )
 
-/** macOS reads the Dock icon from the bundle, so an unpackaged run has to set it itself. */
-private fun setDockIcon() {
+/**
+ * The Dock icon while the app runs. macOS otherwise shows the bundle's, which is the light one (and
+ * nothing at all for an unpackaged run); once the app quits, the Dock goes back to the bundle's.
+ */
+private fun setDockIcon(name: String) {
     runCatching {
-        val url = object {}.javaClass.getResource("/icon.png") ?: return
+        val url = object {}.javaClass.getResource("/$name") ?: return
         java.awt.Taskbar.getTaskbar().iconImage = javax.imageio.ImageIO.read(url)
     }
 }
