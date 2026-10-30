@@ -4,6 +4,6 @@ local.properties
 .idea/
 *.iml
 .DS_Store
-# prebuilt libmpv binaries are extracted from the mpv-android release APK (see README)
+# prebuilt libmpv binaries are extracted from the mpv-android release APK (see docs/development.md)
 app/src/main/jniLibs/
 dist/
