@@ -6,6 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.nio.file.Files
+import java.util.Timer
+import kotlin.concurrent.timerTask
 
 /**
  * libmpv loads and plays a short test pattern through the player, and the picture isn't blank;
@@ -14,7 +16,8 @@ import java.nio.file.Files
  * the bundled one); MIZUNE_TEST_RESOURCES points it at a packaged build's libraries.
  */
 class MpvPlaybackTest {
-    @Test
+    // it takes seconds; it once hung in CI for six hours, so a hang fails it, showing where first
+    @Test(timeout = 150_000)
     fun playsATestPattern() {
         val loaded = runCatching { MpvLib.INSTANCE }
         if (System.getenv("MIZUNE_TEST_MPV") == null) assumeTrue("no libmpv here", loaded.isSuccess)
@@ -22,6 +25,7 @@ class MpvPlaybackTest {
         val video = Files.createTempFile("testsrc", ".mkv").toFile().apply { deleteOnExit() }
         javaClass.getResourceAsStream("/testsrc.mkv")!!.use { input -> video.outputStream().use { input.copyTo(it) } }
 
+        val watchdog = Timer(true).apply { schedule(timerTask { printThreads() }, 120_000) }
         val player = MpvPlayer()
         try {
             player.property("mute", "yes")
@@ -41,6 +45,16 @@ class MpvPlaybackTest {
             assertTrue("the picture is blank", bytes.count { it != 0.toByte() } > bytes.size / 10)
         } finally {
             player.destroy()
+            watchdog.cancel()
+        }
+    }
+
+    /** Every thread's stack, mpv's native calls showing as the JNA calls into them. */
+    private fun printThreads() {
+        System.err.println("still running after two minutes:")
+        Thread.getAllStackTraces().forEach { (thread, stack) ->
+            System.err.println("\"${thread.name}\" ${thread.state}")
+            stack.forEach { System.err.println("    at $it") }
         }
     }
 }
