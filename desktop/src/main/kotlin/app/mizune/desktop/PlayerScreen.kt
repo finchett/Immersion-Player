@@ -566,7 +566,7 @@ private fun VideoArea(
             exit = fadeOut(tween(150)),
             modifier = Modifier.align(Alignment.Center),
         ) {
-            next?.let { NextEpisode(app.settings.title(it.name), onPlayNext) }
+            next?.let { NextEpisode(app.settings.title(it.name), app.settings.accentOnVideo(), onPlayNext) }
         }
         AnimatedVisibility(
             visible,
@@ -605,9 +605,15 @@ private fun VideoArea(
     }
 }
 
+/**
+ * The theme's accent for things over the video, which is dark in every theme: the accent of the
+ * theme's dark side, since a light theme's own (dark green in Jade) would barely show there.
+ */
+private fun Settings.accentOnVideo(): Color = themeFamily.dark?.scheme?.primary ?: Color.White
+
 /** Offered over the last frame: the next video in the folder, a click (or Return) away. */
 @Composable
-private fun NextEpisode(title: String, onPlay: () -> Unit) {
+private fun NextEpisode(title: String, accent: Color, onPlay: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     Column(
@@ -634,7 +640,7 @@ private fun NextEpisode(title: String, onPlay: () -> Unit) {
             Text(
                 "▶",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (hovered) MaterialTheme.colorScheme.primary else Color.White,
+                color = if (hovered) accent else Color.White,
             )
         }
     }
@@ -668,6 +674,7 @@ private fun Controls(
     var scrubbing by remember { mutableStateOf<Double?>(null) }
     val white = Color.White
     val muted = white.copy(alpha = 0.85f)
+    val accent = app.settings.accentOnVideo()
     Row(
         Modifier.fillMaxWidth().height(BAR_HEIGHT)
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xB3000000))))
@@ -703,9 +710,9 @@ private fun Controls(
             )
         }
         LineButtons(app, session, color = muted, hoverColor = white)
-        LineStopButton(app, session, color = muted, hoverColor = white)
+        LineStopButton(app, session, color = muted, hoverColor = white, accent = accent)
         TrackMenu(app.settings, session, onMenu, color = muted, hoverColor = white)
-        ShaderMenu(app, session, onMenu)
+        ShaderMenu(app, session, onMenu, accent)
         PanelButton(app, color = muted, hoverColor = white)
         if (!isMac) FullscreenButton(keys, color = muted, hoverColor = white)
     }
@@ -713,7 +720,7 @@ private fun Controls(
 
 /** Anime4K's preset, and its mode under Advanced: the same settings as Settings › Appearance › Shaders. */
 @Composable
-private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit) {
+private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean) -> Unit, accent: Color) {
     val settings = app.settings
     val videoHeight by session.player.videoHeight.collectAsState()
     var open by remember { mutableStateOf(false) }
@@ -735,7 +742,7 @@ private fun ShaderMenu(app: DesktopApp, session: PlayerSession, onMenu: (Boolean
                 .semantics { contentDescription = "Shaders" }
                 .padding(5.dp),
         ) {
-            ShaderIcon(if (settings.anime4kPreset != Anime4K.Preset.OFF) MaterialTheme.colorScheme.primary else Color.White)
+            ShaderIcon(if (settings.anime4kPreset != Anime4K.Preset.OFF) accent else Color.White)
         }
         DropdownMenu(expanded = open, onDismissRequest = { show(false) }) {
             @Composable
@@ -1142,21 +1149,22 @@ private fun LineStopButton(
     session: PlayerSession,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     hoverColor: Color = MaterialTheme.colorScheme.onSurface,
+    /** The colour while it's on: the theme's own, unless it sits somewhere dark. */
+    accent: Color = MaterialTheme.colorScheme.primary,
 ) {
     val stop = lineStop(app, session)
-    val primary = MaterialTheme.colorScheme.primary
     Hint(stop.hint, "U") {
         IconAction(
             { session.setAutoPause(stop != LineStop.EVERY_LINE) },
             modifier = Modifier
-                .background(if (stop == LineStop.EVERY_LINE) primary.copy(alpha = 0.16f) else Color.Transparent, RoundedCornerShape(6.dp))
+                .background(if (stop == LineStop.EVERY_LINE) accent.copy(alpha = 0.16f) else Color.Transparent, RoundedCornerShape(6.dp))
                 .semantics { contentDescription = stop.hint },
             color = when (stop) {
-                LineStop.EVERY_LINE, LineStop.THIS_LINE -> primary
-                LineStop.HELD -> primary.copy(alpha = 0.5f)
+                LineStop.EVERY_LINE, LineStop.THIS_LINE -> accent
+                LineStop.HELD -> accent.copy(alpha = 0.5f)
                 LineStop.NONE -> color
             },
-            hoverColor = if (stop == LineStop.NONE) hoverColor else primary,
+            hoverColor = if (stop == LineStop.NONE) hoverColor else accent,
         ) { LineStopIcon(it) }
     }
 }
