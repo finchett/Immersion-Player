@@ -383,7 +383,7 @@ fun PlayerScreen(
 
         // picture subtitles come in a moment later: their timing now, their text as they play
         val languages = listOfNotNull(app.prefs.targetLanguage, app.prefs.peekLanguage)
-        withContext(Dispatchers.IO) { runCatching { app.subtitleLoader.openPictureTracks(video, siblings, text, languages) } }
+        withContext(Dispatchers.IO) { runCatching { app.subtitleLoader.openPictureTracks(video, text, languages) } }
             .onSuccess { if (it.isNotEmpty()) useTracks(text + it) }
             .onFailure { app.logError("picture subtitles ${video.uri}", it) }
     }
