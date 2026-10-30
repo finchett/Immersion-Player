@@ -82,6 +82,9 @@ object SubtitleEncoding {
         put(listOf(BALTIC), "lt", "lit", "lv", "lav", "et", "est")
     }
 
+    /** The code pages this Java can't decode, by name. A trimmed runtime without jdk.charsets lacks most. */
+    fun missing(): List<String> = ALL.filter { it.charset == null }.map { it.names.first() }
+
     /** At least this share of the text's non-ASCII characters must be the code page's common letters. */
     private const val MIN_SCORE = 0.3
 

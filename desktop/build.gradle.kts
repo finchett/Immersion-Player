@@ -90,7 +90,8 @@ compose.desktop {
             packageVersion = appVersion
             description = "Japanese video player with a built-in dictionary"
             copyright = "MPL-2.0"
-            modules("java.instrument", "java.prefs", "java.sql", "jdk.unsupported")
+            // jdk.charsets: the old code pages subtitle files come in (Arabic, Shift_JIS, Big5, Korean…)
+            modules("java.instrument", "java.prefs", "java.sql", "jdk.charsets", "jdk.unsupported")
             // libmpv and its libraries, bundled per OS by bundleLibmpv
             appResourcesRootDir.set(layout.buildDirectory.dir("native"))
             // the Android launcher icon, rebuilt for each platform by scripts/make-icons.sh

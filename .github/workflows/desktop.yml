@@ -127,7 +127,7 @@ jobs:
           cat app.log
           grep "^video:" app.log
           cat ~/.local/share/mizune/errors.log 2>/dev/null || true
-          ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log ~/.local/share/mizune/errors.log 2>/dev/null
+          ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread|missing code pages" app.log ~/.local/share/mizune/errors.log 2>/dev/null
           # the video takes the left of the window: its average brightness, 0 for black
           brightness=$(convert shot.png -crop 50%x100%+0+0 -colorspace gray -format "%[fx:mean]" info:)
           echo "video area brightness: $brightness"
@@ -215,7 +215,7 @@ jobs:
               kill %1" || true
             cat app.log
             grep "^video:" app.log
-            ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread" app.log
+            ! grep -E "UnsatisfiedLinkError|Unable to load library|Exception in thread|missing code pages" app.log
             brightness=$(convert shot-appimage.png -crop 50%x100%+0+0 -colorspace gray -format "%[fx:mean]" info:)
             echo "video area brightness: $brightness"
             awk -v b="$brightness" "BEGIN { exit !(b > 0.1) }"'
