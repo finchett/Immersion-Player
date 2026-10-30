@@ -144,6 +144,16 @@ The app shows these once, on first run.
   been tested without a real GPU, where the app uses software rendering, and Anime4K needs
   OpenGL.
 
+## Contributing
+
+Bug reports and ideas are welcome as [issues](https://github.com/finchett/Mizune/issues). Small
+fixes can go straight to a pull request; for anything bigger, open an issue first so we can agree
+on it. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
+
+Mizune is written with the help of AI tools. Every change is read line by line and tested by hand
+before it's merged. Contributions written with AI tools are welcome too, and are reviewed the same
+way as any other.
+
 ## Development
 
 Building, testing and releasing are in [docs/development.md](docs/development.md). How the
