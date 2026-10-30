@@ -29,6 +29,16 @@ object SubtitleEncoding {
             ?.let(Charset::forName)
     }
 
+    // Each code page's `common` string is tuning data, not exact statistics: the script's commonest
+    // letters or characters, roughly in frequency order, picked rather than counted from a corpus.
+    // They only have to be common enough that a right decoding is mostly made of them and a wrong
+    // one almost never is. SubtitleEncodingTest checks that on a real file in each code page except
+    // windows-1254 (Turkish) and windows-1257 (Baltic), which have none yet.
+    // To check a list against published counts: the Chinese ones against Jun Da's Modern Chinese
+    // Character Frequency List, the Korean one against the National Institute of Korean Language's
+    // word-frequency survey, and the alphabets against any letter-frequency table.
+
+    /** All of hiragana, which Japanese text is full of whatever its subject, and its punctuation. */
     private val HIRAGANA = (0x3041..0x3096).joinToString("") { it.toChar().toString() } + "、。ー「」"
 
     private const val CJK_PUNCTUATION = "，。！？、“”…：「」"
@@ -38,10 +48,12 @@ object SubtitleEncoding {
         listOf("GB18030", "GBK"),
         "的一是不了人我在有他这中大来上们个国到说和地也子时道出要就下以生会自着去之过家学对可她里后小么心多天而能好都然没" + CJK_PUNCTUATION,
     )
+    /** The same characters as [GB18030]'s in their traditional forms (这 → 這, 们 → 們). */
     private val BIG5 = CodePage(
         listOf("Big5", "x-windows-950"),
         "的一是不了人我在有他這中大來上們個國到說和地也子時道出要就下以生會自著去之過家學對可她裡後小麼心多天而能好都然沒" + CJK_PUNCTUATION,
     )
+    /** The commonest Hangul syllables: mostly particles (이 는 의 에 을 를) and verb endings (다 요 습). */
     private val KOREAN = CodePage(
         listOf("x-windows-949", "EUC-KR"),
         "이다는의에고하가을를지어서요기로아도한리해나게사그수거자내있시정대일니마라습들저것때면말만네우주했오보무상전야너왜",
