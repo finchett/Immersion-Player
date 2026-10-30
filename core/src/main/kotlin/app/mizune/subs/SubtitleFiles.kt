@@ -73,6 +73,16 @@ object SubtitleFiles {
         return SubtitleTrack(fileName, language, cues)
     }
 
+    /**
+     * The sidecar files, then the embedded tracks in languages no sidecar covers: a file put beside
+     * the video is there on purpose, so it wins for its language, and the video's own tracks fill in
+     * the rest (e.g. English inside the video for Japanese from a file).
+     */
+    fun withEmbedded(sidecars: List<SubtitleTrack>, embedded: List<SubtitleTrack>): List<SubtitleTrack> {
+        val covered = sidecars.mapNotNull(::effectiveLanguage).toSet()
+        return sidecars + embedded.filter { effectiveLanguage(it) !in covered }
+    }
+
     /** Track in the language being studied; falls back to the first track. */
     fun pickPrimary(tracks: List<SubtitleTrack>, target: String = "ja"): SubtitleTrack? =
         // the fullest matching track: dialogue over signs-and-songs

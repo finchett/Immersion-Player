@@ -69,8 +69,10 @@ Other note types are matched by their field names.
     480p. Any of its six modes can be picked under Advanced, or with ⌘ + 1–6.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly. Matroska is parsed in the app, including
-  zlib-compressed tracks, and SRT, ASS, SSA and WebVTT are parsed. Subtitle files next to the
-  video take priority over embedded tracks. The tracks are cached per file.
+  zlib-compressed tracks, and SRT, ASS, SSA and WebVTT are parsed. A subtitle file next to the
+  video takes priority over embedded tracks in its language, and the embedded tracks in other
+  languages still load, so English inside the video can sit under Japanese from a file. The
+  tracks are cached per file.
 - Picture subtitles (Blu-ray PGS) are read with
   [Tesseract](https://github.com/tesseract-ocr/tesseract), with English and Japanese models
   bundled. Only tracks in the study or peek language that no text track covers are read. Their

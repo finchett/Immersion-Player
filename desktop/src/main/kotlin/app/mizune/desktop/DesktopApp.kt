@@ -145,14 +145,21 @@ class DesktopApp(
         _setupStatus.value = null
     }
 
-    /** Sidecar subtitles next to [video] win; otherwise the text tracks embedded in a Matroska file. */
+    /** Sidecar subtitles next to [video], and the text tracks embedded in a Matroska file in languages they don't cover. */
     fun loadSubtitles(video: File): List<SubtitleTrack> {
         val sidecars = sidecarsFor(video).mapNotNull { SubtitleFiles.parseSidecar(it.name, it.readText()) }
-        if (sidecars.isNotEmpty()) return sidecars
-        if (!SubtitleFiles.isMatroska(video.name)) return emptyList()
-        return subtitleCache.load(identity(video)) {
-            RandomAccessFile(video, "r").use { MatroskaSubtitleExtractor(it.channel).extract() }
+        if (!SubtitleFiles.isMatroska(video.name)) return sidecars
+        val embedded = runCatching {
+            subtitleCache.load(identity(video)) {
+                RandomAccessFile(video, "r").use { MatroskaSubtitleExtractor(it.channel).extract() }
+            }
+        }.getOrElse {
+            // the files beside it still play
+            if (sidecars.isEmpty()) throw it
+            logError("embedded subtitles $video", it)
+            emptyList()
         }
+        return SubtitleFiles.withEmbedded(sidecars, embedded)
     }
 
     /**
@@ -162,7 +169,7 @@ class DesktopApp(
      * the file, so call it off the UI thread; the tracks are closed with the session.
      */
     fun openPictureTracks(video: File, text: List<SubtitleTrack>): List<SubtitleTrack> {
-        if (!SubtitleFiles.isMatroska(video.name) || sidecarsFor(video).isNotEmpty()) return emptyList()
+        if (!SubtitleFiles.isMatroska(video.name)) return emptyList()
         val languages = listOfNotNull(settings.targetLanguage, settings.peekLanguage).filter { code ->
             ImageSubtitles.model(code) != null && text.none { SubtitleFiles.isLanguage(it, code) }
         }
