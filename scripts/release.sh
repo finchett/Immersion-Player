@@ -72,13 +72,16 @@ apk="$out/mizune-$version-arm64.apk"
 dmg="$out/Mizune-$version-macos-arm64.dmg"
 cp app/build/outputs/apk/release/app-release.apk "$apk"
 cp "desktop/build/release/Mizune-$version-macos-arm64.dmg" "$dmg"
-"$apksigner" verify --print-certs "$apk" | grep -q "SHA-256 digest: $android_signer" || die "$apk isn't signed with the release key"
+# (grep without -q, as below: with pipefail, stopping early can fail the pipeline on a good APK)
+"$apksigner" verify --print-certs "$apk" | grep "SHA-256 digest: $android_signer" > /dev/null || die "$apk isn't signed with the release key"
 # a release's Mac app carries CI's libmpv without GPL code, never one left from an earlier build
 if [ "$try" = 0 ]; then
     mount="$(mktemp -d)"
     hdiutil attach -noverify -nobrowse -readonly -mountpoint "$mount" "$dmg" > /dev/null 2>&1 || die "can't open $dmg"
     lgpl=0
-    strings "$mount/Mizune.app/Contents/app/resources/libmpv.2.dylib" | grep -q -- "-Dgpl=false" && lgpl=1
+    # grep reads it all (no -q): stopping at the match would kill strings mid-write, and with
+    # pipefail that SIGPIPE fails the pipeline, so an LGPL build would read as a GPL one
+    if strings "$mount/Mizune.app/Contents/app/resources/libmpv.2.dylib" | grep -- "-Dgpl=false" > /dev/null; then lgpl=1; fi
     hdiutil detach -quiet "$mount"
     [ "$lgpl" = 1 ] || die "$dmg carries a libmpv built with GPL code"
 fi
