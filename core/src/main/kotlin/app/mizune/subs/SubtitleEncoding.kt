@@ -32,8 +32,7 @@ object SubtitleEncoding {
     // Each code page's `common` string is tuning data, not exact statistics: the script's commonest
     // letters or characters, roughly in frequency order, picked rather than counted from a corpus.
     // They only have to be common enough that a right decoding is mostly made of them and a wrong
-    // one almost never is. SubtitleEncodingTest checks that on a real file in each code page except
-    // windows-1254 (Turkish) and windows-1257 (Baltic), which have none yet.
+    // one almost never is, which SubtitleEncodingTest checks on a real file in each code page.
     // To check a list against published counts: the Chinese ones against Jun Da's Modern Chinese
     // Character Frequency List, the Korean one against the National Institute of Korean Language's
     // word-frequency survey, and the alphabets against any letter-frequency table.

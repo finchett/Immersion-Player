@@ -57,6 +57,8 @@ class SubtitleEncodingTest {
         assertEquals("สวัสดี วันนี้เป็นอย่างไรบ้าง", firstLine("thai-874.srt"))
         assertEquals("Salut, ça va aujourd'hui ?", firstLine("french-1252.srt"))
         assertEquals("Cześć, jak się dziś masz?", firstLine("polish-1250.pl.srt"))
+        assertEquals("Merhaba, bugün nasılsın?", firstLine("turkish-1254.srt"))
+        assertEquals("Labas, kaip šiandien sekasi?", firstLine("lithuanian-1257.srt"))
     }
 
     @Test
@@ -79,6 +81,8 @@ class SubtitleEncodingTest {
             "greek-1253.srt" to "Γεια σου, τι κάνεις σήμερα;",
             "thai-874.srt" to "สวัสดี วันนี้เป็นอย่างไรบ้าง",
             "french-1252.srt" to "Salut, ça va aujourd'hui ?",
+            "turkish-1254.srt" to "Merhaba, bugün nasılsın?",
+            "lithuanian-1257.srt" to "Labas, kaip šiandien sekasi?",
         )
         val hints = listOf("ja", "zh", "ko", "ar", "ru", "he", "el", "th", "pl", "tr", "en")
         for ((name, line) in expected) {
