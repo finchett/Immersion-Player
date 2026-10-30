@@ -70,7 +70,7 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
     private fun oldTheme() = AppTheme.entries.firstOrNull { it.name == prefs.get("theme", null) }
 
     /** The app icon in the Dock, and on Windows and Linux the window's: light, dark, or as the theme is. */
-    var appIcon by mutableStateOf(AppIcon.entries.firstOrNull { it.name == prefs.get("app_icon", null) } ?: AppIcon.Theme)
+    var appIcon by mutableStateOf(AppIcon.entries.firstOrNull { it.name == prefs.get("app_icon", null) } ?: AppIcon.Light)
         private set
 
     var subtitleSize by mutableStateOf(prefs.getFloat("subtitle_size", 30f))
