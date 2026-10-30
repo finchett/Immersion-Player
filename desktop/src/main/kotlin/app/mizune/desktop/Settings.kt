@@ -69,6 +69,10 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
 
     private fun oldTheme() = AppTheme.entries.firstOrNull { it.name == prefs.get("theme", null) }
 
+    /** The app icon in the Dock, and on Windows and Linux the window's: light, dark, or as the theme is. */
+    var appIcon by mutableStateOf(AppIcon.entries.firstOrNull { it.name == prefs.get("app_icon", null) } ?: AppIcon.Theme)
+        private set
+
     var subtitleSize by mutableStateOf(prefs.getFloat("subtitle_size", 30f))
         private set
     var panelFraction by mutableStateOf(prefs.getFloat("panel_fraction", 0.36f))
@@ -174,6 +178,7 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
 
     fun updateThemeFamily(value: ThemeFamily) { themeFamily = value; prefs.put("theme_family", value.name) }
     fun updateThemeMode(value: ThemeMode) { themeMode = value; prefs.put("theme_mode", value.name) }
+    fun updateAppIcon(value: AppIcon) { appIcon = value; prefs.put("app_icon", value.name) }
     fun updateSubtitleSize(value: Float) { subtitleSize = value; prefs.putFloat("subtitle_size", value) }
     fun updatePanelFraction(value: Float) { panelFraction = value; prefs.putFloat("panel_fraction", value) }
     fun updateAutoPause(value: Boolean) { autoPause = value; prefs.putBoolean("auto_pause", value) }
@@ -251,3 +256,6 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
         MessageDigest.getInstance("SHA-1").digest(path.toByteArray())
             .joinToString("") { "%02x".format(it) }
 }
+
+/** Which app icon to show: the one matching the theme's light or dark side, or one of them always. */
+enum class AppIcon(val label: String) { Theme("Match theme"), Light("Light"), Dark("Dark") }

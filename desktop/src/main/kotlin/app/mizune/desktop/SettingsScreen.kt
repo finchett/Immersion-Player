@@ -415,6 +415,14 @@ private fun AppearancePane(app: DesktopApp) {
     Section("Theme") {
         Card {
             ThemePicker(settings, Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp))
+            RowDivider()
+            SettingRow("App icon", if (isMac) "In the Dock while Mizune is open" else "On the taskbar while Mizune is open") {
+                Select(
+                    text = settings.appIcon.label,
+                    options = AppIcon.entries.map { it.label },
+                    onSelect = { settings.updateAppIcon(AppIcon.entries[it]) },
+                )
+            }
         }
     }
     Section("Video") {
