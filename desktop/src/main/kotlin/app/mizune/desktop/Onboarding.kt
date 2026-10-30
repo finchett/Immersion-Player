@@ -239,7 +239,7 @@ private fun ColumnScope.PeekStep(app: DesktopApp) {
     }
     Spacer(Modifier.height(14.dp))
     Text(
-        settings.peekLanguage?.let(::pictureSubtitlesNote) ?: "You can change this any time in Settings › General.",
+        settings.peekLanguage?.let(::peekLanguageNote) ?: "You can change this any time in Settings › General.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,

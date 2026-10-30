@@ -127,11 +127,12 @@ fun LanguageRow(
     }
 }
 
-/** Said wherever a peek language is picked, when its picture subtitles can't be read; else null. */
-fun pictureSubtitlesNote(code: String): String? {
-    if (ImageSubtitles.model(code) != null) return null
+/** Said wherever a peek language is picked: the subtitles are the user's own, and which can't be read. */
+fun peekLanguageNote(code: String): String {
     val name = SubtitleFiles.language(code)?.name ?: code
-    return "Picture subtitles (Blu-ray PGS) can only be read in English and Japanese for now, so $name needs text subtitles."
+    val files = "Mizune doesn't translate or download subtitles, so $name ones need to be in the video or in a file beside it."
+    if (ImageSubtitles.model(code) != null) return files
+    return "$files Picture subtitles (PGS) can only be read in English and Japanese for now."
 }
 
 /** A theme as a tile of its own colours; [theme] null is the one that follows the phone. */
