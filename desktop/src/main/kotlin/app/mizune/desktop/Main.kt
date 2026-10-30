@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
@@ -122,7 +123,12 @@ fun main(args: Array<String>) {
                 if (event.type == KeyEventType.KeyDown) tutorial(event.key)
                 return true
             }
-            if (event.key == Key.I) {
+            val keyMap = app.settings.keyMap
+            val pressed = KeyBinding(event.key, event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed)
+            // peeking lasts while its key is held, whatever happens to the modifiers meanwhile
+            if (keyMap.actionFor(pressed) == PlayerAction.Peek ||
+                (event.type == KeyEventType.KeyUp && keyMap.keysFor(PlayerAction.Peek).any { it.key == event.key })
+            ) {
                 keys.peeking = event.type == KeyEventType.KeyDown
                 return true
             }
@@ -151,35 +157,36 @@ fun main(args: Array<String>) {
                 )
                 return true
             }
-            when (event.key) {
-                Key.Spacebar -> current.togglePause()
-                Key.H -> current.previousLine()
-                Key.L -> current.nextLine()
-                Key.J -> current.previousLine(stopAtEnd = true)
-                Key.K -> current.nextLine(stopAtEnd = true)
-                Key.Semicolon, Key.DirectionDown -> current.replayLine(stopAtEnd = true)
-                Key.Y -> current.seekBy(-5.0)
-                Key.O -> current.seekBy(5.0)
-                Key.N -> current.shiftOffset(-0.1)
-                Key.M -> current.shiftOffset(0.1)
-                Key.U -> {
-                    val on = !app.settings.autoPause
-                    current.setAutoPause(on)
-                    keys.notice = Notice(if (on) "Stopping at the end of every line" else "Playing straight through")
-                }
-                Key.S -> app.settings.updatePanelHidden(!app.settings.panelHidden)
-                Key.F, Key.F11 -> toggleFullscreen()
-                Key.Z -> app.settings.updateVideoFill(!app.settings.videoFill)
-                Key.A -> keys.onAddCard()
-                Key.Enter -> keys.onPlayNext?.invoke() ?: return false
-                Key.DirectionLeft -> if (event.isShiftPressed) current.seekBy(-5.0) else current.previousLine()
-                Key.DirectionRight -> if (event.isShiftPressed) current.seekBy(5.0) else current.nextLine()
-                Key.Escape -> when {
+            if (event.key == Key.Escape) {
+                when {
                     keys.onDismiss != null -> keys.onDismiss?.invoke()
                     isFullscreen() -> toggleFullscreen()
                     else -> closeVideo()
                 }
-                else -> return false
+                return true
+            }
+            when (keyMap.actionFor(pressed) ?: return false) {
+                PlayerAction.PlayPause -> current.togglePause()
+                PlayerAction.PreviousLine -> current.previousLine()
+                PlayerAction.NextLine -> current.nextLine()
+                PlayerAction.PreviousLineStop -> current.previousLine(stopAtEnd = true)
+                PlayerAction.NextLineStop -> current.nextLine(stopAtEnd = true)
+                PlayerAction.ReplayLine -> current.replayLine(stopAtEnd = true)
+                PlayerAction.Peek -> Unit
+                PlayerAction.SeekBack -> current.seekBy(-5.0)
+                PlayerAction.SeekForward -> current.seekBy(5.0)
+                PlayerAction.SubtitlesEarlier -> current.shiftOffset(-0.1)
+                PlayerAction.SubtitlesLater -> current.shiftOffset(0.1)
+                PlayerAction.StopEveryLine -> {
+                    val on = !app.settings.autoPause
+                    current.setAutoPause(on)
+                    keys.notice = Notice(if (on) "Stopping at the end of every line" else "Playing straight through")
+                }
+                PlayerAction.Panel -> app.settings.updatePanelHidden(!app.settings.panelHidden)
+                PlayerAction.FullScreen -> toggleFullscreen()
+                PlayerAction.FillFit -> app.settings.updateVideoFill(!app.settings.videoFill)
+                PlayerAction.AddCard -> keys.onAddCard()
+                PlayerAction.PlayNext -> keys.onPlayNext?.invoke() ?: return false
             }
             return true
         }

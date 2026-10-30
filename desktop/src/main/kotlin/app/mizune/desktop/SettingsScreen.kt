@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -51,6 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -58,9 +62,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -274,10 +289,11 @@ private fun GeneralPane(app: DesktopApp) {
                 }
             }
             RowDivider()
+            val peekKey = settings.keyMap.label(PlayerAction.Peek)
             SettingRow(
                 "Peek language",
-                detail = "Hold i to show subtitles in this language",
-                detailKey = "i",
+                detail = peekKey?.let { "Hold $it to show subtitles in this language" } ?: "Hold the line to show subtitles in this language",
+                detailKey = peekKey,
                 note = settings.peekLanguage?.let(::peekLanguageNote),
             ) {
                 LanguageSelect(settings.peekLanguage, allowNone = true, onSelect = settings::updatePeekLanguage)
@@ -752,46 +768,220 @@ private fun KeyboardPane(settings: Settings) {
         }
     }
     Section("In the player") {
+        PlayerKeyList(settings)
+    }
+    Section("Always") {
         Card {
-            KEYS.forEachIndexed { index, key ->
+            FIXED_KEYS.forEachIndexed { index, key ->
                 if (index > 0) RowDivider()
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(key.action, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    key.note?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    key.caps.forEach { Keycap(it) }
-                }
+                KeyRow(key.action, key.note) { key.caps.forEach { Keycap(it) } }
             }
         }
     }
 }
 
-/** One row of the keyboard pane: the keys to press, and what they do. */
-class KeyHelp(val caps: List<String>, val action: String, val note: String? = null)
+/**
+ * Every player action and its keys, to change: click a key to give it a new one (Esc cancels), its
+ * × to take it off, + to add a second. A key another action had moves over, and the row says so.
+ */
+@Composable
+internal fun PlayerKeyList(settings: Settings) {
+    val map = settings.keyMap
+    // the key being set (an action and which of its keys), and what to say in a row after a change
+    var recording by remember { mutableStateOf<Pair<PlayerAction, Int>?>(null) }
+    var said by remember { mutableStateOf<Pair<PlayerAction, String>?>(null) }
+    var imported by remember { mutableStateOf<List<String>?>(null) }
+    fun record(action: PlayerAction, slot: Int, pressed: KeyBinding) {
+        recording = null
+        val reason = pressed.fixed ?: "That key can't be used".takeUnless { KeyBinding.known(pressed.key) }
+        if (reason != null) {
+            said = action to reason
+            return
+        }
+        val (next, from) = map.bind(action, slot, pressed)
+        settings.updateKeyMap(next)
+        said = from?.let { action to "${pressed.label} was ${it.label}" }
+    }
+    Card {
+        PlayerAction.entries.forEachIndexed { index, action ->
+            if (index > 0) RowDivider()
+            val note = said?.takeIf { it.first == action }?.second
+            KeyRow(action.label, note ?: action.note, highlight = note != null) {
+                val keys = map.keysFor(action)
+                keys.forEachIndexed { slot, binding ->
+                    KeyButton(
+                        // one keycap a key, so ⇧← doesn't read as two
+                        listOf(binding.label),
+                        recording = recording == action to slot,
+                        onClick = { recording = action to slot; said = null },
+                        onRemove = { settings.updateKeyMap(map.unbind(action, slot)); said = null },
+                        onKey = { record(action, slot, it) },
+                        onCancel = { recording = null },
+                    )
+                }
+                if (keys.size < KeyMap.MAX_KEYS) {
+                    KeyButton(
+                        null,
+                        recording = recording == action to keys.size,
+                        onClick = { recording = action to keys.size; said = null },
+                        onRemove = null,
+                        onKey = { record(action, keys.size, it) },
+                        onCancel = { recording = null },
+                    )
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        SmallButton("Export…") {
+            chooseKeyMapToSave()?.let { file -> runCatching { file.writeText(map.toJson()) } }
+        }
+        SmallButton("Import…") {
+            chooseKeyMapToOpen()?.let { file ->
+                val read = runCatching { KeyMap.fromJson(file.readText()) }
+                    .getOrElse { KeyMap.Read(map, listOf("Couldn't read ${file.name}")) }
+                settings.updateKeyMap(read.map)
+                imported = read.problems
+                said = null
+            }
+        }
+        if (!map.isDefault) SmallButton("Reset to defaults") { settings.updateKeyMap(KeyMap.DEFAULT); said = null; imported = null }
+    }
+    imported?.let { problems ->
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (problems.isEmpty()) "Imported." else "Imported, except: " + problems.joinToString("; ") + ".",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
-val KEYS = listOf(
-    KeyHelp(listOf("Space"), "Play / pause"),
-    KeyHelp(listOf("H", "L"), "Previous / next line, then keep playing"),
-    KeyHelp(listOf("J", "K"), "Previous / next line, stop at its end"),
-    KeyHelp(listOf("L", "K"), "Carry on playing; press again to jump to the next line", "while paused"),
-    KeyHelp(listOf(";"), "Replay this line, stop at its end"),
-    KeyHelp(listOf("I"), "Show the peek language", "hold, or hold the line"),
-    KeyHelp(listOf("Y", "O"), "Seek 5 s back / forward"),
-    KeyHelp(listOf("N", "M"), "Shift subtitles 0.1 s earlier / later"),
-    KeyHelp(listOf("U"), "Stop at the end of every line, on or off", "or the button under the panel"),
-    KeyHelp(listOf("S"), "Put the panel away, or bring it back", "the line then goes over the video"),
-    KeyHelp(listOf("F"), "Full screen", "or double-click"),
-    KeyHelp(listOf("Z"), "Fill the area, or fit the whole picture", "or ⌘ + scroll"),
-    KeyHelp(listOf("⌘", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", "or Ctrl; turns it on"),
-    KeyHelp(listOf("⌘", "0"), "Anime4K off", "or Ctrl"),
-    KeyHelp(listOf("Esc"), "Close a lookup over the video, leave full screen, then back to the library"),
-    KeyHelp(listOf("A"), "Add the looked-up word to Anki", "when Anki cards are on"),
-    KeyHelp(emptyList(), "Look up a word", "click or drag it; over the video, point at it"),
+/** A row of the keyboard pane: what it does, a quieter [note], and its keys at the end. */
+@Composable
+private fun KeyRow(action: String, note: String?, highlight: Boolean = false, keys: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(action, style = MaterialTheme.typography.bodyMedium)
+            note?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) { keys() }
+    }
+}
+
+/**
+ * One of an action's keys, as keycaps ([caps] null: the + for adding one). Clicked, it waits for a
+ * key, taking it with whatever modifiers are held; Esc cancels. Hovered, an × on its corner removes it.
+ */
+@Composable
+private fun KeyButton(
+    caps: List<String>?,
+    recording: Boolean,
+    onClick: () -> Unit,
+    onRemove: (() -> Unit)?,
+    onKey: (KeyBinding) -> Unit,
+    onCancel: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val focus = remember { FocusRequester() }
+    val scheme = MaterialTheme.colorScheme
+    // whether it has had focus since it started waiting: requestFocus reports it unfocused on the
+    // way, which isn't the user clicking elsewhere
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(recording) {
+        focused = false
+        if (recording) focus.requestFocus()
+    }
+    // the × sits over the key's corner, so the key and it are hovered as one
+    Box(Modifier.hoverable(interaction)) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(7.dp))
+                .border(1.dp, if (recording) scheme.primary else if (hovered) scheme.controlLine else Color.Transparent, RoundedCornerShape(7.dp))
+                .focusRequester(focus)
+                // clicking elsewhere stops it waiting; focus anywhere inside (the clickable's) counts
+                .onFocusChanged { state ->
+                    if (state.hasFocus) focused = true else if (recording && focused) onCancel()
+                }
+                .onPreviewKeyEvent { event ->
+                    if (!recording) return@onPreviewKeyEvent false
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                    when {
+                        // a modifier on its own: wait for the key it goes with
+                        event.key in MODIFIER_KEYS -> Unit
+                        event.key == Key.Escape -> onCancel()
+                        else -> onKey(KeyBinding(event.key, event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed))
+                    }
+                    true
+                }
+                .focusable()
+                .clickable(interaction, indication = null, onClick = onClick)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when {
+                recording -> Text(
+                    "Press a key…",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.primary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+                caps == null -> Text(
+                    "+",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant.copy(alpha = if (hovered) 1f else 0.5f),
+                    modifier = Modifier.widthIn(min = 22.dp).padding(horizontal = 6.dp, vertical = 3.dp),
+                    textAlign = TextAlign.Center,
+                )
+                else -> caps.forEach { Keycap(it) }
+            }
+        }
+        if (hovered && !recording && caps != null && onRemove != null) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .size(15.dp)
+                    .clip(CircleShape)
+                    .background(scheme.onSurfaceVariant)
+                    .clickable(onClick = onRemove)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .semantics { contentDescription = "Remove" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("×", fontSize = 11.sp, lineHeight = 11.sp, color = scheme.surface)
+            }
+        }
+    }
+}
+
+private val MODIFIER_KEYS = setOf(
+    Key.ShiftLeft, Key.ShiftRight, Key.CtrlLeft, Key.CtrlRight, Key.AltLeft, Key.AltRight,
+    Key.MetaLeft, Key.MetaRight, Key.CapsLock, Key.Function,
+)
+
+/** A key that can't be changed, and what it does. */
+private class FixedKey(val caps: List<String>, val action: String, val note: String? = null)
+
+private val FIXED_KEYS = listOf(
+    FixedKey(listOf("Esc"), "Close a lookup over the video, leave full screen, then back to the library"),
+    FixedKey(listOf(if (isMac) "⌘" else "Ctrl", "1–6"), "Anime4K mode A, B, C, A+A, B+B, C+A", if (isMac) "or Ctrl; turns it on" else "turns it on"),
+    FixedKey(listOf(if (isMac) "⌘" else "Ctrl", "0"), "Anime4K off", if (isMac) "or Ctrl" else null),
+    FixedKey(emptyList(), "Look up a word", "click or drag it; over the video, point at it"),
 )
 
 // --- pieces ---------------------------------------------------------------------------------

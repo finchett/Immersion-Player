@@ -442,6 +442,7 @@ fun PlayerScreen(
                 settings.updatePlayerTutorialSeen(true)
                 session.play()
             },
+            keyMap = settings.keyMap,
         )
     }
     }
@@ -714,7 +715,7 @@ private fun Controls(
         TrackMenu(app.settings, session, onMenu, color = muted, hoverColor = white)
         ShaderMenu(app, session, onMenu, accent)
         PanelButton(app, color = muted, hoverColor = white)
-        if (!isMac) FullscreenButton(keys, color = muted, hoverColor = white)
+        if (!isMac) FullscreenButton(keys, app.settings.keyMap.label(PlayerAction.FullScreen), color = muted, hoverColor = white)
     }
 }
 
@@ -1122,16 +1123,23 @@ private fun LineButtons(
     hoverColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val stopping = lineStop(app, session) == LineStop.EVERY_LINE
+    val keyMap = app.settings.keyMap
+    /** "H, or J to stop at its end", with whichever of the two actions have keys. */
+    fun lineKeys(move: PlayerAction, stop: PlayerAction): String? {
+        val keys = keyMap.label(move)
+        val stopKeys = keyMap.label(stop)?.let { "$it to stop at its end" }
+        return if (keys != null && stopKeys != null) "$keys, or $stopKeys" else keys ?: stopKeys
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Hint("Previous line", "H, or J to stop at its end") {
+        Hint("Previous line", lineKeys(PlayerAction.PreviousLine, PlayerAction.PreviousLineStop)) {
             IconAction({ session.previousLine(stopAtEnd = stopping) }, color = color, hoverColor = hoverColor) {
                 LineSkipIcon(it, forward = false)
             }
         }
-        Hint("Replay this line", ";") {
+        Hint("Replay this line", keyMap.label(PlayerAction.ReplayLine)) {
             IconAction({ session.replayLine(stopAtEnd = true) }, color = color, hoverColor = hoverColor) { ReplayIcon(it) }
         }
-        Hint("Next line", "L, or K to stop at its end") {
+        Hint("Next line", lineKeys(PlayerAction.NextLine, PlayerAction.NextLineStop)) {
             IconAction({ session.nextLine(stopAtEnd = stopping) }, color = color, hoverColor = hoverColor) {
                 LineSkipIcon(it, forward = true)
             }
@@ -1153,7 +1161,7 @@ private fun LineStopButton(
     accent: Color = MaterialTheme.colorScheme.primary,
 ) {
     val stop = lineStop(app, session)
-    Hint(stop.hint, "U") {
+    Hint(stop.hint, app.settings.keyMap.label(PlayerAction.StopEveryLine)) {
         IconAction(
             { session.setAutoPause(stop != LineStop.EVERY_LINE) },
             modifier = Modifier
@@ -1174,7 +1182,7 @@ private fun LineStopButton(
 private fun PanelButton(app: DesktopApp, color: Color, hoverColor: Color) {
     val hidden = app.settings.panelHidden
     val hint = if (hidden) "Bring the panel back" else "Put the panel away"
-    Hint(hint, "S") {
+    Hint(hint, app.settings.keyMap.label(PlayerAction.Panel)) {
         IconAction(
             { app.settings.updatePanelHidden(!hidden) },
             modifier = Modifier.semantics { contentDescription = hint },
@@ -1185,9 +1193,9 @@ private fun PanelButton(app: DesktopApp, color: Color, hoverColor: Color) {
 }
 
 @Composable
-private fun FullscreenButton(keys: PlayerKeys, color: Color, hoverColor: Color) {
+private fun FullscreenButton(keys: PlayerKeys, key: String?, color: Color, hoverColor: Color) {
     val hint = if (keys.fullscreen) "Leave full screen" else "Full screen"
-    Hint(hint, "F") {
+    Hint(hint, key) {
         IconAction(
             { keys.onToggleFullscreen() },
             modifier = Modifier.semantics { contentDescription = hint },
@@ -1197,17 +1205,19 @@ private fun FullscreenButton(keys: PlayerKeys, color: Color, hoverColor: Color) 
     }
 }
 
-/** What a control does and its key, shown after the pointer rests on it. */
+/** What a control does and its key (if it has one), shown after the pointer rests on it. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Hint(text: String, key: String, content: @Composable () -> Unit) {
+private fun Hint(text: String, key: String?, content: @Composable () -> Unit) {
     TooltipArea(
         tooltip = {
             Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
                 Text(
                     buildAnnotatedString {
                         append(text)
-                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.65f))) { append("  $key") }
+                        if (key != null) {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.65f))) { append("  $key") }
+                        }
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.inverseOnSurface,

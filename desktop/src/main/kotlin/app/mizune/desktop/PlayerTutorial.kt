@@ -60,6 +60,8 @@ fun PlayerTutorial(
     keys: PlayerKeys,
     ankiEnabled: Boolean,
     onFinish: () -> Unit,
+    /** The keys to show, as the user has them. */
+    keyMap: KeyMap = KeyMap.DEFAULT,
     start: TutorialStep = TutorialStep.Words,
 ) {
     var step by remember { mutableStateOf(start) }
@@ -131,7 +133,7 @@ fun PlayerTutorial(
                             (fadeOut(tween(140)) + slideOutHorizontally(tween(300)) { -sign * it / 10 })
                     },
                     label = "words",
-                ) { shown -> StepText(shown, ankiEnabled) }
+                ) { shown -> StepText(shown, ankiEnabled, keyMap) }
             }
             Row(
                 Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 18.dp),
@@ -153,7 +155,7 @@ fun PlayerTutorial(
 }
 
 @Composable
-private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
+private fun StepText(step: TutorialStep, ankiEnabled: Boolean, keyMap: KeyMap) {
     val scheme = MaterialTheme.colorScheme
     // as tall as the tallest step, so the buttons stay put from one to the next
     Column(Modifier.fillMaxWidth().heightIn(min = 214.dp)) {
@@ -164,7 +166,8 @@ private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
             TutorialStep.Lines -> "Move line by line" to
                 "Missed something? Jump straight back to the line instead of hunting for it."
             TutorialStep.Peek -> "Peek at the translation" to
-                "Hold I, or press and hold the line, and the translation appears under the Japanese. " +
+                (keyMap.label(PlayerAction.Peek)?.let { "Hold $it, or press and hold the line" } ?: "Press and hold the line") +
+                ", and the translation appears under the Japanese. " +
                 "Let go and it's gone, so you only look when you need to."
             TutorialStep.Playback -> "Play, pause and the rest" to
                 "A few more you'll reach for. Every shortcut is in Settings › Keyboard."
@@ -174,24 +177,26 @@ private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
         Text(body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, lineHeight = 21.sp)
         Spacer(Modifier.height(16.dp))
         when (step) {
-            TutorialStep.Words -> if (ankiEnabled) Hint(listOf("A"), "Save the word as an Anki card")
+            TutorialStep.Words -> if (ankiEnabled) Hint(keyMap.caps(PlayerAction.AddCard), "Save the word as an Anki card")
             TutorialStep.Lines -> Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Hint(listOf("←", "→"), "The previous or next line")
-                Hint(listOf("H", "L"), "The same, on the home row")
-                Hint(listOf("J", "K"), "Previous or next, stopping when it ends")
-                Hint(listOf(";"), "Hear this line again")
+                // each action's first key, then its second, as the user has them
+                fun second(action: PlayerAction) = listOfNotNull(keyMap.keysFor(action).getOrNull(1)?.label)
+                Hint(keyMap.caps(PlayerAction.PreviousLine) + keyMap.caps(PlayerAction.NextLine), "The previous or next line")
+                Hint(second(PlayerAction.PreviousLine) + second(PlayerAction.NextLine), "The same")
+                Hint(keyMap.caps(PlayerAction.PreviousLineStop) + keyMap.caps(PlayerAction.NextLineStop), "Previous or next, stopping when it ends")
+                Hint(keyMap.caps(PlayerAction.ReplayLine), "Hear this line again")
             }
-            TutorialStep.Peek -> Hint(listOf("I"), "Hold to peek, let go to hide")
+            TutorialStep.Peek -> Hint(keyMap.caps(PlayerAction.Peek), "Hold to peek, let go to hide")
             TutorialStep.Playback -> Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Hint(listOf("Space"), "Play or pause")
-                    Hint(listOf("Y", "O"), "5 s back or forward")
-                    Hint(listOf("U"), "Stop after every line")
+                    Hint(keyMap.caps(PlayerAction.PlayPause), "Play or pause")
+                    Hint(keyMap.caps(PlayerAction.SeekBack) + keyMap.caps(PlayerAction.SeekForward), "5 s back or forward")
+                    Hint(keyMap.caps(PlayerAction.StopEveryLine), "Stop after every line")
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Hint(listOf("S"), "Put the panel away")
-                    Hint(listOf("F"), "Full screen")
-                    Hint(listOf("Z"), "Fill the area, or fit it all")
+                    Hint(keyMap.caps(PlayerAction.Panel), "Put the panel away")
+                    Hint(keyMap.caps(PlayerAction.FullScreen), "Full screen")
+                    Hint(keyMap.caps(PlayerAction.FillFit), "Fill the area, or fit it all")
                     Hint(listOf("Esc"), "Back to your library")
                 }
             }
@@ -199,8 +204,10 @@ private fun StepText(step: TutorialStep, ankiEnabled: Boolean) {
     }
 }
 
+/** A key and what it does; nothing, if no key does it. */
 @Composable
 private fun Hint(caps: List<String>, text: String) {
+    if (caps.isEmpty()) return
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.width(52.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) { caps.forEach { Keycap(it) } }
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
