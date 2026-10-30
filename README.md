@@ -84,6 +84,9 @@ on Android). The code is in [`UsageStats`](core/src/main/kotlin/app/mizune/stats
 
 ## Keys (desktop)
 
+These are the defaults. Every key can be changed under Settings › Keyboard, and the key map
+exported as a file to keep or share, or imported from one.
+
 | Key | Does |
 |---|---|
 | Space | play / pause |

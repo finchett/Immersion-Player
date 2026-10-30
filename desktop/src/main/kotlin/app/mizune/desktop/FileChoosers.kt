@@ -41,3 +41,38 @@ fun chooseDictionaryZip(): File? {
     }
     return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
+
+/** Where to save the key map, as a .json file. */
+fun chooseKeyMapToSave(): File? {
+    if (isMac) {
+        val dialog = FileDialog(null as Frame?, "Export keys", FileDialog.SAVE)
+        dialog.file = "mizune-keys.json"
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        return File(dialog.directory, if (name.endsWith(".json", ignoreCase = true)) name else "$name.json")
+    }
+    val chooser = JFileChooser().apply {
+        dialogTitle = "Export keys"
+        selectedFile = File("mizune-keys.json")
+        fileFilter = FileNameExtensionFilter("Mizune keys (.json)", "json")
+    }
+    if (chooser.showSaveDialog(null) != JFileChooser.APPROVE_OPTION) return null
+    val file = chooser.selectedFile
+    return if (file.name.endsWith(".json", ignoreCase = true)) file else File(file.path + ".json")
+}
+
+/** A key map file to import. */
+fun chooseKeyMapToOpen(): File? {
+    if (isMac) {
+        val dialog = FileDialog(null as Frame?, "Import keys", FileDialog.LOAD)
+        dialog.setFilenameFilter { _, name -> name.endsWith(".json", ignoreCase = true) }
+        dialog.isVisible = true
+        val name = dialog.file ?: return null
+        return File(dialog.directory, name)
+    }
+    val chooser = JFileChooser().apply {
+        dialogTitle = "Import keys"
+        fileFilter = FileNameExtensionFilter("Mizune keys (.json)", "json")
+    }
+    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
+}

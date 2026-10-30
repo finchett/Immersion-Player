@@ -226,6 +226,14 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
         private set
     fun updatePlayerTutorialSeen(value: Boolean) { playerTutorialSeen = value; prefs.putBoolean("player_tutorial_seen", value) }
 
+    /** The player's keys (Settings › Keyboard). Kept only once changed, so new defaults reach everyone else. */
+    var keyMap by mutableStateOf(prefs.get("key_map", null)?.let { KeyMap.fromJson(it).map } ?: KeyMap.DEFAULT)
+        private set
+    fun updateKeyMap(value: KeyMap) {
+        keyMap = value
+        if (value.isDefault) prefs.remove("key_map") else prefs.put("key_map", value.toJson())
+    }
+
     fun isBundledInstalled(name: String) = prefs.getBoolean("bundled:$name", false)
     fun setBundledInstalled(name: String) = prefs.putBoolean("bundled:$name", true)
 
