@@ -839,6 +839,7 @@ private fun StudyPanel(
                     lookup = lookup,
                     textSize = app.settings.subtitleSize,
                     peeking = keys.peeking || mouseHold,
+                    peekOff = app.settings.peekLanguage == null,
                     onHold = { mouseHold = it },
                     onCharTap = onLookup,
                     onSelect = onSelect,
@@ -980,6 +981,9 @@ private fun trackLabel(track: SubtitleTrack): String {
     return "${track.name}$language · ${track.cues.size} lines"
 }
 
+/** Shown on a held line when no peek language is set (a track can still be picked under ⚙). */
+private const val PEEK_OFF = "Peeking is off. Choose a peek language in Settings, or a translation track under ⚙."
+
 @Composable
 private fun CurrentLine(
     track: SubtitleTrack?,
@@ -992,6 +996,8 @@ private fun CurrentLine(
     lookup: ActiveLookup?,
     textSize: Float,
     peeking: Boolean,
+    /** No peek language is set, so no translation was picked. */
+    peekOff: Boolean,
     onHold: (Boolean) -> Unit,
     onCharTap: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
@@ -1038,9 +1044,9 @@ private fun CurrentLine(
                 modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = japaneseAlpha },
             )
             val translation = secondary?.translationFor(cue.start, cue.end)
-            // with no English to show, saying so only while peeking
+            // with no translation to show, saying so only while peeking
             val english = translation ?: (if (secondary == null) {
-                "No subtitles in your peek language. Pick a translation track under ⚙."
+                if (peekOff) PEEK_OFF else "No subtitles in your peek language. Pick a translation track under ⚙."
             } else {
                 "Nothing here in your peek language."
             }).takeIf { peeking }
@@ -1324,7 +1330,11 @@ private fun BoxScope.LineOverVideo(
                     // line's backing grows to fit whichever is bigger
                     if (peeking) {
                         BasicText(
-                            translation ?: if (secondary == null) "No subtitles in your peek language" else "Nothing here in your peek language",
+                            translation ?: when {
+                                secondary != null -> "Nothing here in your peek language"
+                                app.settings.peekLanguage == null -> PEEK_OFF
+                                else -> "No subtitles in your peek language"
+                            },
                             style = MaterialTheme.typography.titleLarge.copy(
                                 color = if (translation != null) Color.White else Color.White.copy(alpha = 0.7f),
                                 textAlign = TextAlign.Center,

@@ -10,20 +10,32 @@ object SubtitleFiles {
     val SUBTITLE_EXTENSIONS = setOf("srt", "ass", "ssa", "vtt")
     private val MATROSKA_EXTENSIONS = setOf("mkv", "mka", "webm")
 
-    /** A language users can pick, with the tags subtitle files and Matroska tracks use for it. */
-    data class Language(val code: String, val name: String, val tags: Set<String>)
+    /**
+     * A language users can pick, by its English [name] and its own [native] one, with the tags
+     * subtitle files and Matroska tracks use for it (a region or script after them is ignored).
+     */
+    data class Language(val code: String, val name: String, val native: String, val tags: Set<String>)
 
     val LANGUAGES = listOf(
-        Language("ja", "Japanese", setOf("ja", "jpn", "jp", "ja-jp")),
-        Language("en", "English", setOf("en", "eng", "en-us", "en-gb")),
-        Language("zh", "Chinese", setOf("zh", "zho", "chi", "zh-cn", "zh-tw", "zh-hans", "zh-hant", "chs", "cht")),
-        Language("ko", "Korean", setOf("ko", "kor", "ko-kr")),
-        Language("es", "Spanish", setOf("es", "spa", "es-es", "es-419", "es-mx")),
-        Language("fr", "French", setOf("fr", "fre", "fra", "fr-fr")),
-        Language("de", "German", setOf("de", "ger", "deu", "de-de")),
-        Language("pt", "Portuguese", setOf("pt", "por", "pt-br", "pt-pt")),
-        Language("it", "Italian", setOf("it", "ita")),
-        Language("ru", "Russian", setOf("ru", "rus")),
+        Language("ar", "Arabic", "العربية", setOf("ar", "ara")),
+        Language("zh", "Chinese", "中文", setOf("zh", "zho", "chi", "zh-cn", "zh-tw", "zh-hans", "zh-hant", "chs", "cht")),
+        Language("nl", "Dutch", "Nederlands", setOf("nl", "nld", "dut")),
+        Language("en", "English", "English", setOf("en", "eng", "en-us", "en-gb")),
+        Language("fr", "French", "Français", setOf("fr", "fre", "fra", "fr-fr")),
+        Language("de", "German", "Deutsch", setOf("de", "ger", "deu", "de-de")),
+        Language("hi", "Hindi", "हिन्दी", setOf("hi", "hin")),
+        Language("id", "Indonesian", "Indonesia", setOf("id", "ind", "in")),
+        Language("it", "Italian", "Italiano", setOf("it", "ita")),
+        Language("ja", "Japanese", "日本語", setOf("ja", "jpn", "jp", "ja-jp")),
+        Language("ko", "Korean", "한국어", setOf("ko", "kor", "ko-kr")),
+        Language("pl", "Polish", "Polski", setOf("pl", "pol")),
+        Language("pt", "Portuguese", "Português", setOf("pt", "por", "pt-br", "pt-pt")),
+        Language("ru", "Russian", "Русский", setOf("ru", "rus")),
+        Language("es", "Spanish", "Español", setOf("es", "spa", "es-es", "es-419", "es-mx")),
+        Language("th", "Thai", "ไทย", setOf("th", "tha")),
+        Language("tr", "Turkish", "Türkçe", setOf("tr", "tur")),
+        Language("uk", "Ukrainian", "Українська", setOf("uk", "ukr")),
+        Language("vi", "Vietnamese", "Tiếng Việt", setOf("vi", "vie")),
     )
 
     fun language(code: String): Language? = LANGUAGES.firstOrNull { it.code == code }
@@ -32,16 +44,23 @@ object SubtitleFiles {
     fun mpvLanguages(code: String): String = (language(code)?.tags ?: setOf(code)).joinToString(",")
 
     /**
-     * The language code a tag like "jpn" or "ja-JP" stands for, or the tag itself if unknown.
-     * Null for no tag, and for the placeholders files carry instead of one ("und", "mul", ...).
+     * The language code a tag like "jpn", "ja-JP" or "fr-CA" stands for, or the tag itself if
+     * unknown. Null for no tag, and for the placeholders files carry instead of one ("und", "mul", ...).
      */
     fun codeForTag(tag: String?): String? {
-        val lower = tag?.trim()?.lowercase()?.takeUnless { it.isEmpty() || it in NOT_A_LANGUAGE } ?: return null
-        return LANGUAGES.firstOrNull { lower in it.tags }?.code ?: lower
+        val lower = tag?.trim()?.lowercase()?.replace('_', '-')
+            ?.takeUnless { it.isEmpty() || it.substringBefore('-') in NOT_A_LANGUAGE } ?: return null
+        // BCP 47: the language comes first, then any script and region ("zh-Hant-TW", "es-419")
+        return LANGUAGES.firstOrNull { lower in it.tags }?.code
+            ?: LANGUAGES.firstOrNull { lower.substringBefore('-') in it.tags }?.code
+            ?: lower
     }
 
     /** ISO 639 codes for "undetermined", "multiple", "no linguistic content" and the like. */
     private val NOT_A_LANGUAGE = setOf("und", "mul", "mis", "zxx", "unk", "qaa")
+
+    /** A language tag at the end of a sidecar's name: "ja", "jpn", "pt-BR", "zh-Hant". */
+    private val SIDECAR_TAG = Regex("[a-z]{2,3}([-_][a-z0-9]{2,8})*", RegexOption.IGNORE_CASE)
 
     /** Whether [track] is in [code], by its text when its tag is clearly wrong (see [LanguageDetector]). */
     fun isLanguage(track: SubtitleTrack, code: String): Boolean =
@@ -68,8 +87,8 @@ object SubtitleFiles {
             else -> SrtParser.parse(content)
         }
         if (cues.isEmpty()) return null
-        // "Episode 1.ja.srt" -> "ja"
-        val language = fileName.substringBeforeLast('.').substringAfterLast('.', "").takeIf { it.length in 2..3 }
+        // "Episode 1.ja.srt" -> "ja", "Episode 1.pt-BR.srt" -> "pt-BR"
+        val language = fileName.substringBeforeLast('.').substringAfterLast('.', "").takeIf { it.matches(SIDECAR_TAG) }
         return SubtitleTrack(fileName, language, cues)
     }
 

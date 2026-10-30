@@ -8,9 +8,13 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import app.mizune.ui.AppTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -37,6 +41,7 @@ class OnboardingTest {
         val headlines = mapOf(
             OnboardingStep.Welcome to "Welcome to Mizune",
             OnboardingStep.Look to "Pick a look",
+            OnboardingStep.Peek to "Peek in your language",
             OnboardingStep.Videos to "Where do your videos live?",
             OnboardingStep.Dictionaries to "Choose your dictionaries",
             OnboardingStep.Anki to "Make flashcards with Anki",
@@ -64,7 +69,25 @@ class OnboardingTest {
                     assertTrue(it.name, onAllNodesWithText(headlines.getValue(it)).fetchSemanticsNodes().isNotEmpty())
                     shoot(it.name.lowercase())
                 }
+                // the peek step: a language with no OCR model says so; no peeking turns it off
+                step = OnboardingStep.Peek
+                mainClock.advanceTimeBy(600)
+                assertTrue(onAllNodesWithText("Japanese").fetchSemanticsNodes().isEmpty())
+                onNodeWithText("Thai").performClick()
+                mainClock.advanceTimeBy(300)
+                assertEquals("th", settings.peekLanguage)
+                assertTrue(onAllNodesWithText("Thai ones need to be in the video", substring = true).fetchSemanticsNodes().isNotEmpty())
+                assertTrue(onAllNodesWithText("can only be read in English and Japanese", substring = true).fetchSemanticsNodes().isNotEmpty())
+                shoot("peek-thai")
+                onNodeWithText("No peeking").performClick()
+                mainClock.advanceTimeBy(300)
+                assertNull(settings.peekLanguage)
+                assertTrue(settings.peekLanguageChosen)
+                onNodeWithText("English").performClick()
                 theme = AppTheme.Jade
+                step = OnboardingStep.Peek
+                mainClock.advanceTimeBy(600)
+                shoot("peek-dark")
                 step = OnboardingStep.Dictionaries
                 mainClock.advanceTimeBy(600)
                 shoot("dictionaries-dark")

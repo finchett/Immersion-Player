@@ -115,6 +115,8 @@ class Settings(node: String = System.getProperty("mizune.prefs") ?: "app/mizune"
     /** Language shown while peeking, or null for none. */
     var peekLanguage by mutableStateOf(prefs.get("peek_language", "en").ifEmpty { null })
         private set
+    /** Whether a peek language (or none) has been chosen, rather than English by default. */
+    val peekLanguageChosen: Boolean get() = prefs.get("peek_language", null) != null
 
     // --- Anki ---
 

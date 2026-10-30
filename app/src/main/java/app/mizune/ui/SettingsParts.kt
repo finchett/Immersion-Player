@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.mizune.R
+import app.mizune.subs.ImageSubtitles
 import app.mizune.subs.SubtitleFiles
 
 /** A titled card; settings are grouped into a few of these. */
@@ -97,13 +98,16 @@ fun SettingRow(
 fun LanguageRow(
     title: String,
     description: String? = null,
+    /** Said under [description] for the language chosen, if anything. */
+    note: (String?) -> String? = { null },
     selected: String?,
     allowNone: Boolean,
     onSelect: (String?) -> Unit,
 ) {
     var choice by remember { mutableStateOf(selected) }
     var open by remember { mutableStateOf(false) }
-    SettingRow(title = title, description = description) {
+    val described = listOfNotNull(description, note(choice)).joinToString(" ").ifEmpty { null }
+    SettingRow(title = title, description = described) {
         Box {
             OutlinedButton(onClick = { open = true }) {
                 Text((choice?.let { SubtitleFiles.language(it)?.name ?: it } ?: "Off") + "  ▾")
@@ -121,6 +125,14 @@ fun LanguageRow(
             }
         }
     }
+}
+
+/** Said wherever a peek language is picked: the subtitles are the user's own, and which can't be read. */
+fun peekLanguageNote(code: String): String {
+    val name = SubtitleFiles.language(code)?.name ?: code
+    val files = "Mizune doesn't translate or download subtitles, so $name ones need to be in the video or in a file beside it."
+    if (ImageSubtitles.model(code) != null) return files
+    return "$files Picture subtitles (PGS) can only be read in English and Japanese for now."
 }
 
 /** A theme as a tile of its own colours; [theme] null is the one that follows the phone. */

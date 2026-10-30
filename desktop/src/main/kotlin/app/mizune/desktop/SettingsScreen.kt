@@ -73,6 +73,7 @@ import app.mizune.anki.CardFormats
 import app.mizune.anki.CardSource
 import app.mizune.dictionary.DictionaryInfo
 import app.mizune.dictionary.YomitanImporter
+import app.mizune.subs.ImageSubtitles
 import app.mizune.subs.SubtitleFiles
 import app.mizune.ui.AppTheme
 import app.mizune.ui.NoteTypeSource
@@ -273,7 +274,12 @@ private fun GeneralPane(app: DesktopApp) {
                 }
             }
             RowDivider()
-            SettingRow("Peek language", detail = "Hold i to show subtitles in this language", detailKey = "i") {
+            SettingRow(
+                "Peek language",
+                detail = "Hold i to show subtitles in this language",
+                detailKey = "i",
+                note = settings.peekLanguage?.let(::peekLanguageNote),
+            ) {
                 LanguageSelect(settings.peekLanguage, allowNone = true, onSelect = settings::updatePeekLanguage)
             }
         }
@@ -287,6 +293,14 @@ private fun GeneralPane(app: DesktopApp) {
             )
         }
     }
+}
+
+/** Said wherever a peek language is picked: the subtitles are the user's own, and which can't be read. */
+fun peekLanguageNote(code: String): String {
+    val name = SubtitleFiles.language(code)?.name ?: code
+    val files = "Mizune doesn't translate or download subtitles, so $name ones need to be in the video or in a file beside it."
+    if (ImageSubtitles.model(code) != null) return files
+    return "$files Picture subtitles (PGS) can only be read in English and Japanese for now."
 }
 
 /** What the usage counts are, wherever they can be turned off. */
@@ -832,6 +846,8 @@ private fun SettingRow(
     detail: String? = null,
     detailMono: Boolean = false,
     detailKey: String? = null,
+    /** A second, quieter line under [detail]. */
+    note: String? = null,
     control: @Composable () -> Unit = {},
 ) {
     Row(
@@ -861,6 +877,14 @@ private fun SettingRow(
                         )
                     }
                 }
+            }
+            if (note != null) {
+                Text(
+                    note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
         control()

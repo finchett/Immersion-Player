@@ -2,6 +2,7 @@ package app.mizune.subs
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -38,6 +39,16 @@ class ImageSubtitlesTest {
         ))
 
     private fun clear(at: Double) = PgsBlock(at, Double.NaN, segments(0x16 to pcs(objects = 0), 0x80 to byteArrayOf()))
+
+    @Test
+    fun picturesAreReadOnlyInLanguagesWithAModel() {
+        // only English and Japanese models are bundled: a Spanish peek language needs text subtitles
+        val spanish = ImageSubtitleTrack("t", "spa", listOf(show(1.0), clear(2.0)))
+        val english = ImageSubtitleTrack("t", "eng", listOf(show(1.0), clear(2.0)))
+        assertNull(ImageSubtitles.model("es"))
+        assertTrue(ImageSubtitles.tracksToRead(emptyList(), listOf(spanish, english), listOf("ja", "es")).isEmpty())
+        assertEquals(listOf(english), ImageSubtitles.tracksToRead(emptyList(), listOf(spanish, english), listOf("ja", "en")))
+    }
 
     @Test
     fun decodesADisplaySetIntoDarkTextOnWhite() {
