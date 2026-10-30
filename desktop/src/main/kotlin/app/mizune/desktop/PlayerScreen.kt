@@ -566,7 +566,7 @@ private fun VideoArea(
             exit = fadeOut(tween(150)),
             modifier = Modifier.align(Alignment.Center),
         ) {
-            next?.let { NextEpisode(app.settings.title(it.name), onPlayNext) }
+            next?.let { NextEpisode(app.settings.title(it.name), app.settings.accentOnVideo(), onPlayNext) }
         }
         AnimatedVisibility(
             visible,
@@ -605,9 +605,15 @@ private fun VideoArea(
     }
 }
 
+/**
+ * The theme's accent for things over the video, which is dark in every theme: the accent of the
+ * theme's dark side, since a light theme's own (dark green in Jade) would barely show there.
+ */
+private fun Settings.accentOnVideo(): Color = themeFamily.dark?.scheme?.primary ?: Color.White
+
 /** Offered over the last frame: the next video in the folder, a click (or Return) away. */
 @Composable
-private fun NextEpisode(title: String, onPlay: () -> Unit) {
+private fun NextEpisode(title: String, accent: Color, onPlay: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     Column(
@@ -634,7 +640,7 @@ private fun NextEpisode(title: String, onPlay: () -> Unit) {
             Text(
                 "▶",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (hovered) MaterialTheme.colorScheme.primary else Color.White,
+                color = if (hovered) accent else Color.White,
             )
         }
     }
@@ -668,8 +674,7 @@ private fun Controls(
     var scrubbing by remember { mutableStateOf<Double?>(null) }
     val white = Color.White
     val muted = white.copy(alpha = 0.85f)
-    // the bar is dark in every theme, so a light theme's accent (dark green in Jade) would barely show
-    val accent = app.settings.themeFamily.dark?.scheme?.primary ?: white
+    val accent = app.settings.accentOnVideo()
     Row(
         Modifier.fillMaxWidth().height(BAR_HEIGHT)
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xB3000000))))
