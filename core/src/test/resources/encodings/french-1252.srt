@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:02,500
+Salut, ça va aujourd'hui ?
+
+2
+00:00:03,000 --> 00:00:05,500
+Je vais bien, merci beaucoup.
+
+3
+00:00:06,000 --> 00:00:08,500
+Tu veux aller à l'école avec moi ?
+
+4
+00:00:09,000 --> 00:00:11,500
+Je ne sais pas quoi dire.
+
+5
+00:00:12,000 --> 00:00:14,500
+Attends un peu, s'il te plaît !
+
+6
+00:00:15,000 --> 00:00:17,500
+Ce n'est pas ce que j'ai voulu dire.
+
+7
+00:00:18,000 --> 00:00:20,500
+On se voit demain matin.
+
+8
+00:00:21,000 --> 00:00:23,500
+Pourquoi tu ne me l'as pas dit avant ?

@@ -374,7 +374,7 @@ fun PlayerScreen(
             session.setTracks(list, primary, SubtitleFiles.pickSecondary(list, primary, app.prefs.peekLanguage))
             subtitleStatus = if (primary == null) "No text subtitles found for this video" else null
         }
-        val text = withContext(Dispatchers.IO) { runCatching { app.subtitleLoader.load(video, siblings) } }
+        val text = withContext(Dispatchers.IO) { runCatching { app.subtitleLoader.load(video, siblings, listOfNotNull(app.prefs.targetLanguage, app.prefs.peekLanguage)) } }
             .getOrElse {
                 subtitleStatus = "Couldn't read subtitles: ${it.message}"
                 return@LaunchedEffect

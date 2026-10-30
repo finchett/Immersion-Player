@@ -10,9 +10,10 @@ class SubtitleLoader(private val context: Context) {
 
     private val cache = EmbeddedSubtitleCache(File(context.cacheDir, "subtitles"))
 
-    fun load(video: DocumentFile, siblings: List<DocumentFile>): List<SubtitleTrack> {
+    /** [languages] (the target and peek language) help tell what a sidecar file's bytes are in. */
+    fun load(video: DocumentFile, siblings: List<DocumentFile>, languages: List<String>): List<SubtitleTrack> {
         val videoName = video.name ?: return emptyList()
-        val sidecars = sidecarsFor(videoName, siblings).mapNotNull { readSidecar(it) }
+        val sidecars = sidecarsFor(videoName, siblings).mapNotNull { readSidecar(it, languages) }
         if (!SubtitleFiles.isMatroska(videoName)) return sidecars
         val embedded = runCatching {
             cache.load(identity(video)) {
@@ -57,10 +58,10 @@ class SubtitleLoader(private val context: Context) {
 
     private fun identity(video: DocumentFile) = "${video.uri}|${video.length()}|${video.lastModified()}"
 
-    private fun readSidecar(file: DocumentFile): SubtitleTrack? {
+    private fun readSidecar(file: DocumentFile, languages: List<String>): SubtitleTrack? {
         val name = file.name ?: return null
         val content = context.contentResolver.openInputStream(file.uri)?.use {
-            it.readBytes().toString(Charsets.UTF_8)
+            SubtitleEncoding.decode(it.readBytes(), name, languages)
         } ?: return null
         return SubtitleFiles.parseSidecar(name, content)
     }

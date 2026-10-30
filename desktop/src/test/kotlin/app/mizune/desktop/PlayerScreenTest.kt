@@ -92,12 +92,13 @@ class PlayerScreenTest {
     private val node = "app/mizune-test"
 
     /** Builds that library, runs [block] against it, and takes it all down again afterwards. */
-    private fun fixture(ja: String, en: String, block: Fixture.() -> Unit) {
+    private fun fixture(ja: String, en: String, others: Map<String, ByteArray> = emptyMap(), block: Fixture.() -> Unit) {
         val dir = Files.createTempDirectory("mizune-test").toFile()
         val video = File(dir, "Lesson 01.mkv")
         Files.createSymbolicLink(video.toPath(), videoSource!!.absoluteFile.toPath())
         File(dir, "Lesson 01.ja.srt").writeText(ja)
         File(dir, "Lesson 01.en.srt").writeText(en)
+        others.forEach { (name, bytes) -> File(dir, name).writeBytes(bytes) }
         // the episode after it, for the end-of-video prompt
         Files.createSymbolicLink(File(dir, "Lesson 02.mkv").toPath(), videoSource.absoluteFile.toPath())
 
@@ -554,6 +555,47 @@ class PlayerScreenTest {
                 assertTrue("the English fits over the video", fits())
                 shot("13-peek-over-video")
                 keys.peeking = false
+            }
+        }
+    }
+
+    /** Arabic from a windows-1256 file (as subtitle sites hand them out) reads as Arabic, right to left. */
+    @Test
+    fun arabicFromAnOldCodePage() {
+        assumeTrue("set MIZUNE_TEST_VIDEO", videoSource?.isFile == true)
+        val arabic = "مرحبا، كيف حالك اليوم؟"
+        val file = srt(1.0..4.0 to arabic, 5.0..8.0 to "هذا ليس ما قصدته.").toByteArray(charset("windows-1256"))
+        fixture(ja = srt(1.0..4.0 to "今日は何を食べたい？", 5.0..8.0 to "そんなこと言ってないよ。"), en = srt(), others = mapOf("Lesson 01.ar.srt" to file)) {
+            app.settings.updatePeekLanguage("ar")
+            val keys = PlayerKeys()
+            runDesktopComposeUiTest(width = 1440, height = 860) {
+                setContent {
+                    DesktopTheme(AppTheme.Jade) {
+                        PlayerScreen(app, session, keys, onBack = {}, onOpenVideo = {})
+                    }
+                }
+                waitUntil(timeoutMillis = 15_000) { shows("今日は") }
+                assertEquals(arabic, session.secondary.value?.cues?.first()?.text)
+                session.pause()
+                keys.peeking = true
+                waitUntil(timeoutMillis = 5_000) { shows(arabic) }
+                mainClock.advanceTimeBy(500)
+                shot("14-arabic-peek-panel")
+                app.settings.updatePanelHidden(true)
+                waitUntil(timeoutMillis = 5_000) { onAllNodesWithText(arabic).fetchSemanticsNodes().size == 1 }
+                mainClock.advanceTimeBy(500)
+                shot("15-arabic-peek-over-video")
+                keys.peeking = false
+                app.settings.updatePanelHidden(false)
+
+                // Arabic as the line itself, the way someone studying it would see it
+                session.selectPrimary(session.tracks.value.first { it.language == "ar" })
+                waitUntil(timeoutMillis = 5_000) { shows(arabic) }
+                mainClock.advanceTimeBy(500)
+                shot("16-arabic-line-panel")
+                app.settings.updatePanelHidden(true)
+                mainClock.advanceTimeBy(500)
+                shot("17-arabic-line-over-video")
             }
         }
     }

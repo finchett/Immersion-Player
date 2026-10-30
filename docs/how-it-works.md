@@ -73,6 +73,10 @@ Other note types are matched by their field names.
   video takes priority over embedded tracks in its language, and the embedded tracks in other
   languages still load, so English inside the video can sit under Japanese from a file. The
   tracks are cached per file.
+- Subtitle files don't have to be UTF-8. A byte-order mark, UTF-16 or an old code page (Arabic
+  windows-1256, Shift_JIS, GBK, Big5, windows-1251 and others) is recognised. The file's language
+  tag and the languages in settings narrow the guess, and the reading that gives that script's
+  commonest letters wins.
 - Picture subtitles (Blu-ray PGS) are read with
   [Tesseract](https://github.com/tesseract-ocr/tesseract), with English and Japanese models
   bundled. Only tracks in the study or peek language that no text track covers are read. Their
