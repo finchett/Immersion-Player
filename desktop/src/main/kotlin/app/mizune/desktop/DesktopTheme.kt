@@ -6,7 +6,9 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
@@ -225,22 +228,47 @@ fun IconAction(
     }
 }
 
+/** The app icon in use (light or dark, as the Dock's is set), for the middle of the header. */
+val LocalAppIcon = staticCompositionLocalOf { "icon.png" }
+
+/** How wide the start of a header may run and stay clear of the app icon in the middle. */
+val LocalHeaderLead = staticCompositionLocalOf { Dp.Infinity }
+
+// the icon carries its own margin, so 28 dp draws a 22 dp tile
+private val HeaderIconSize = 28.dp
+
 /**
  * A header bar that stays put, a hairline, and the body below it. A screen with a sidebar passes
  * it as [leading]: it runs the full height, the traffic lights sit over its top, and the header
- * and its hairline start where it ends.
+ * and its hairline start where it ends. The app's icon sits in the middle of the window on the
+ * header's line, the way a Mac window centres its title, and stays there from screen to screen.
  */
 @Composable
 fun Chrome(header: @Composable () -> Unit, body: @Composable () -> Unit, leading: (@Composable () -> Unit)? = null) {
-    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        leading?.invoke()
-        Column(Modifier.fillMaxSize()) {
-            Box(
-                Modifier.fillMaxWidth().height(HeaderHeight).movesWindow()
-                    .padding(start = if (leading == null) HeaderStart else 32.dp, end = 12.dp + HeaderEnd),
-            ) { header() }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Box(Modifier.fillMaxSize()) { body() }
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val windowWidth = maxWidth
+        Row(Modifier.fillMaxSize()) {
+            leading?.invoke()
+            Column(Modifier.fillMaxSize()) {
+                val end = 12.dp + HeaderEnd
+                Box(
+                    Modifier.fillMaxWidth().height(HeaderHeight).movesWindow()
+                        .padding(start = if (leading == null) HeaderStart else 32.dp, end = end),
+                ) {
+                    BoxWithConstraints {
+                        // the header ends [end] short of the window's edge, so the window's middle
+                        // is this far in from where the header's content starts
+                        val middle = maxWidth + end - windowWidth / 2
+                        val lead = (middle - HeaderIconSize / 2 - 8.dp).coerceAtLeast(0.dp)
+                        CompositionLocalProvider(LocalHeaderLead provides lead) { header() }
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Box(Modifier.fillMaxSize()) { body() }
+            }
+        }
+        Box(Modifier.align(Alignment.TopCenter).height(HeaderHeight), contentAlignment = Alignment.Center) {
+            Image(painterResource(LocalAppIcon.current), contentDescription = null, modifier = Modifier.size(HeaderIconSize))
         }
     }
 }
