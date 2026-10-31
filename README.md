@@ -124,6 +124,7 @@ The app shows these once, on first run.
 | Video | drag sideways | scrub; move up or down while dragging to scrub faster |
 | Video | pinch | fill the area, or fit the whole picture |
 | Video (paused) | tap or drag the bottom line | seek |
+| Video (panel off screen) | hold | show the line in the peek language |
 | Line | tap a word | look it up |
 | Line | drag across the text | look up the selection |
 | Line | hold | show the line in the peek language |

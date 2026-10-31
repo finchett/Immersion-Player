@@ -492,6 +492,16 @@ fun PlayerScreen(
         if (resumeAfterPopup) session.play()
         resumeAfterPopup = false
     }.takeIf { popupOpen }
+    // and holding anywhere on the video, or on the line, shows the line in the peek language
+    val haptics = LocalHapticFeedback.current
+    var peeking by remember { mutableStateOf(false) }
+    val onHold: (Boolean) -> Unit = remember(haptics) {
+        { hold ->
+            if (hold && !peeking) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            peeking = hold
+        }
+    }
+    LaunchedEffect(panelHidden, landscapeNow) { peeking = false }
 
     val rounded = app.appearance.roundedCorners
     val gap = if (rounded) CARD_GAP else 0.dp
@@ -526,6 +536,7 @@ fun PlayerScreen(
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
                     dismiss = closePopup,
+                    onHold = onHold.takeIf { panelHidden && landscape },
                     overlay = if (panelHidden && landscape) {
                         { onTapVideo ->
                             val shownLookup = lookup.takeIf { popupOpen }
@@ -533,6 +544,8 @@ fun PlayerScreen(
                                 session = session,
                                 textSize = app.prefs.subtitleSize,
                                 peekOff = app.prefs.peekLanguage == null,
+                                peeking = peeking,
+                                onHold = onHold,
                                 lookup = shownLookup,
                                 hasDictionaries = hasDictionaries,
                                 dictionarySetup = dictionarySetup,
@@ -669,7 +682,8 @@ fun PlayerScreen(
  * Full-bleed video. Tap toggles play/pause; dragging sideways scrubs.
  * A thin progress line sits on the bottom edge; time and a close button show while paused.
  * [overlay] (the line, with the panel off screen) goes over the video, given what a tap on the
- * video does; while [dismiss] is set, that tap calls it instead of playing or pausing.
+ * video does; while [dismiss] is set, that tap calls it instead of playing or pausing. With
+ * [onHold], holding the video reports the hold's start and end.
  */
 @Composable
 private fun VideoArea(
@@ -680,11 +694,13 @@ private fun VideoArea(
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
     dismiss: (() -> Unit)?,
+    onHold: ((Boolean) -> Unit)?,
     overlay: (@Composable BoxScope.(onTapVideo: () -> Unit) -> Unit)?,
     modifier: Modifier,
 ) {
     val ended by session.ended.collectAsState()
     val currentDismiss by rememberUpdatedState(dismiss)
+    val currentOnHold by rememberUpdatedState(onHold)
 
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
@@ -792,7 +808,7 @@ private fun VideoArea(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     // pinch out = fill, pinch in = fit. Runs in the Initial pass so a second finger
-                    // cancels the scrub/tap the first finger started.
+                    // cancels the scrub/tap the first finger started. Letting go ends a hold.
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         var zoom = 1f
@@ -803,6 +819,7 @@ private fun VideoArea(
                                 event.changes.forEach { it.consume() }
                             }
                         } while (event.changes.any { it.pressed })
+                        currentOnHold?.invoke(false)
                         val fill = when {
                             zoom > 1.12f -> true
                             zoom < 0.9f -> false
@@ -815,8 +832,12 @@ private fun VideoArea(
                         }
                     }
                 }
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { offset ->
+                .pointerInput(onHold != null) {
+                    // without a hold to report, a long press still counts as a tap
+                    val onLongPress: ((Offset) -> Unit)? = if (onHold != null) {
+                        { currentOnHold?.invoke(true) }
+                    } else null
+                    detectTapGestures(onLongPress = onLongPress, onTap = { offset ->
                         currentDismiss?.let {
                             it()
                             return@detectTapGestures
@@ -1074,9 +1095,9 @@ private fun VideoArea(
 /**
  * The line over the video while the panel is off screen, as subtitles: a tapped word (or a
  * selection dragged across) opens its [lookup] above the line, in the room up to the buttons along
- * the top, and holding the line shows it in the peek language. A tap beside the words is a tap on
- * the video. It shows while it's spoken, while paused, and while held or looked up, clear of the
- * time and the seek line.
+ * the top, and holding the line (or the video) shows it in the peek language while [peeking]. A tap
+ * beside the words is a tap on the video. It shows while it's spoken, while paused, and while held
+ * or looked up, clear of the time and the seek line.
  */
 @Composable
 private fun BoxScope.LineOverVideo(
@@ -1084,6 +1105,8 @@ private fun BoxScope.LineOverVideo(
     textSize: Float,
     /** No peek language is set, so no translation was picked. */
     peekOff: Boolean,
+    peeking: Boolean,
+    onHold: (Boolean) -> Unit,
     lookup: ActiveLookup?,
     hasDictionaries: Boolean,
     dictionarySetup: String?,
@@ -1098,19 +1121,11 @@ private fun BoxScope.LineOverVideo(
     val lineActive by session.lineActive.collectAsState()
     val linesRead by session.linesRead.collectAsState()
     val paused by session.paused.collectAsState()
-    val haptics = LocalHapticFeedback.current
-    var peeking by remember { mutableStateOf(false) }
-    val onHold: (Boolean) -> Unit = remember(haptics) {
-        { hold ->
-            if (hold && !peeking) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            peeking = hold
-        }
-    }
     val tapVideo by rememberUpdatedState(onTapVideo)
     val cue = remember(primary, lineIndex, linesRead) { primary?.cues?.getOrNull(lineIndex) }
     val shown = cue != null && cue.text.isNotEmpty() && (lineActive || paused || peeking || lookup != null)
-    // a hold can't be let go of once its line is gone
-    LaunchedEffect(shown) { if (!shown) peeking = false }
+    // a hold on the line can't be let go of once the line is gone
+    LaunchedEffect(shown) { if (!shown) onHold(false) }
 
     Column(
         Modifier.matchParentSize().padding(start = 20.dp, top = 56.dp, end = 20.dp, bottom = 44.dp),
