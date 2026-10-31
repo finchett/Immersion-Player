@@ -476,8 +476,8 @@ fun PlayerScreen(
     val stoppedAtLine by session.stoppedAtLine.collectAsState()
 
     // with the panel off screen, a word tapped in the line over the video opens its entries over
-    // it, until they're closed (a tap on the video, or back) or the line changes. If opening them
-    // paused the video, closing them plays it again.
+    // it, until they're closed (a tap on the video, or back) or the line changes. A tap closes them
+    // and plays on, whatever paused it; back plays again only if opening them paused the video.
     var popupOpen by remember { mutableStateOf(false) }
     var resumeAfterPopup by remember { mutableStateOf(false) }
     LaunchedEffect(lineIndex, panelHidden, landscapeNow) {
@@ -536,7 +536,12 @@ fun PlayerScreen(
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
-                    dismiss = closePopup,
+                    dismiss = closePopup?.let { close ->
+                        {
+                            close()
+                            session.play()
+                        }
+                    },
                     lineGestures = panelHidden && landscape,
                     onHold = onHold,
                     overlay = if (panelHidden && landscape) {
