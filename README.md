@@ -130,7 +130,7 @@ The app shows these once, on first run.
 | Panel | swipe sideways | previous / next line |
 | Panel | tap | play / pause |
 | Panel | double-tap | stop at the end of every line, on or off |
-| Divider | drag | resize the video and the panel; in landscape, drag it off the edge to watch with plain subtitles |
+| Divider | drag | resize the video and the panel; in landscape, drag it off the edge to watch with the line over the video |
 | Shoulder triggers | press | previous / next line on RedMagic phones ([details](docs/how-it-works.md#redmagic-shoulder-triggers)) |
 
 ## Limitations
