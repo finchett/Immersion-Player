@@ -4,6 +4,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
 enum class AppTheme(val label: String, val scheme: ColorScheme) {
     /** The app's own colours: a jade accent on warm charcoal, like ink and jade. */
@@ -234,3 +235,22 @@ enum class ThemeMode { Auto, Light, Dark }
 /** The themes "System" follows, by the device's light or dark setting. */
 val SystemDark = AppTheme.Jade
 val SystemLight = AppTheme.Celadon
+
+/**
+ * The scheme with the colours Material would otherwise fill with its default purples (containers,
+ * outlines) worked out from the theme's own instead. Both apps use it.
+ */
+fun ColorScheme.retuned(): ColorScheme = copy(
+    onPrimary = background,
+    primaryContainer = primary.copy(alpha = 0.22f).compositeOver(surface),
+    onPrimaryContainer = onSurface,
+    secondaryContainer = surfaceVariant,
+    onSecondaryContainer = onSurface,
+    surfaceContainerLowest = background,
+    surfaceContainerLow = surface,
+    surfaceContainer = surfaceVariant,
+    surfaceContainerHigh = surfaceVariant,
+    surfaceContainerHighest = surfaceVariant,
+    outline = onSurfaceVariant.copy(alpha = 0.5f),
+    outlineVariant = onSurfaceVariant.copy(alpha = 0.18f),
+)

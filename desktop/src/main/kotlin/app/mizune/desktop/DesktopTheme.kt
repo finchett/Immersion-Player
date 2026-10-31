@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -44,6 +43,7 @@ import app.mizune.ui.SystemDark
 import app.mizune.ui.SystemLight
 import app.mizune.ui.ThemeFamily
 import app.mizune.ui.ThemeMode
+import app.mizune.ui.retuned
 
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
@@ -94,7 +94,7 @@ fun DesktopTheme(family: ThemeFamily, mode: ThemeMode, content: @Composable () -
 @Composable
 fun DesktopTheme(choice: AppTheme?, content: @Composable () -> Unit) {
     val theme = choice ?: if (isSystemInDarkTheme()) SystemDark else SystemLight
-    val scheme = remember(theme) { theme.scheme.forDesktop() }
+    val scheme = remember(theme) { theme.scheme.retuned() }
     MaterialTheme(colorScheme = scheme, typography = DesktopTypography) {
         // default text colour for everything, so no screen depends on a Surface to set it
         CompositionLocalProvider(
@@ -103,30 +103,6 @@ fun DesktopTheme(choice: AppTheme?, content: @Composable () -> Unit) {
             content = content,
         )
     }
-}
-
-private fun ColorScheme.forDesktop(): ColorScheme = copy(
-    onPrimary = background,
-    primaryContainer = primary.copy(alpha = 0.22f).compositeOver(surface),
-    onPrimaryContainer = onSurface,
-    secondaryContainer = surfaceVariant,
-    onSecondaryContainer = onSurface,
-    surfaceContainerLowest = background,
-    surfaceContainerLow = surface,
-    surfaceContainer = surfaceVariant,
-    surfaceContainerHigh = surfaceVariant,
-    surfaceContainerHighest = surfaceVariant,
-    outline = onSurfaceVariant.copy(alpha = 0.5f),
-    outlineVariant = onSurfaceVariant.copy(alpha = 0.18f),
-)
-
-private fun Color.compositeOver(background: Color): Color {
-    val a = alpha
-    return Color(
-        red = red * a + background.red * (1 - a),
-        green = green * a + background.green * (1 - a),
-        blue = blue * a + background.blue * (1 - a),
-    )
 }
 
 // regular and medium weights only: hierarchy comes from size and space

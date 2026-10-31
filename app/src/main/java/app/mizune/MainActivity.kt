@@ -18,7 +18,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import app.mizune.ui.SystemDark
 import app.mizune.ui.SystemLight
 import app.mizune.ui.Motion
-import androidx.compose.material3.MaterialTheme
+import app.mizune.ui.PhoneTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val theme = app.appearance.theme
                 ?: if (isSystemInDarkTheme()) SystemDark else SystemLight
-            MaterialTheme(colorScheme = theme.scheme) {
+            PhoneTheme(theme) {
                 BackHandler(enabled = screen != Screen.Library) { screen = Screen.Library }
                 LaunchedEffect(pendingScreen) {
                     val next = pendingScreen ?: return@LaunchedEffect

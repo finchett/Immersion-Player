@@ -48,11 +48,10 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.mandatorySystemGestures
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,6 +67,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,11 +83,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Switch
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.IntOffset
@@ -103,8 +103,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.platform.LocalView
 import android.view.RoundedCorner
 import androidx.compose.ui.unit.Dp
@@ -272,14 +274,14 @@ private fun ResizeHandle(
 }
 
 /** Share of the video width on each side where double tap jumps. */
-private const val EDGE_ZONE = 0.3f
+private const val EDGE_ZONE = 0.15f
 private const val JUMP_SECONDS = 5
 /** Window for a second tap on a video edge to count as a double tap. */
 private const val VIDEO_DOUBLE_TAP_MS = 180L
 /** After a jump, further taps on the same edge within this window jump again. */
 private const val JUMP_CONTINUE_MS = 600L
 
-/** Window for a second tap on the study panel to count as a double tap. */
+/** Window for a second tap on the study panel (or the video, with it off screen) to count as a double tap. */
 private const val PANEL_DOUBLE_TAP_MS = 180L
 
 /** Scrub speed multiplier when the finger has moved far up or down from where the drag began. */
@@ -473,6 +475,35 @@ fun PlayerScreen(
     }
     val paused by session.paused.collectAsState()
 
+    // with the panel off screen, a word tapped in the line over the video opens its entries over
+    // it, until they're closed (a tap on the video, or back) or the line changes. A tap closes them
+    // and plays on, whatever paused it; back plays again only if opening them paused the video.
+    var popupOpen by remember { mutableStateOf(false) }
+    var resumeAfterPopup by remember { mutableStateOf(false) }
+    LaunchedEffect(lineIndex, panelHidden, landscapeNow) {
+        popupOpen = false
+        resumeAfterPopup = false
+    }
+    fun openPopup() {
+        if (!popupOpen) resumeAfterPopup = app.prefs.pauseOnLookup && !session.paused.value
+        popupOpen = true
+    }
+    val closePopup = {
+        popupOpen = false
+        if (resumeAfterPopup) session.play()
+        resumeAfterPopup = false
+    }.takeIf { popupOpen }
+    // and holding anywhere on the video, or on the line, shows the line in the peek language
+    val haptics = LocalHapticFeedback.current
+    var peeking by remember { mutableStateOf(false) }
+    val onHold: (Boolean) -> Unit = remember(haptics) {
+        { hold ->
+            if (hold && !peeking) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            peeking = hold
+        }
+    }
+    LaunchedEffect(panelHidden, landscapeNow) { peeking = false }
+
     val rounded = app.appearance.roundedCorners
     val gap = if (rounded) CARD_GAP else 0.dp
     val cardRadius = deviceCardRadius()
@@ -494,7 +525,13 @@ fun PlayerScreen(
                 settle(panelFraction, app.prefs.panelFraction.coerceIn(MIN_PANEL_FRACTION, MAX_PANEL_FRACTION))
                 hidePanel(false)
             }
+            // and a word's entries open over the video close first
+            BackHandler(enabled = closePopup != null) { closePopup?.invoke() }
             val portraitVideoHeight = maxWidth * 9 / 16
+            // held sideways the video reaches the screen's bottom edge, where swipes are the system's
+            // (home, switching apps) and can't be taken back: what's dragged there reaches above them
+            val gestureBottom = with(LocalDensity.current) { WindowInsets.mandatorySystemGestures.getBottom(this).toDp() }
+            val bottomClear = if (landscape) (gestureBottom - gap).coerceAtLeast(0.dp) else 0.dp
             val videoArea = @Composable { modifier: Modifier ->
                 VideoArea(
                     session = session,
@@ -503,8 +540,35 @@ fun PlayerScreen(
                     nextEpisodeName = nextEpisodeName,
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
-                    lineOver = panelHidden && landscape,
-                    lineSize = app.prefs.subtitleSize,
+                    dismiss = closePopup?.let { close ->
+                        {
+                            close()
+                            session.play()
+                        }
+                    },
+                    bottomClear = bottomClear,
+                    lineGestures = panelHidden && landscape,
+                    onHold = onHold,
+                    overlay = if (panelHidden && landscape) {
+                        { onTapVideo ->
+                            val shownLookup = lookup.takeIf { popupOpen }
+                            LineOverVideo(
+                                session = session,
+                                textSize = app.prefs.subtitleSize,
+                                peekOff = app.prefs.peekLanguage == null,
+                                peeking = peeking,
+                                onHold = onHold,
+                                lookup = shownLookup,
+                                hasDictionaries = hasDictionaries,
+                                dictionarySetup = dictionarySetup,
+                                entryAction = shownLookup?.let { cardAction(app, session, it) },
+                                onLookup = { line, text, start -> openPopup(); startLookup(line, text, start) },
+                                onSelect = { line, text, start, end -> openPopup(); startLookup(line, text, start, end - start) },
+                                onTapVideo = onTapVideo,
+                                bottomClear = bottomClear,
+                            )
+                        }
+                    } else null,
                     modifier = modifier,
                 )
             }
@@ -630,8 +694,12 @@ fun PlayerScreen(
 /**
  * Full-bleed video. Tap toggles play/pause; dragging sideways scrubs.
  * A thin progress line sits on the bottom edge; time and a close button show while paused.
- * With [lineOver] (the panel off screen) the line goes over the video as plain subtitles, in
- * [lineSize]: for watching, so there's nothing to tap in it.
+ * [overlay] (the line, with the panel off screen) goes over the video, given what a tap on the
+ * video does; while [dismiss] is set, that tap calls it instead of playing or pausing. With
+ * [lineGestures] (the panel off screen) it takes the panel's: swipes move a line at a time, a
+ * double tap in the middle stops at the end of every line (the edges still jump), and a hold is
+ * reported to [onHold]. Scrubbing is then on the seek line, while paused. The seek line's touch
+ * strip reaches [bottomClear] further up than it would, out of the system's swipes.
  */
 @Composable
 private fun VideoArea(
@@ -641,11 +709,17 @@ private fun VideoArea(
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
-    lineOver: Boolean,
-    lineSize: Float,
+    dismiss: (() -> Unit)?,
+    bottomClear: Dp,
+    lineGestures: Boolean,
+    onHold: (Boolean) -> Unit,
+    overlay: (@Composable BoxScope.(onTapVideo: () -> Unit) -> Unit)?,
     modifier: Modifier,
 ) {
     val ended by session.ended.collectAsState()
+    val currentDismiss by rememberUpdatedState(dismiss)
+    val currentOnHold by rememberUpdatedState(onHold)
+    val haptics = LocalHapticFeedback.current
 
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
@@ -655,8 +729,24 @@ private fun VideoArea(
     var scrubTarget by remember { mutableStateOf<Double?>(null) }
     var scrubOffset by remember { mutableStateOf(0.0) }
     var scrubSpeed by remember { mutableStateOf(1.0) }
-    var flash by remember { mutableIntStateOf(0) }
     var showOptions by remember { mutableStateOf(false) }
+
+    // a word in the middle for a moment: fill or fit, or stop at end of line on or off
+    var noticeCount by remember { mutableIntStateOf(0) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(noticeCount) {
+        if (noticeCount > 0) {
+            delay(900)
+            notice = null
+        }
+    }
+    fun toggleStopAtEnd() {
+        val enabled = !session.autoPause.value
+        session.setAutoPause(enabled)
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        notice = if (enabled) "Stop at end of line: on" else "Stop at end of line: off"
+        noticeCount++
+    }
 
     // double-tap jumps on the video's edges
     val videoScope = rememberCoroutineScope()
@@ -688,20 +778,53 @@ private fun VideoArea(
         session.seekTo(target.coerceIn(0.0, maxTime))
         jumpShown++
     }
-    var flashFill by remember { mutableIntStateOf(0) }
-    var fillNotice by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(flashFill) {
-        if (flashFill > 0) {
-            delay(900)
-            fillNotice = null
+    /** A tap on the video's left edge (-1), middle (0) or right edge (1). */
+    fun tap(zone: Int) {
+        currentDismiss?.let {
+            it()
+            return
         }
-    }
-    var showFlash by remember { mutableStateOf(false) }
-    LaunchedEffect(flash) {
-        if (flash > 0) {
-            showFlash = true
-            delay(500)
-            showFlash = false
+        val now = SystemClock.uptimeMillis()
+        val pending = pendingVideoTap
+        when {
+            // the middle, as on the panel: play/pause after a short wait, and a second tap within
+            // it is stop at the end of every line
+            lineGestures && zone == 0 -> if (pending != null && pending.isActive && pendingZone == 0) {
+                pending.cancel()
+                toggleStopAtEnd()
+            } else {
+                pending?.cancel()
+                pendingZone = 0
+                pendingVideoTap = videoScope.launch {
+                    delay(PANEL_DOUBLE_TAP_MS)
+                    session.togglePause()
+                }
+            }
+            // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
+            // a single edge tap still plays/pauses after a short wait.
+            zone == 0 -> {
+                pending?.cancel()
+                session.togglePause()
+            }
+            zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
+                lastJumpTap = now
+                jump(zone)
+            }
+            pending != null && pending.isActive && pendingZone == zone -> {
+                pending.cancel()
+                jumpZone = zone
+                lastJumpTap = now
+                jumpTotal = 0
+                jump(zone)
+            }
+            else -> {
+                pending?.cancel()
+                pendingZone = zone
+                pendingVideoTap = videoScope.launch {
+                    delay(VIDEO_DOUBLE_TAP_MS)
+                    session.togglePause()
+                }
+            }
         }
     }
 
@@ -753,7 +876,7 @@ private fun VideoArea(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     // pinch out = fill, pinch in = fit. Runs in the Initial pass so a second finger
-                    // cancels the scrub/tap the first finger started.
+                    // cancels the scrub/tap the first finger started. Letting go ends a hold.
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         var zoom = 1f
@@ -764,6 +887,7 @@ private fun VideoArea(
                                 event.changes.forEach { it.consume() }
                             }
                         } while (event.changes.any { it.pressed })
+                        currentOnHold(false)
                         val fill = when {
                             zoom > 1.12f -> true
                             zoom < 0.9f -> false
@@ -771,52 +895,45 @@ private fun VideoArea(
                         }
                         if (fill != null && fill != session.fill.value) {
                             session.setFill(fill)
-                            fillNotice = if (fill) "Fill" else "Fit"
-                            flashFill++
+                            notice = if (fill) "Fill" else "Fit"
+                            noticeCount++
                         }
                     }
                 }
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { offset ->
-                        // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
-                        // a single edge tap still plays/pauses after a short wait.
-                        val zone = when {
-                            offset.x < widthPx * EDGE_ZONE -> -1
-                            offset.x > widthPx * (1 - EDGE_ZONE) -> 1
-                            else -> 0
-                        }
-                        val now = SystemClock.uptimeMillis()
-                        val pending = pendingVideoTap
-                        when {
-                            zone == 0 -> {
-                                pending?.cancel()
-                                session.togglePause()
-                                flash++
-                            }
-                            zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
-                                lastJumpTap = now
-                                jump(zone)
-                            }
-                            pending != null && pending.isActive && pendingZone == zone -> {
-                                pending.cancel()
-                                jumpZone = zone
-                                lastJumpTap = now
-                                jumpTotal = 0
-                                jump(zone)
-                            }
-                            else -> {
-                                pending?.cancel()
-                                pendingZone = zone
-                                pendingVideoTap = videoScope.launch {
-                                    delay(VIDEO_DOUBLE_TAP_MS)
-                                    session.togglePause()
-                                    flash++
-                                }
-                            }
-                        }
+                .pointerInput(lineGestures) {
+                    // without a hold to report, a long press still counts as a tap
+                    val onLongPress: ((Offset) -> Unit)? = if (lineGestures) {
+                        { currentOnHold(true) }
+                    } else null
+                    detectTapGestures(onLongPress = onLongPress, onTap = { offset ->
+                        tap(
+                            when {
+                                offset.x < widthPx * EDGE_ZONE -> -1
+                                offset.x > widthPx * (1 - EDGE_ZONE) -> 1
+                                else -> 0
+                            },
+                        )
                     })
                 }
-                .pointerInput(widthPx, heightPx) {
+                .pointerInput(widthPx, heightPx, lineGestures) {
+                    if (lineGestures) {
+                        // a line at a time, as on the panel
+                        val swipeThreshold = 56.dp.toPx()
+                        var total = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { total = 0f },
+                            onHorizontalDrag = { change, amount ->
+                                change.consume()
+                                total += amount
+                            },
+                            onDragEnd = {
+                                if (abs(total) > swipeThreshold) {
+                                    if (total < 0) session.nextLine() else session.previousLine()
+                                }
+                            },
+                        )
+                        return@pointerInput
+                    }
                     // horizontal movement scrubs; moving away vertically from where the drag
                     // started speeds it up (applies to movement from then on, so you can slow back down)
                     var start = 0.0
@@ -849,17 +966,7 @@ private fun VideoArea(
                 },
         )
 
-        if (lineOver) LineOverVideo(session, lineSize)
-
-        // play/pause flash in the middle
-        AnimatedVisibility(showFlash, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
-            Box(
-                Modifier.background(Color(0x99000000), CircleShape).padding(22.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (paused) PauseIcon(Color.White, diameter = 30.dp) else PlayIcon(Color.White, diameter = 30.dp)
-            }
-        }
+        overlay?.invoke(this) { tap(0) }
 
         // end of episode: offer the next one in the folder
         AnimatedVisibility(
@@ -870,15 +977,16 @@ private fun VideoArea(
         ) {
             Column(
                 Modifier
-                    .background(Color(0xCC1E2126), RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(OVER_VIDEO)
                     .clickable { onNextEpisode?.invoke() }
-                    .padding(horizontal = 28.dp, vertical = 18.dp),
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("Next episode  ▶", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Text(
                     nextEpisodeName.orEmpty(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -894,22 +1002,18 @@ private fun VideoArea(
             Text(
                 if (jumpLabelZone < 0) "« −${jumpLabelTotal}s" else "+${jumpLabelTotal}s »",
                 color = Color.White,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .background(Color(0x99000000), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.videoPill(),
             )
         }
 
-        // fill/fit notice
-        AnimatedVisibility(fillNotice != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+        // fill/fit or stop-at-end notice
+        AnimatedVisibility(notice != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
             Text(
-                fillNotice.orEmpty(),
+                notice.orEmpty(),
                 color = Color.White,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .background(Color(0xAA000000), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.videoPill(),
             )
         }
 
@@ -920,11 +1024,8 @@ private fun VideoArea(
             Text(
                 "${formatTime(target)}   $sign${formatTime(abs(scrubOffset))}$speed",
                 color = Color.White,
-                fontSize = 22.sp,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .background(Color(0xAA000000), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                modifier = Modifier.align(Alignment.Center).videoPill(),
             )
         }
 
@@ -934,36 +1035,20 @@ private fun VideoArea(
                 Text(
                     "${formatTime(position)} / ${formatTime(duration)}",
                     color = Color.White,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 16.dp)
-                        .background(Color(0x88000000), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = VIDEO_INSET, bottom = 16.dp)
+                        .background(OVER_VIDEO, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
-                Text(
-                    "✕",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .background(Color(0x88000000), CircleShape)
-                        .clickable(onClick = onBack)
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                )
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .background(Color(0x88000000), CircleShape)
-                        .clickable { showOptions = true }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                ) { Cog(Color.White, diameter = 20.dp) }
+                VideoButton(onBack, Modifier.align(Alignment.TopStart)) { CloseIcon(Color.White, diameter = 13.dp) }
+                VideoButton({ showOptions = true }, Modifier.align(Alignment.TopEnd)) { Cog(Color.White, diameter = 19.dp) }
             }
         }
         if (showOptions) PlayerOptions(session, onDismiss = { showOptions = false })
 
         // seek bar: a thin line on the bottom edge, hidden while playing. While paused it can be
-        // tapped or dragged (via an invisible touch strip); it fattens while held.
+        // tapped or dragged (via an invisible touch strip, reaching up past the system's swipes);
+        // it fattens while held.
         AnimatedVisibility(
             visible = paused || scrubTarget != null,
             enter = fadeIn(),
@@ -978,7 +1063,7 @@ private fun VideoArea(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(32.dp)
+                    .height(32.dp + bottomClear)
                     .pointerInput(Unit) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -1023,30 +1108,147 @@ private fun VideoArea(
     }
 }
 
+/** The shade behind everything drawn over the video: buttons, the time, notices. */
+private val OVER_VIDEO = Color(0x80000000)
+
+/** How far the buttons and the time sit in from the video's edges. */
+private val VIDEO_INSET = 12.dp
+
+/** A round button over the video, the same size whatever it holds. */
+@Composable
+private fun VideoButton(onClick: () -> Unit, modifier: Modifier, icon: @Composable () -> Unit) {
+    Box(
+        modifier.padding(VIDEO_INSET).size(40.dp).clip(CircleShape).background(OVER_VIDEO).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { icon() }
+}
+
+/** A short notice over the video, in the shade the buttons use. */
+private fun Modifier.videoPill() =
+    background(OVER_VIDEO, RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 8.dp)
+
 /**
- * The line over the video while the panel is off screen, as plain subtitles: shown while it's
- * spoken, clear of the time and the seek line, and not touchable, so taps go to the video.
+ * The line over the video while the panel is off screen, as subtitles: a tapped word (or a
+ * selection dragged across) opens its [lookup] above the line, in the room up to the buttons along
+ * the top, and holding the line (or the video) shows it in the peek language while [peeking]. A tap
+ * beside the words is a tap on the video. It shows while it's spoken, while paused, and while held
+ * or looked up, clear of the time and the seek line's touch strip (which reaches [bottomClear] up).
  */
 @Composable
-private fun BoxScope.LineOverVideo(session: PlayerSession, textSize: Float) {
+private fun BoxScope.LineOverVideo(
+    session: PlayerSession,
+    textSize: Float,
+    /** No peek language is set, so no translation was picked. */
+    peekOff: Boolean,
+    peeking: Boolean,
+    onHold: (Boolean) -> Unit,
+    lookup: ActiveLookup?,
+    hasDictionaries: Boolean,
+    dictionarySetup: String?,
+    entryAction: (@Composable (TermEntry) -> Unit)?,
+    onLookup: (Int, String, Int) -> Unit,
+    onSelect: (Int, String, Int, Int) -> Unit,
+    onTapVideo: () -> Unit,
+    bottomClear: Dp,
+) {
     val primary by session.primary.collectAsState()
+    val secondary by session.secondary.collectAsState()
     val lineIndex by session.lineIndex.collectAsState()
     val lineActive by session.lineActive.collectAsState()
     val linesRead by session.linesRead.collectAsState()
-    val text = remember(primary, lineIndex, linesRead) { primary?.cues?.getOrNull(lineIndex)?.text }
-    if (!lineActive || text.isNullOrEmpty()) return
-    Text(
-        text,
-        color = Color.White,
-        fontSize = textSize.sp,
-        lineHeight = (textSize * 1.3f).sp,
-        textAlign = TextAlign.Center,
-        style = MaterialTheme.typography.headlineSmall.copy(shadow = Shadow(Color.Black, Offset(0f, 2f), blurRadius = 6f)),
-        modifier = Modifier.align(Alignment.BottomCenter).padding(start = 20.dp, end = 20.dp, bottom = 44.dp)
-            .background(Color(0x99000000), RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
+    val paused by session.paused.collectAsState()
+    val tapVideo by rememberUpdatedState(onTapVideo)
+    val cue = remember(primary, lineIndex, linesRead) { primary?.cues?.getOrNull(lineIndex) }
+    val shown = cue != null && cue.text.isNotEmpty() && (lineActive || paused || peeking || lookup != null)
+    // a hold on the line can't be let go of once the line is gone
+    LaunchedEffect(shown) { if (!shown) onHold(false) }
+
+    Column(
+        Modifier.matchParentSize().padding(start = 20.dp, top = 56.dp, end = 20.dp, bottom = 44.dp + bottomClear),
+        verticalArrangement = Arrangement.Bottom,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (lookup != null) {
+            // a Surface keeps taps in it from reaching the video
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 8.dp,
+                modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp),
+            ) {
+                DictionaryPanel(
+                    lookup = lookup,
+                    hasDictionaries = hasDictionaries,
+                    setupStatus = dictionarySetup,
+                    entryAction = entryAction,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+        if (shown && cue != null) {
+            val translation = secondary?.translationFor(cue.start, cue.end)
+            val shadow = Shadow(Color.Black, Offset(0f, 2f), blurRadius = 6f)
+            Box(
+                Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0x99000000))
+                    .pointerInput(onHold) {
+                        // observe (without consuming) so it also lets go of holds that began on the
+                        // words, even if they're swapped out by a new line mid-hold
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (event.changes.any { it.pressed })
+                            onHold(false)
+                        }
+                    }
+                    .pointerInput(onHold) { detectTapGestures(onLongPress = { onHold(true) }, onTap = { tapVideo() }) }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val highlight = lookup?.takeIf { it.lineIndex == lineIndex && it.result != null && it.result.matchLength > 0 }
+                    ?.let { it.start until it.start + it.result!!.matchLength }
+                // while peeking, the line stays laid out (invisible) under the translation, and the
+                // backing grows to fit whichever is bigger
+                val japaneseAlpha by animateFloatAsState(if (peeking) 0f else 1f, label = "japaneseAlpha")
+                TappableText(
+                    text = cue.text,
+                    highlight = highlight,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = textSize.sp,
+                        lineHeight = 1.3.em,
+                        textAlign = TextAlign.Center,
+                        color = Color.White,
+                        shadow = shadow,
+                    ),
+                    onTap = { onLookup(lineIndex, cue.text, it) },
+                    onHold = onHold,
+                    onSelect = { start, end -> onSelect(lineIndex, cue.text, start, end) },
+                    onTapOutside = { tapVideo() },
+                    modifier = Modifier.graphicsLayer { alpha = japaneseAlpha },
+                )
+                if (peeking) {
+                    BasicText(
+                        translation ?: when {
+                            secondary != null -> "Nothing here in your peek language"
+                            peekOff -> PEEK_OFF
+                            else -> "No subtitles in your peek language"
+                        },
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            color = if (translation != null) Color.White else Color.White.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center,
+                            shadow = shadow,
+                        ),
+                        autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 22.sp, stepSize = 1.sp),
+                    )
+                }
+            }
+        }
+    }
 }
+
+/** Shown on a held line when no peek language is set (a track can still be picked under ⚙). */
+private const val PEEK_OFF = "Peeking is off. Choose a peek language in Settings, or a translation track under ⚙ (while paused)."
 
 /**
  * The study side: the current line at the top, definitions right below.
@@ -1177,19 +1379,7 @@ private fun StudyPanel(
                             lookup = lookup,
                             hasDictionaries = hasDictionaries,
                             setupStatus = dictionarySetup,
-                            entryAction = if (app.prefs.ankiEnabled) {
-                                { entry ->
-                                    val word = minedWord(session, lookup, entry)
-                                    CardButton(
-                                        added = word != null && app.anki.isAdded(word),
-                                        enabled = word != null,
-                                        onAdd = { word?.let { addCard(app, session, it) } },
-                                        onRemove = { word?.let(app.anki::remove) },
-                                        size = 26.dp,
-                                        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
-                                    )
-                                }
-                            } else null,
+                            entryAction = cardAction(app, session, lookup),
                         )
                     } else if (dictionarySetup != null) {
                         Text(
@@ -1216,13 +1406,15 @@ private fun StudyPanel(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).zIndex(2f),
             ) {
+                val scheme = MaterialTheme.colorScheme
                 Text(
                     shown.text,
-                    color = if (shown.failed) Color(0xFFFFB4AB) else Color.White,
+                    color = if (shown.failed) scheme.error else scheme.onSurface,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
-                        .background(Color(0xE0303338), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .background(scheme.surfaceVariant, RoundedCornerShape(10.dp))
+                        .border(1.dp, scheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
         }
@@ -1305,7 +1497,7 @@ private fun CurrentLine(
                 // with no translation to show, saying so only while peeking
                 val english = translation ?: (if (secondary == null) {
                     if (peekOff) {
-                        "Peeking is off. Choose a peek language in Settings, or a translation track under ⚙ (while paused)."
+                        PEEK_OFF
                     } else {
                         "No subtitles in your peek language. Pick a translation track under ⚙ (while paused)."
                     }
@@ -1387,6 +1579,10 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
                     }
                     // the shift between the buttons that change it; tapped, it goes back to none
                     OptionRow("Timing") {
+                        Row(
+                            Modifier.weight(1f).height(40.dp).clip(OPTION_SHAPE).background(MaterialTheme.colorScheme.optionField),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                         listOf(-1.0 to "−1", -0.1 to "−.1").forEach { (delta, label) -> OffsetButton(label) { session.setOffset(offset + delta) } }
                         Text(
                             when {
@@ -1394,14 +1590,15 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
                                 else -> "%+.1fs".format(offset)
                             },
                             color = if (offset == 0.0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                             textAlign = TextAlign.Center,
                             maxLines = 1,
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                            modifier = Modifier.weight(1f).fillMaxHeight()
                                 .clickable(enabled = offset != 0.0) { session.setOffset(0.0) }
-                                .padding(vertical = 8.dp),
+                                .wrapContentHeight(),
                         )
                         listOf(0.1 to "+.1", 1.0 to "+1").forEach { (delta, label) -> OffsetButton(label) { session.setOffset(offset + delta) } }
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OptionChip("Fill the area", fill, Modifier.weight(1f)) { session.setFill(!fill) }
@@ -1413,23 +1610,37 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
     }
 }
 
+/** The corners of every control in the options. */
+private val OPTION_SHAPE = RoundedCornerShape(10.dp)
+
+/** What the options' controls sit on: a faint lift off the dialog. */
+private val ColorScheme.optionField: Color
+    get() = onSurface.copy(alpha = 0.07f)
+
 /** A row of the options: its [title] down the left, then [content]. */
 @Composable
 private fun OptionRow(title: String, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(64.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(64.dp),
+        )
         content()
     }
 }
 
-/** One of the buttons that shift the subtitles. */
+/** One of the segments of the timing control that shift the subtitles. */
 @Composable
 private fun OffsetButton(label: String, onClick: () -> Unit) {
-    FilledTonalButton(
-        onClick = onClick,
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.width(44.dp).height(36.dp),
-    ) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+    Text(
+        label,
+        maxLines = 1,
+        style = MaterialTheme.typography.labelLarge,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.width(44.dp).fillMaxHeight().clickable(onClick = onClick).wrapContentHeight(),
+    )
 }
 
 /** An on/off option as a chip, ticked while on. */
@@ -1437,9 +1648,8 @@ private fun OffsetButton(label: String, onClick: () -> Unit) {
 private fun OptionChip(label: String, on: Boolean, modifier: Modifier, onToggle: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Row(
-        modifier.height(40.dp).clip(RoundedCornerShape(10.dp))
-            .background(if (on) scheme.primary.copy(alpha = 0.18f) else Color.Transparent)
-            .border(1.dp, if (on) scheme.primary else scheme.outline, RoundedCornerShape(10.dp))
+        modifier.height(40.dp).clip(OPTION_SHAPE)
+            .background(if (on) scheme.primary.copy(alpha = 0.18f) else scheme.optionField)
             .clickable(onClick = onToggle)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1456,18 +1666,33 @@ private fun TrackSelect(title: String, current: String, options: List<Pair<Strin
     var open by remember { mutableStateOf(false) }
     OptionRow(title) {
         Box(Modifier.weight(1f)) {
-            OutlinedButton(
-                onClick = { open = true },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                modifier = Modifier.fillMaxWidth().height(40.dp),
+            Row(
+                Modifier.fillMaxWidth().height(40.dp).clip(OPTION_SHAPE)
+                    .background(MaterialTheme.colorScheme.optionField)
+                    .clickable { open = true }
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(current, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text("  ▾")
+                Text(
+                    current,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenu(
+                expanded = open,
+                onDismissRequest = { open = false },
+                shape = OPTION_SHAPE,
+                containerColor = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
                 options.forEach { (label, select) ->
                     DropdownMenuItem(
-                        text = { Text(label, fontWeight = if (label == current) FontWeight.SemiBold else null) },
+                        text = { Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = { Text(if (label == current) "✓" else "", color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(12.dp)) },
                         onClick = { select(); open = false },
                     )
                 }
@@ -1480,6 +1705,22 @@ private fun trackLabel(track: SubtitleTrack): String {
     val language = track.language?.let { " · $it" }.orEmpty()
     return "${track.name}$language · ${track.cues.size} lines"
 }
+
+/** With Anki on, a button on each of [lookup]'s entries that makes a card of it. */
+private fun cardAction(app: App, session: PlayerSession, lookup: ActiveLookup): (@Composable (TermEntry) -> Unit)? =
+    if (app.prefs.ankiEnabled) {
+        { entry ->
+            val word = minedWord(session, lookup, entry)
+            CardButton(
+                added = word != null && app.anki.isAdded(word),
+                enabled = word != null,
+                onAdd = { word?.let { addCard(app, session, it) } },
+                onRemove = { word?.let(app.anki::remove) },
+                size = 26.dp,
+                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+            )
+        }
+    } else null
 
 /** The looked-up [entry] in its line, with the line's times in the video's clock. */
 private fun minedWord(session: PlayerSession, lookup: ActiveLookup, entry: TermEntry): MinedWord? {
