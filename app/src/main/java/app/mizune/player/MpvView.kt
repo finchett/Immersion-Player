@@ -6,6 +6,9 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.MPVLib.MpvFormat
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SurfaceView that owns the (process-wide) libmpv instance.
@@ -24,6 +27,12 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     var listener: Listener? = null
     private var pendingFile: String? = null
     private var initialized = false
+
+    // mpv makes whoever sets a property wait for its own thread, which is busy while playing; the
+    // margin changes every frame the panel moves, so it's set from here, keeping only the latest
+    private val marginThread = Executors.newSingleThreadExecutor()
+    private val pendingMargin = AtomicReference<Double?>(null)
+    private var lastMargin = 0.0
 
     private val observer = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) {}
@@ -103,6 +112,8 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     fun destroy() {
         if (!initialized) return
         initialized = false
+        marginThread.shutdown()
+        marginThread.awaitTermination(1, TimeUnit.SECONDS)
         MPVLib.removeObserver(observer)
         holder.removeCallback(this)
         MPVLib.destroy()
@@ -116,6 +127,16 @@ class MpvView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     /** Crop to fill the view (1.0) or fit the whole picture (0.0). */
     fun setFill(fill: Boolean) {
         MPVLib.setPropertyDouble("panscan", if (fill) 1.0 else 0.0)
+    }
+
+    /** Keeps the picture out of this share of the view's width on the right, which is covered. */
+    fun setRightMargin(ratio: Double) {
+        if (!initialized || ratio == lastMargin) return
+        lastMargin = ratio
+        if (pendingMargin.getAndSet(ratio) != null) return
+        marginThread.execute {
+            pendingMargin.getAndSet(null)?.let { MPVLib.setPropertyDouble("video-margin-ratio-right", it) }
+        }
     }
 
     fun seek(seconds: Double) {
