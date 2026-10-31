@@ -52,6 +52,17 @@ class Mp4SubtitleExtractorTest {
     }
 
     @Test
+    fun readsWhatThereIsOfACutOffFile() {
+        // plain.mp4 with -movflags +faststart (its index first, as for streaming), cut off at
+        // 3500 bytes like a download in progress: the last Japanese line starts at byte 3542
+        val whole = File(javaClass.getResource("/mp4/faststart.mp4")!!.toURI()).readBytes()
+        val file = File.createTempFile("cut", ".mp4").apply { deleteOnExit() }
+        file.writeBytes(whole.copyOf(3500))
+        val tracks = RandomAccessFile(file, "r").use { SubtitleFiles.extractEmbedded(file.name, it.channel) }
+        assertCues(japanese.take(2), tracks[0].cues)
+    }
+
+    @Test
     fun readsFragments() {
         // -movflags frag_keyframe+empty_moov -g 6: a fragment every three seconds. ffmpeg stretches
         // the last line of a fragment to the next one, so some times differ from the SRT's.
