@@ -35,37 +35,6 @@ fun LineSkipIcon(color: Color, forward: Boolean, diameter: Dp = 16.dp) {
     }
 }
 
-/**
- * Play: a triangle, set a little right of centre so it looks centred (its weight sits towards
- * its flat side).
- */
-@Composable
-fun PlayIcon(color: Color, diameter: Dp = 16.dp) {
-    Canvas(Modifier.size(diameter)) {
-        val w = size.width
-        val h = size.height
-        val triangle = Path().apply {
-            moveTo(w * 0.27f, h * 0.16f)
-            lineTo(w * 0.87f, h * 0.5f)
-            lineTo(w * 0.27f, h * 0.84f)
-            close()
-        }
-        drawPath(triangle, color)
-    }
-}
-
-/** Pause: two bars. */
-@Composable
-fun PauseIcon(color: Color, diameter: Dp = 16.dp) {
-    Canvas(Modifier.size(diameter)) {
-        val w = size.width
-        val h = size.height
-        val radius = CornerRadius(w * 0.05f)
-        drawRoundRect(color, Offset(w * 0.24f, h * 0.18f), Size(w * 0.18f, h * 0.64f), radius)
-        drawRoundRect(color, Offset(w * 0.58f, h * 0.18f), Size(w * 0.18f, h * 0.64f), radius)
-    }
-}
-
 /** Replay the line: an arrow most of the way round anticlockwise, its head at the top. */
 @Composable
 fun ReplayIcon(color: Color, diameter: Dp = 16.dp) {
