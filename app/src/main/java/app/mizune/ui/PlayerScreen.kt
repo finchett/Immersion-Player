@@ -48,13 +48,10 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.mandatorySystemGestures
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,6 +67,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -90,7 +88,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Switch
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.IntOffset
@@ -106,8 +103,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.platform.LocalView
 import android.view.RoundedCorner
 import androidx.compose.ui.unit.Dp
@@ -1579,6 +1578,10 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
                     }
                     // the shift between the buttons that change it; tapped, it goes back to none
                     OptionRow("Timing") {
+                        Row(
+                            Modifier.weight(1f).height(40.dp).clip(OPTION_SHAPE).background(MaterialTheme.colorScheme.optionField),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                         listOf(-1.0 to "−1", -0.1 to "−.1").forEach { (delta, label) -> OffsetButton(label) { session.setOffset(offset + delta) } }
                         Text(
                             when {
@@ -1586,14 +1589,15 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
                                 else -> "%+.1fs".format(offset)
                             },
                             color = if (offset == 0.0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                             textAlign = TextAlign.Center,
                             maxLines = 1,
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                            modifier = Modifier.weight(1f).fillMaxHeight()
                                 .clickable(enabled = offset != 0.0) { session.setOffset(0.0) }
-                                .padding(vertical = 8.dp),
+                                .wrapContentHeight(),
                         )
                         listOf(0.1 to "+.1", 1.0 to "+1").forEach { (delta, label) -> OffsetButton(label) { session.setOffset(offset + delta) } }
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OptionChip("Fill the area", fill, Modifier.weight(1f)) { session.setFill(!fill) }
@@ -1605,23 +1609,37 @@ private fun PlayerOptions(session: PlayerSession, onDismiss: () -> Unit) {
     }
 }
 
+/** The corners of every control in the options. */
+private val OPTION_SHAPE = RoundedCornerShape(10.dp)
+
+/** What the options' controls sit on: a faint lift off the dialog. */
+private val ColorScheme.optionField: Color
+    get() = onSurface.copy(alpha = 0.07f)
+
 /** A row of the options: its [title] down the left, then [content]. */
 @Composable
 private fun OptionRow(title: String, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(64.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(64.dp),
+        )
         content()
     }
 }
 
-/** One of the buttons that shift the subtitles. */
+/** One of the segments of the timing control that shift the subtitles. */
 @Composable
 private fun OffsetButton(label: String, onClick: () -> Unit) {
-    FilledTonalButton(
-        onClick = onClick,
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.width(44.dp).height(36.dp),
-    ) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+    Text(
+        label,
+        maxLines = 1,
+        style = MaterialTheme.typography.labelLarge,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.width(44.dp).fillMaxHeight().clickable(onClick = onClick).wrapContentHeight(),
+    )
 }
 
 /** An on/off option as a chip, ticked while on. */
@@ -1629,9 +1647,8 @@ private fun OffsetButton(label: String, onClick: () -> Unit) {
 private fun OptionChip(label: String, on: Boolean, modifier: Modifier, onToggle: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Row(
-        modifier.height(40.dp).clip(RoundedCornerShape(10.dp))
-            .background(if (on) scheme.primary.copy(alpha = 0.18f) else Color.Transparent)
-            .border(1.dp, if (on) scheme.primary else scheme.outline, RoundedCornerShape(10.dp))
+        modifier.height(40.dp).clip(OPTION_SHAPE)
+            .background(if (on) scheme.primary.copy(alpha = 0.18f) else scheme.optionField)
             .clickable(onClick = onToggle)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1648,18 +1665,33 @@ private fun TrackSelect(title: String, current: String, options: List<Pair<Strin
     var open by remember { mutableStateOf(false) }
     OptionRow(title) {
         Box(Modifier.weight(1f)) {
-            OutlinedButton(
-                onClick = { open = true },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                modifier = Modifier.fillMaxWidth().height(40.dp),
+            Row(
+                Modifier.fillMaxWidth().height(40.dp).clip(OPTION_SHAPE)
+                    .background(MaterialTheme.colorScheme.optionField)
+                    .clickable { open = true }
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(current, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text("  ▾")
+                Text(
+                    current,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenu(
+                expanded = open,
+                onDismissRequest = { open = false },
+                shape = OPTION_SHAPE,
+                containerColor = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
                 options.forEach { (label, select) ->
                     DropdownMenuItem(
-                        text = { Text(label, fontWeight = if (label == current) FontWeight.SemiBold else null) },
+                        text = { Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = { Text(if (label == current) "✓" else "", color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(12.dp)) },
                         onClick = { select(); open = false },
                     )
                 }
