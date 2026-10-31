@@ -70,10 +70,21 @@ interface MpvLib : Library {
                 Platform.isLinux() -> listOf("mpv", "libmpv.so.2", "libmpv.so.1")
                 else -> listOf("mpv")
             }
-            names.drop(1).fold(runCatching { Native.load(names[0], MpvLib::class.java) }) { loaded, name ->
-                loaded.recoverCatching { Native.load(name, MpvLib::class.java) }
+            names.drop(1).fold(runCatching { load(names[0]) }) { loaded, name ->
+                loaded.recoverCatching { load(name) }
             }.getOrThrow()
         }
+
+        /**
+         * libmpv takes and gives strings as UTF-8 on every OS. JNA's own default is the system's
+         * code page, which on Windows is an ANSI one: a path with ™ or Japanese in it reached mpv
+         * as something else, and the video never opened (#67).
+         */
+        private fun load(name: String): MpvLib =
+            Native.load(name, MpvLib::class.java, mapOf(Library.OPTION_STRING_ENCODING to UTF_8))
+
+        /** libmpv's string encoding, also for reading the strings it returns as a [Pointer]. */
+        const val UTF_8 = "UTF-8"
 
         /** The libmpv packaged with the app, if this is a packaged build; else the system's. */
         private fun bundled(): String? {

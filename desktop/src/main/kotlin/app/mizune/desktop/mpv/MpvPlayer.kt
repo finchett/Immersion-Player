@@ -223,7 +223,7 @@ class MpvPlayer {
     /** A property's current value as mpv formats it, or null if it has none. */
     fun propertyString(name: String): String? {
         val value = lib.mpv_get_property_string(handle, name) ?: return null
-        return try { value.getString(0) } finally { lib.mpv_free(value) }
+        return try { value.getString(0, MpvLib.UTF_8) } finally { lib.mpv_free(value) }
     }
 
     private fun option(name: String, value: String) {
