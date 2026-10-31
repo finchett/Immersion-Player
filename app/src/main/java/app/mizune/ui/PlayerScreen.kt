@@ -1171,8 +1171,9 @@ private fun BoxScope.LineOverVideo(
         if (lookup != null) {
             // a Surface keeps taps in it from reaching the video
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 shadowElevation = 8.dp,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp),
             ) {
