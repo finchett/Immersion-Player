@@ -10,7 +10,8 @@ import java.util.Timer
 import kotlin.concurrent.timerTask
 
 /**
- * libmpv loads and plays a short test pattern through the player, and the picture isn't blank;
+ * libmpv loads and plays a short test pattern through the player, from a file whose name isn't
+ * ASCII, and the picture isn't blank;
  * prints which mpv and FFmpeg it is and how mpv was configured (where a build without GPL code
  * shows). Skips itself where there's no libmpv, unless MIZUNE_TEST_MPV is set (Windows CI, for
  * the bundled one); MIZUNE_TEST_RESOURCES points it at a packaged build's libraries.
@@ -22,7 +23,8 @@ class MpvPlaybackTest {
         val loaded = runCatching { MpvLib.INSTANCE }
         if (System.getenv("MIZUNE_TEST_MPV") == null) assumeTrue("no libmpv here", loaded.isSuccess)
         loaded.getOrThrow()
-        val video = Files.createTempFile("testsrc", ".mkv").toFile().apply { deleteOnExit() }
+        // a name Windows' ANSI code page can't spell, as many videos have (#67)
+        val video = Files.createTempFile("testsrc ™ 字幕 ", ".mkv").toFile().apply { deleteOnExit() }
         javaClass.getResourceAsStream("/testsrc.mkv")!!.use { input -> video.outputStream().use { input.copyTo(it) } }
 
         val watchdog = Timer(true).apply { schedule(timerTask { printThreads() }, 120_000) }
