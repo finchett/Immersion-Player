@@ -39,8 +39,8 @@ import app.mizune.update.AppUpdateState
 import kotlin.reflect.KClass
 
 /**
- * Beside the cog from the moment an update is found: "1.2.0 is on its way", filling up as it
- * downloads, then "What's new in 1.2.0". Either opens its notes, the second with a way to
+ * At the foot of the settings from the moment an update is found: "1.2.0 on its way", filling
+ * up as it downloads, then "What's new in 1.2.0". Either opens its notes, the second with a way to
  * install it (on Android 12 and newer it also goes in by itself once the app is put away).
  */
 @Composable
@@ -130,7 +130,7 @@ fun UpdatePill(app: App, modifier: Modifier = Modifier) {
 }
 
 private fun pillText(update: AppUpdateState): String? = when (update) {
-    is AppUpdateState.Downloading -> "✦  ${update.version} is on its way · ${(update.progress * 100).toInt()}%"
+    is AppUpdateState.Downloading -> "✦  ${update.version} on its way · ${(update.progress * 100).toInt()}%"
     is AppUpdateState.Ready -> "✦  What's new in ${update.version}"
     is AppUpdateState.Installing -> "✦  Installing ${update.version}…"
     else -> null

@@ -4,6 +4,8 @@
     <!-- updates: the feed and the APK from GitHub, installed in place (silently, once this app
          installed itself the first time) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- whether the connection is metered, so updates wait for one that isn't -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 

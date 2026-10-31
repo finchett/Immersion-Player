@@ -182,10 +182,10 @@ fun ThemeSwatch(label: String, theme: AppTheme?, selected: Boolean, onClick: () 
 
 /**
  * The app's own icon, name and version, at the foot of the settings, and where its update stands:
- * the latest, on its way, or ready with a way to install it.
+ * the latest, waiting for a connection that isn't metered, or [updatePill] on its way in.
  */
 @Composable
-fun AppFooter(version: String, update: AppUpdateState, onInstall: () -> Unit) {
+fun AppFooter(version: String, update: AppUpdateState, updatePill: @Composable () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -205,14 +205,15 @@ fun AppFooter(version: String, update: AppUpdateState, onInstall: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            when (update) {
-                is AppUpdateState.Downloading -> "Getting ${update.version}… ${(update.progress * 100).toInt()}%"
-                is AppUpdateState.Ready -> "${update.version} is ready"
-                is AppUpdateState.Installing -> "Installing ${update.version}…"
-                else -> null
-            }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+            (update as? AppUpdateState.Waiting)?.let {
+                Text(
+                    "${it.version} waits for an unmetered connection",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        if (update is AppUpdateState.Ready) OutlinedButton(onClick = onInstall) { Text("Update now") }
+        updatePill()
     }
 }
 

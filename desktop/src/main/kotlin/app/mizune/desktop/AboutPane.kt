@@ -56,7 +56,7 @@ fun AboutPane(app: DesktopApp, onRestartToUpdate: () -> Unit) {
             Text(
                 "Version $APP_VERSION" + when (val state = update) {
                     UpdateState.UpToDate -> " · the latest"
-                    is UpdateState.Downloading -> " · getting ${state.version}…"
+                    is UpdateState.Waiting -> " · ${state.version} waits for an unmetered connection"
                     else -> ""
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -67,7 +67,7 @@ fun AboutPane(app: DesktopApp, onRestartToUpdate: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
-            if (update is UpdateState.Ready || update is UpdateState.Available) {
+            if (update is UpdateState.Downloading || update is UpdateState.Ready || update is UpdateState.Available) {
                 Row(Modifier.padding(top = 6.dp)) { UpdatePill(app, onRestartToUpdate) }
             }
         }

@@ -52,10 +52,10 @@ import app.mizune.ui.ReleaseNotesText
 import kotlin.reflect.KClass
 
 /**
- * Beside the cog from the moment an update is found: "1.2.0 is on its way", filling up as it
- * downloads, then "What's new in 0.5.0", which opens its notes with a way to restart into it (it
- * goes in at the next quit anyway). Where this copy can't update itself it links to the release
- * instead.
+ * In Settings, under the app's name and in About, from the moment an update is found: "1.2.0 on
+ * its way", filling up as it downloads, then "What's new in 1.2.0", which opens its notes with a
+ * way to restart into it (it goes in at the next quit anyway). Where this copy can't update itself
+ * it links to the release instead.
  */
 @Composable
 fun UpdatePill(app: DesktopApp, onRestartToUpdate: () -> Unit) {
@@ -97,7 +97,7 @@ fun UpdatePill(app: DesktopApp, onRestartToUpdate: () -> Unit) {
 }
 
 private fun pillText(update: UpdateState): String? = when (update) {
-    is UpdateState.Downloading -> "✦  ${update.version} is on its way · ${(update.progress * 100).toInt()}%"
+    is UpdateState.Downloading -> "✦  ${update.version} on its way · ${(update.progress * 100).toInt()}%"
     is UpdateState.Ready -> "✦  What's new in ${update.version}"
     is UpdateState.Available -> "✦  ${update.version} is out"
     else -> null
@@ -150,7 +150,6 @@ private fun Pill(update: UpdateState, progress: Float?, onClick: () -> Unit) {
         },
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .padding(end = 10.dp)
             .clip(RoundedCornerShape(50))
             .background(primary.copy(alpha = if (hovered) 0.22f else 0.13f))
             .drawBehind { drawRect(primary.copy(alpha = fillAlpha), size = Size(size.width * filled, size.height)) }

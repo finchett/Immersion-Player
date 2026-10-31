@@ -187,17 +187,18 @@ fun SettingsSidebar(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    (update as? UpdateState.Downloading)?.let { state ->
+                    (update as? UpdateState.Waiting)?.let {
                         Text(
-                            "Getting ${state.version}… ${(state.progress * 100).toInt()}%",
+                            "${it.version} waits for an unmetered connection",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
-            if (update is UpdateState.Ready || update is UpdateState.Available) {
-                Box(Modifier.padding(start = 12.dp, bottom = 14.dp)) { UpdatePill(app, onRestartToUpdate) }
+            if (update is UpdateState.Downloading || update is UpdateState.Ready || update is UpdateState.Available) {
+                // in line with the edge of the row above, so the longest pill still fits
+                Box(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 14.dp)) { UpdatePill(app, onRestartToUpdate) }
             }
         }
         VerticalDivider(color = MaterialTheme.colorScheme.hairline)

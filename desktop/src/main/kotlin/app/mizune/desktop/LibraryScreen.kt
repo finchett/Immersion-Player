@@ -104,7 +104,6 @@ fun LibraryHeader(
     folder: File?,
     onOpenFolder: (File) -> Unit,
     onOpenSettings: () -> Unit,
-    onRestartToUpdate: () -> Unit = {},
 ) {
     val (root, current) = locate(app, folder)
     val above = generateSequence(current?.takeIf { it != root }?.parentFile) { it.parentFile?.takeIf { _ -> it != root } }
@@ -131,7 +130,6 @@ fun LibraryHeader(
                 )
             }
         }
-        UpdatePill(app, onRestartToUpdate)
         IconAction(onClick = onOpenSettings) { Cog(it) }
     }
 }
