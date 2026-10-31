@@ -16,10 +16,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.io.IOException
 
-/** Where an update stands, for the library. */
+/** Where an update stands, for the library and the foot of the settings. */
 sealed interface AppUpdateState {
-    data object None : AppUpdateState
-    data class Downloading(val version: String, val progress: Float) : AppUpdateState
+    /** Not checked yet, or the last check failed (it's tried again later). */
+    data object Unknown : AppUpdateState
+    data object UpToDate : AppUpdateState
+    /** On its way; [notes] are its release notes. */
+    data class Downloading(val version: String, val notes: String, val progress: Float) : AppUpdateState
     /** Downloaded and checked, waiting to go in. [notes] are its release notes. */
     data class Ready(val version: String, val notes: String, val apk: File) : AppUpdateState
     data class Installing(val version: String, val notes: String) : AppUpdateState
@@ -35,7 +38,7 @@ sealed interface AppUpdateState {
  * newer) updates go in without asking, whenever the app is put away off the player.
  */
 class AppUpdater(private val app: App) {
-    private val _state = MutableStateFlow<AppUpdateState>(AppUpdateState.None)
+    private val _state = MutableStateFlow<AppUpdateState>(AppUpdateState.Unknown)
     val state: StateFlow<AppUpdateState> = _state.asStateFlow()
 
     /** The notes of the update on its way, for its first launch. */
@@ -50,7 +53,7 @@ class AppUpdater(private val app: App) {
                     check()
                 } catch (e: Exception) {
                     app.logError("update check", e)
-                    if (_state.value is AppUpdateState.Downloading) _state.value = AppUpdateState.None
+                    if (_state.value is AppUpdateState.Downloading) _state.value = AppUpdateState.Unknown
                 }
                 Thread.sleep(CHECK_EVERY_MS)
             }
@@ -62,14 +65,18 @@ class AppUpdater(private val app: App) {
         val code = versionCode(release.version)
         if (code <= BuildConfig.VERSION_CODE) {
             dir.deleteRecursively()
-            _state.value = AppUpdateState.None
+            _state.value = AppUpdateState.UpToDate
             return
         }
         if (_state.value.let { it is AppUpdateState.Ready && it.version == release.version || it is AppUpdateState.Installing }) return
         val asset = release.assets[PLATFORM] ?: return
-        _state.value = AppUpdateState.Downloading(release.version, 0f)
+        _state.value = AppUpdateState.Downloading(release.version, release.notes, 0f)
         val apk = Updates.download(asset, File(dir, asset.name)) { progress ->
-            _state.value = AppUpdateState.Downloading(release.version, progress)
+            // a step per percent, not per block read
+            val shown = (progress * 100).toInt() / 100f
+            if ((_state.value as? AppUpdateState.Downloading)?.progress != shown) {
+                _state.value = AppUpdateState.Downloading(release.version, release.notes, shown)
+            }
         }
         val info = app.packageManager.getPackageArchiveInfo(apk.path, 0)
         if (info?.packageName != app.packageName || info.longVersionCode != code.toLong()) {
@@ -136,7 +143,7 @@ class AppUpdater(private val app: App) {
         app.logError("update install", IOException(message ?: "failed"))
         val installing = _state.value as? AppUpdateState.Installing ?: return
         val apk = dir.listFiles().orEmpty().firstOrNull { it.name.endsWith(".apk") }
-        _state.value = if (apk != null) AppUpdateState.Ready(installing.version, installing.notes, apk) else AppUpdateState.None
+        _state.value = if (apk != null) AppUpdateState.Ready(installing.version, installing.notes, apk) else AppUpdateState.Unknown
     }
 
     companion object {

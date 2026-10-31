@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import app.mizune.R
 import app.mizune.subs.ImageSubtitles
 import app.mizune.subs.SubtitleFiles
+import app.mizune.update.AppUpdateState
 
 /** A titled card; settings are grouped into a few of these. */
 @Composable
@@ -179,9 +180,12 @@ fun ThemeSwatch(label: String, theme: AppTheme?, selected: Boolean, onClick: () 
     }
 }
 
-/** The app's own icon, name and version, at the foot of the settings. */
+/**
+ * The app's own icon, name and version, at the foot of the settings, and where its update stands:
+ * the latest, on its way, or ready with a way to install it.
+ */
 @Composable
-fun AppFooter(version: String) {
+fun AppFooter(version: String, update: AppUpdateState, onInstall: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -194,10 +198,21 @@ fun AppFooter(version: String) {
             // the launcher foreground draws inside a 72 of 108 dp safe zone, so it is scaled to fill
             Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(66.dp))
         }
-        Column {
+        Column(Modifier.weight(1f)) {
             Text("Mizune", style = MaterialTheme.typography.titleSmall)
-            Text("Version $version", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Version $version" + if (update == AppUpdateState.UpToDate) " · the latest" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            when (update) {
+                is AppUpdateState.Downloading -> "Getting ${update.version}… ${(update.progress * 100).toInt()}%"
+                is AppUpdateState.Ready -> "${update.version} is ready"
+                is AppUpdateState.Installing -> "Installing ${update.version}…"
+                else -> null
+            }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
         }
+        if (update is AppUpdateState.Ready) OutlinedButton(onClick = onInstall) { Text("Update now") }
     }
 }
 
