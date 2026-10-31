@@ -120,10 +120,12 @@ The app shows these once, on first run.
 | Where | Gesture | Does |
 |---|---|---|
 | Video | tap | play / pause |
-| Video | double-tap the left or right edge | 5 s back / forward; keep tapping to go further |
-| Video | drag sideways | scrub; move up or down while dragging to scrub faster |
+| Video (panel on screen) | double-tap the left or right edge | 5 s back / forward; keep tapping to go further |
+| Video (panel on screen) | drag sideways | scrub; move up or down while dragging to scrub faster |
 | Video | pinch | fill the area, or fit the whole picture |
 | Video (paused) | tap or drag the bottom line | seek |
+| Video (panel off screen) | swipe sideways | previous / next line |
+| Video (panel off screen) | double-tap | stop at the end of every line, on or off |
 | Video (panel off screen) | hold | show the line in the peek language |
 | Line | tap a word | look it up |
 | Line | drag across the text | look up the selection |

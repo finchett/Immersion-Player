@@ -280,7 +280,7 @@ private const val VIDEO_DOUBLE_TAP_MS = 180L
 /** After a jump, further taps on the same edge within this window jump again. */
 private const val JUMP_CONTINUE_MS = 600L
 
-/** Window for a second tap on the study panel to count as a double tap. */
+/** Window for a second tap on the study panel (or the video, with it off screen) to count as a double tap. */
 private const val PANEL_DOUBLE_TAP_MS = 180L
 
 /** Scrub speed multiplier when the finger has moved far up or down from where the drag began. */
@@ -536,7 +536,8 @@ fun PlayerScreen(
                     onNextEpisode = onNextEpisode,
                     onBack = onBack,
                     dismiss = closePopup,
-                    onHold = onHold.takeIf { panelHidden && landscape },
+                    lineGestures = panelHidden && landscape,
+                    onHold = onHold,
                     overlay = if (panelHidden && landscape) {
                         { onTapVideo ->
                             val shownLookup = lookup.takeIf { popupOpen }
@@ -683,7 +684,9 @@ fun PlayerScreen(
  * A thin progress line sits on the bottom edge; time and a close button show while paused.
  * [overlay] (the line, with the panel off screen) goes over the video, given what a tap on the
  * video does; while [dismiss] is set, that tap calls it instead of playing or pausing. With
- * [onHold], holding the video reports the hold's start and end.
+ * [lineGestures] (the panel off screen) it takes the panel's: swipes move a line at a time, a
+ * double tap stops at the end of every line, and a hold is reported to [onHold]. Scrubbing is then
+ * on the seek line, while paused.
  */
 @Composable
 private fun VideoArea(
@@ -694,13 +697,15 @@ private fun VideoArea(
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
     dismiss: (() -> Unit)?,
-    onHold: ((Boolean) -> Unit)?,
+    lineGestures: Boolean,
+    onHold: (Boolean) -> Unit,
     overlay: (@Composable BoxScope.(onTapVideo: () -> Unit) -> Unit)?,
     modifier: Modifier,
 ) {
     val ended by session.ended.collectAsState()
     val currentDismiss by rememberUpdatedState(dismiss)
     val currentOnHold by rememberUpdatedState(onHold)
+    val haptics = LocalHapticFeedback.current
 
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
@@ -712,6 +717,23 @@ private fun VideoArea(
     var scrubSpeed by remember { mutableStateOf(1.0) }
     var flash by remember { mutableIntStateOf(0) }
     var showOptions by remember { mutableStateOf(false) }
+
+    // a word in the middle for a moment: fill or fit, or stop at end of line on or off
+    var noticeCount by remember { mutableIntStateOf(0) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(noticeCount) {
+        if (noticeCount > 0) {
+            delay(900)
+            notice = null
+        }
+    }
+    fun toggleStopAtEnd() {
+        val enabled = !session.autoPause.value
+        session.setAutoPause(enabled)
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        notice = if (enabled) "Stop at end of line: on" else "Stop at end of line: off"
+        noticeCount++
+    }
 
     // double-tap jumps on the video's edges
     val videoScope = rememberCoroutineScope()
@@ -743,12 +765,54 @@ private fun VideoArea(
         session.seekTo(target.coerceIn(0.0, maxTime))
         jumpShown++
     }
-    var flashFill by remember { mutableIntStateOf(0) }
-    var fillNotice by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(flashFill) {
-        if (flashFill > 0) {
-            delay(900)
-            fillNotice = null
+    /** A tap on the video's left edge (-1), middle (0) or right edge (1). */
+    fun tap(zone: Int) {
+        currentDismiss?.let {
+            it()
+            return
+        }
+        val now = SystemClock.uptimeMillis()
+        val pending = pendingVideoTap
+        when {
+            // as on the panel: play/pause after a short wait, and a second tap within it is
+            // stop at the end of every line
+            lineGestures -> if (pending != null && pending.isActive) {
+                pending.cancel()
+                toggleStopAtEnd()
+            } else {
+                pendingVideoTap = videoScope.launch {
+                    delay(PANEL_DOUBLE_TAP_MS)
+                    session.togglePause()
+                    flash++
+                }
+            }
+            // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
+            // a single edge tap still plays/pauses after a short wait.
+            zone == 0 -> {
+                pending?.cancel()
+                session.togglePause()
+                flash++
+            }
+            zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
+                lastJumpTap = now
+                jump(zone)
+            }
+            pending != null && pending.isActive && pendingZone == zone -> {
+                pending.cancel()
+                jumpZone = zone
+                lastJumpTap = now
+                jumpTotal = 0
+                jump(zone)
+            }
+            else -> {
+                pending?.cancel()
+                pendingZone = zone
+                pendingVideoTap = videoScope.launch {
+                    delay(VIDEO_DOUBLE_TAP_MS)
+                    session.togglePause()
+                    flash++
+                }
+            }
         }
     }
     var showFlash by remember { mutableStateOf(false) }
@@ -819,7 +883,7 @@ private fun VideoArea(
                                 event.changes.forEach { it.consume() }
                             }
                         } while (event.changes.any { it.pressed })
-                        currentOnHold?.invoke(false)
+                        currentOnHold(false)
                         val fill = when {
                             zoom > 1.12f -> true
                             zoom < 0.9f -> false
@@ -827,60 +891,45 @@ private fun VideoArea(
                         }
                         if (fill != null && fill != session.fill.value) {
                             session.setFill(fill)
-                            fillNotice = if (fill) "Fill" else "Fit"
-                            flashFill++
+                            notice = if (fill) "Fill" else "Fit"
+                            noticeCount++
                         }
                     }
                 }
-                .pointerInput(onHold != null) {
+                .pointerInput(lineGestures) {
                     // without a hold to report, a long press still counts as a tap
-                    val onLongPress: ((Offset) -> Unit)? = if (onHold != null) {
-                        { currentOnHold?.invoke(true) }
+                    val onLongPress: ((Offset) -> Unit)? = if (lineGestures) {
+                        { currentOnHold(true) }
                     } else null
                     detectTapGestures(onLongPress = onLongPress, onTap = { offset ->
-                        currentDismiss?.let {
-                            it()
-                            return@detectTapGestures
-                        }
-                        // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
-                        // a single edge tap still plays/pauses after a short wait.
-                        val zone = when {
-                            offset.x < widthPx * EDGE_ZONE -> -1
-                            offset.x > widthPx * (1 - EDGE_ZONE) -> 1
-                            else -> 0
-                        }
-                        val now = SystemClock.uptimeMillis()
-                        val pending = pendingVideoTap
-                        when {
-                            zone == 0 -> {
-                                pending?.cancel()
-                                session.togglePause()
-                                flash++
-                            }
-                            zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
-                                lastJumpTap = now
-                                jump(zone)
-                            }
-                            pending != null && pending.isActive && pendingZone == zone -> {
-                                pending.cancel()
-                                jumpZone = zone
-                                lastJumpTap = now
-                                jumpTotal = 0
-                                jump(zone)
-                            }
-                            else -> {
-                                pending?.cancel()
-                                pendingZone = zone
-                                pendingVideoTap = videoScope.launch {
-                                    delay(VIDEO_DOUBLE_TAP_MS)
-                                    session.togglePause()
-                                    flash++
-                                }
-                            }
-                        }
+                        tap(
+                            when {
+                                offset.x < widthPx * EDGE_ZONE -> -1
+                                offset.x > widthPx * (1 - EDGE_ZONE) -> 1
+                                else -> 0
+                            },
+                        )
                     })
                 }
-                .pointerInput(widthPx, heightPx) {
+                .pointerInput(widthPx, heightPx, lineGestures) {
+                    if (lineGestures) {
+                        // a line at a time, as on the panel
+                        val swipeThreshold = 56.dp.toPx()
+                        var total = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { total = 0f },
+                            onHorizontalDrag = { change, amount ->
+                                change.consume()
+                                total += amount
+                            },
+                            onDragEnd = {
+                                if (abs(total) > swipeThreshold) {
+                                    if (total < 0) session.nextLine() else session.previousLine()
+                                }
+                            },
+                        )
+                        return@pointerInput
+                    }
                     // horizontal movement scrubs; moving away vertically from where the drag
                     // started speeds it up (applies to movement from then on, so you can slow back down)
                     var start = 0.0
@@ -913,12 +962,7 @@ private fun VideoArea(
                 },
         )
 
-        overlay?.invoke(this) {
-            currentDismiss?.invoke() ?: run {
-                session.togglePause()
-                flash++
-            }
-        }
+        overlay?.invoke(this) { tap(0) }
 
         // play/pause flash in the middle
         AnimatedVisibility(showFlash, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
@@ -970,10 +1014,10 @@ private fun VideoArea(
             )
         }
 
-        // fill/fit notice
-        AnimatedVisibility(fillNotice != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+        // fill/fit or stop-at-end notice
+        AnimatedVisibility(notice != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
             Text(
-                fillNotice.orEmpty(),
+                notice.orEmpty(),
                 color = Color.White,
                 fontSize = 20.sp,
                 modifier = Modifier
