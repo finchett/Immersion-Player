@@ -273,7 +273,7 @@ private fun ResizeHandle(
 }
 
 /** Share of the video width on each side where double tap jumps. */
-private const val EDGE_ZONE = 0.3f
+private const val EDGE_ZONE = 0.15f
 private const val JUMP_SECONDS = 5
 /** Window for a second tap on a video edge to count as a double tap. */
 private const val VIDEO_DOUBLE_TAP_MS = 180L
