@@ -49,6 +49,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.mandatorySystemGestures
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -528,6 +530,10 @@ fun PlayerScreen(
             // and a word's entries open over the video close first
             BackHandler(enabled = closePopup != null) { closePopup?.invoke() }
             val portraitVideoHeight = maxWidth * 9 / 16
+            // held sideways the video reaches the screen's bottom edge, where swipes are the system's
+            // (home, switching apps) and can't be taken back: what's dragged there sits above them
+            val gestureBottom = with(LocalDensity.current) { WindowInsets.mandatorySystemGestures.getBottom(this).toDp() }
+            val bottomClear = if (landscape) (gestureBottom - gap).coerceAtLeast(0.dp) else 0.dp
             val videoArea = @Composable { modifier: Modifier ->
                 VideoArea(
                     session = session,
@@ -542,6 +548,7 @@ fun PlayerScreen(
                             session.play()
                         }
                     },
+                    bottomClear = bottomClear,
                     lineGestures = panelHidden && landscape,
                     onHold = onHold,
                     overlay = if (panelHidden && landscape) {
@@ -560,6 +567,7 @@ fun PlayerScreen(
                                 onLookup = { line, text, start -> openPopup(); startLookup(line, text, start) },
                                 onSelect = { line, text, start, end -> openPopup(); startLookup(line, text, start, end - start) },
                                 onTapVideo = onTapVideo,
+                                bottomClear = bottomClear,
                             )
                         }
                     } else null,
@@ -693,7 +701,8 @@ fun PlayerScreen(
  * video does; while [dismiss] is set, that tap calls it instead of playing or pausing. With
  * [lineGestures] (the panel off screen) it takes the panel's: swipes move a line at a time, a
  * double tap in the middle stops at the end of every line (the edges still jump), and a hold is
- * reported to [onHold]. Scrubbing is then on the seek line, while paused.
+ * reported to [onHold]. Scrubbing is then on the seek line, while paused. The seek line and the
+ * time sit [bottomClear] up from the bottom edge, out of the system's swipes.
  */
 @Composable
 private fun VideoArea(
@@ -704,6 +713,7 @@ private fun VideoArea(
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
     dismiss: (() -> Unit)?,
+    bottomClear: Dp,
     lineGestures: Boolean,
     onHold: (Boolean) -> Unit,
     overlay: (@Composable BoxScope.(onTapVideo: () -> Unit) -> Unit)?,
@@ -1062,7 +1072,7 @@ private fun VideoArea(
                     "${formatTime(position)} / ${formatTime(duration)}",
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 16.dp)
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 16.dp + bottomClear)
                         .background(Color(0x88000000), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
@@ -1089,13 +1099,14 @@ private fun VideoArea(
         }
         if (showOptions) PlayerOptions(session, onDismiss = { showOptions = false })
 
-        // seek bar: a thin line on the bottom edge, hidden while playing. While paused it can be
-        // tapped or dragged (via an invisible touch strip); it fattens while held.
+        // seek bar: a thin line on the bottom edge (or just above the system's swipes), hidden while
+        // playing. While paused it can be tapped or dragged (via an invisible touch strip); it
+        // fattens while held.
         AnimatedVisibility(
             visible = (paused && !stoppedAtLine) || scrubTarget != null,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomStart),
+            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = bottomClear),
         ) {
             val shown = scrubTarget ?: position
             val fraction = if (duration > 0) (shown / duration).toFloat().coerceIn(0f, 1f) else 0f
@@ -1155,7 +1166,7 @@ private fun VideoArea(
  * selection dragged across) opens its [lookup] above the line, in the room up to the buttons along
  * the top, and holding the line (or the video) shows it in the peek language while [peeking]. A tap
  * beside the words is a tap on the video. It shows while it's spoken, while paused, and while held
- * or looked up, clear of the time and the seek line.
+ * or looked up, clear of the time and the seek line (which are [bottomClear] up).
  */
 @Composable
 private fun BoxScope.LineOverVideo(
@@ -1172,6 +1183,7 @@ private fun BoxScope.LineOverVideo(
     onLookup: (Int, String, Int) -> Unit,
     onSelect: (Int, String, Int, Int) -> Unit,
     onTapVideo: () -> Unit,
+    bottomClear: Dp,
 ) {
     val primary by session.primary.collectAsState()
     val secondary by session.secondary.collectAsState()
@@ -1186,7 +1198,7 @@ private fun BoxScope.LineOverVideo(
     LaunchedEffect(shown) { if (!shown) onHold(false) }
 
     Column(
-        Modifier.matchParentSize().padding(start = 20.dp, top = 56.dp, end = 20.dp, bottom = 44.dp),
+        Modifier.matchParentSize().padding(start = 20.dp, top = 56.dp, end = 20.dp, bottom = 44.dp + bottomClear),
         verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
