@@ -1406,13 +1406,15 @@ private fun StudyPanel(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp).zIndex(2f),
             ) {
+                val scheme = MaterialTheme.colorScheme
                 Text(
                     shown.text,
-                    color = if (shown.failed) Color(0xFFFFB4AB) else Color.White,
+                    color = if (shown.failed) scheme.error else scheme.onSurface,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
-                        .background(Color(0xE0303338), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .background(scheme.surfaceVariant, RoundedCornerShape(10.dp))
+                        .border(1.dp, scheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
         }
