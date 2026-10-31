@@ -305,7 +305,8 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
 
     /** A timed-text sample: its length in two bytes, the text, then style boxes this doesn't need. */
     private fun readLine(sample: Sample): String? {
-        if (sample.size < 2) return null
+        // a file still downloading has its index but not all of its lines
+        if (sample.size < 2 || sample.offset < 0 || sample.offset + sample.size > reader.size) return null
         reader.position = sample.offset
         val length = minOf(reader.readU16().toLong(), sample.size - 2)
         if (length <= 0) return null
