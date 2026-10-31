@@ -338,7 +338,8 @@ fun SettingsScreen(app: App, onBack: () -> Unit) {
                         context.packageManager.getPackageInfo(context.packageName, 0).versionName
                     }.getOrNull() ?: ""
                 }
-                AppFooter(version)
+                val update by app.updater.state.collectAsState()
+                AppFooter(version, update) { UpdatePill(app) }
 
                 Text(
                     "Bundled dictionary: JMdict, © Electronic Dictionary Research and Development Group, used " +

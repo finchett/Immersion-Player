@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import app.mizune.R
 import app.mizune.subs.ImageSubtitles
 import app.mizune.subs.SubtitleFiles
+import app.mizune.update.AppUpdateState
 
 /** A titled card; settings are grouped into a few of these. */
 @Composable
@@ -179,9 +180,12 @@ fun ThemeSwatch(label: String, theme: AppTheme?, selected: Boolean, onClick: () 
     }
 }
 
-/** The app's own icon, name and version, at the foot of the settings. */
+/**
+ * The app's own icon, name and version, at the foot of the settings, and where its update stands:
+ * the latest, waiting for a connection that isn't metered, or [updatePill] on its way in.
+ */
 @Composable
-fun AppFooter(version: String) {
+fun AppFooter(version: String, update: AppUpdateState, updatePill: @Composable () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -194,10 +198,22 @@ fun AppFooter(version: String) {
             // the launcher foreground draws inside a 72 of 108 dp safe zone, so it is scaled to fill
             Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(66.dp))
         }
-        Column {
+        Column(Modifier.weight(1f)) {
             Text("Mizune", style = MaterialTheme.typography.titleSmall)
-            Text("Version $version", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Version $version" + if (update == AppUpdateState.UpToDate) " · the latest" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            (update as? AppUpdateState.Waiting)?.let {
+                Text(
+                    "${it.version} waits for an unmetered connection",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+        updatePill()
     }
 }
 

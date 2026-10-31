@@ -74,7 +74,6 @@ import app.mizune.library.Titles
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import app.mizune.library.formatTime
 import app.mizune.library.isVideoName
-import app.mizune.update.AppUpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -201,41 +200,7 @@ fun LibraryScreen(
                 modifier = Modifier.align(Alignment.TopEnd),
             )
 
-            val update by app.updater.state.collectAsState()
             val setupStatus by BundledDictionaries.status.collectAsState()
-            var readingNotes by remember { mutableStateOf(false) }
-            (update as? AppUpdateState.Ready)?.takeIf { setupStatus == null }?.let { ready ->
-                Surface(
-                    onClick = {
-                        app.updater.whatsNew.seen()
-                        readingNotes = true
-                    },
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = 12.dp),
-                ) {
-                    Text(
-                        "✦  What's new in ${ready.version}",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                    )
-                }
-                if (readingNotes) {
-                    WhatsNewDialog(
-                        eyebrow = "Ready to install",
-                        version = ready.version,
-                        notes = ready.notes,
-                        confirm = "Update now",
-                        onConfirm = {
-                            readingNotes = false
-                            app.updater.install(context)
-                        },
-                        later = "Later",
-                        onDismiss = { readingNotes = false },
-                    )
-                }
-            }
             JustUpdated(app)
             setupStatus?.let {
                 Surface(

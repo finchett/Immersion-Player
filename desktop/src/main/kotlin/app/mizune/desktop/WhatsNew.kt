@@ -1,5 +1,12 @@
 package app.mizune.desktop
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +30,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.res.painterResource
@@ -39,36 +49,58 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import app.mizune.ui.ReleaseNotesText
+import kotlin.reflect.KClass
 
 /**
- * Beside the cog once an update is waiting: "What's new in 0.5.0", which opens its notes with a
+ * In Settings, under the app's name and in About, from the moment an update is found: "1.2.0 on
+ * its way", filling up as it downloads, then "What's new in 1.2.0", which opens its notes with a
  * way to restart into it (it goes in at the next quit anyway). Where this copy can't update itself
  * it links to the release instead.
  */
 @Composable
 fun UpdatePill(app: DesktopApp, onRestartToUpdate: () -> Unit) {
     var open by remember { mutableStateOf(false) }
-    when (val update = app.updater.state.collectAsState().value) {
-        is UpdateState.Ready -> {
-            Pill("✦  What's new in ${update.version}") {
+    val update = app.updater.state.collectAsState().value
+    if (pillText(update) == null) return
+    Pill(update, progress = (update as? UpdateState.Downloading)?.progress) {
+        when (update) {
+            is UpdateState.Available -> openInBrowser(update.page)
+            is UpdateState.Ready -> {
                 app.updater.whatsNew.seen()
                 open = true
             }
-            if (open) {
-                WhatsNewDialog(
-                    eyebrow = "Ready to install",
-                    version = update.version,
-                    notes = update.notes,
-                    confirm = "Restart now",
-                    onConfirm = onRestartToUpdate,
-                    later = "Later",
-                    onDismiss = { open = false },
-                )
-            }
+            else -> open = true
         }
-        is UpdateState.Available -> Pill("✦  ${update.version} is out") { openInBrowser(update.page) }
-        else -> {}
     }
+    if (open) {
+        when (update) {
+            is UpdateState.Downloading -> WhatsNewDialog(
+                eyebrow = "On its way · ${(update.progress * 100).toInt()}%",
+                version = update.version,
+                notes = update.notes,
+                confirm = "OK",
+                onConfirm = { open = false },
+                onDismiss = { open = false },
+            )
+            is UpdateState.Ready -> WhatsNewDialog(
+                eyebrow = "Ready to install",
+                version = update.version,
+                notes = update.notes,
+                confirm = "Restart now",
+                onConfirm = onRestartToUpdate,
+                later = "Later",
+                onDismiss = { open = false },
+            )
+            else -> {}
+        }
+    }
+}
+
+private fun pillText(update: UpdateState): String? = when (update) {
+    is UpdateState.Downloading -> "✦  ${update.version} on its way · ${(update.progress * 100).toInt()}%"
+    is UpdateState.Ready -> "✦  What's new in ${update.version}"
+    is UpdateState.Available -> "✦  ${update.version} is out"
+    else -> null
 }
 
 /** The first launch after an update: what it brought, once, unless it was read before it went in. */
@@ -90,25 +122,50 @@ fun JustUpdated(app: DesktopApp) {
     )
 }
 
+/**
+ * One pill for every state of the update, so it changes over in place: once the download is
+ * done the fill runs to the end and fades as the words crossfade and the pill resizes to them.
+ */
 @Composable
-private fun Pill(text: String, onClick: () -> Unit) {
+private fun Pill(update: UpdateState, progress: Float?, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val primary = MaterialTheme.colorScheme.primary
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = primary,
-        maxLines = 1,
+    val filled by animateFloatAsState(progress ?: 1f, label = "filled")
+    val fillAlpha by animateFloatAsState(
+        if (progress != null) 0.18f else 0f,
+        tween(durationMillis = 500, delayMillis = 300),
+        label = "fill",
+    )
+    // a new kind of message crossfades as the pill resizes to it; the percentage just ticks.
+    // Keyed on the kind alone, with what each kind last said kept for the one fading out.
+    val text = pillText(update).orEmpty()
+    val said = remember { HashMap<KClass<out UpdateState>, String>() }
+    SideEffect { said[update::class] = text }
+    AnimatedContent(
+        targetState = update::class,
+        transitionSpec = {
+            (fadeIn(tween(300, delayMillis = 300)) togetherWith fadeOut(tween(300, delayMillis = 300)))
+                .using(SizeTransform { _, _ -> tween(300, delayMillis = 300) })
+        },
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .padding(end = 10.dp)
             .clip(RoundedCornerShape(50))
             .background(primary.copy(alpha = if (hovered) 0.22f else 0.13f))
+            .drawBehind { drawRect(primary.copy(alpha = fillAlpha), size = Size(size.width * filled, size.height)) }
             .hoverable(interaction)
             .clickable(interaction, indication = null, onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(horizontal = 12.dp, vertical = 5.dp),
-    )
+            .pointerHoverIcon(PointerIcon.Hand),
+        label = "update",
+    ) { kind ->
+        Text(
+            if (kind == update::class) text else said[kind].orEmpty(),
+            style = MaterialTheme.typography.labelLarge,
+            color = primary,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+        )
+    }
 }
 
 @Composable
