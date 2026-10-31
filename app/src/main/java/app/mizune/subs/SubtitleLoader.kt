@@ -14,11 +14,11 @@ class SubtitleLoader(private val context: Context) {
     fun load(video: DocumentFile, siblings: List<DocumentFile>, languages: List<String>): List<SubtitleTrack> {
         val videoName = video.name ?: return emptyList()
         val sidecars = sidecarsFor(videoName, siblings).mapNotNull { readSidecar(it, languages) }
-        if (!SubtitleFiles.isMatroska(videoName)) return sidecars
+        if (!SubtitleFiles.hasReadableTracks(videoName)) return sidecars
         val embedded = runCatching {
             cache.load(identity(video)) {
                 context.contentResolver.openFileDescriptor(video.uri, "r")?.use { pfd ->
-                    FileInputStream(pfd.fileDescriptor).channel.use { MatroskaSubtitleExtractor(it).extract() }
+                    FileInputStream(pfd.fileDescriptor).channel.use { SubtitleFiles.extractEmbedded(videoName, it) }
                 }.orEmpty()
             }
         }.getOrElse {

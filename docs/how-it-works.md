@@ -69,10 +69,11 @@ Other note types are matched by their field names.
     480p. Any of its six modes can be picked under Advanced, or with ⌘ + 1–6.
 - Library thumbnails come from a second, headless mpv rather than a separate decoder.
 - Subtitles are read from the container directly. Matroska is parsed in the app, including
-  zlib-compressed tracks, and SRT, ASS, SSA and WebVTT are parsed. A subtitle file next to the
-  video takes priority over embedded tracks in its language, and the embedded tracks in other
-  languages still load, so English inside the video can sit under Japanese from a file. The
-  tracks are cached per file.
+  zlib-compressed tracks, and SRT, ASS, SSA and WebVTT are parsed. MP4, M4V and QuickTime files
+  are read too, fragmented or not, for their timed-text (mov_text) tracks; a QuickTime chapter
+  track is left out. A subtitle file next to the video takes priority over embedded tracks in
+  its language, and the embedded tracks in other languages still load, so English inside the
+  video can sit under Japanese from a file. The tracks are cached per file.
 - Subtitle files don't have to be UTF-8. A byte-order mark, UTF-16 or an old code page (Arabic
   windows-1256, Shift_JIS, GBK, Big5, windows-1251 and others) is recognised. The file's language
   tag and the languages in settings narrow the guess, and the reading that gives that script's
