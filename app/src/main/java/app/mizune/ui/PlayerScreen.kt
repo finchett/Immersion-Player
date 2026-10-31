@@ -730,7 +730,6 @@ private fun VideoArea(
     var scrubTarget by remember { mutableStateOf<Double?>(null) }
     var scrubOffset by remember { mutableStateOf(0.0) }
     var scrubSpeed by remember { mutableStateOf(1.0) }
-    var flash by remember { mutableIntStateOf(0) }
     var showOptions by remember { mutableStateOf(false) }
 
     // a word in the middle for a moment: fill or fit, or stop at end of line on or off
@@ -800,7 +799,6 @@ private fun VideoArea(
                 pendingVideoTap = videoScope.launch {
                     delay(PANEL_DOUBLE_TAP_MS)
                     session.togglePause()
-                    flash++
                 }
             }
             // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
@@ -808,7 +806,6 @@ private fun VideoArea(
             zone == 0 -> {
                 pending?.cancel()
                 session.togglePause()
-                flash++
             }
             zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
                 lastJumpTap = now
@@ -827,17 +824,8 @@ private fun VideoArea(
                 pendingVideoTap = videoScope.launch {
                     delay(VIDEO_DOUBLE_TAP_MS)
                     session.togglePause()
-                    flash++
                 }
             }
-        }
-    }
-    var showFlash by remember { mutableStateOf(false) }
-    LaunchedEffect(flash) {
-        if (flash > 0) {
-            showFlash = true
-            delay(500)
-            showFlash = false
         }
     }
 
@@ -980,16 +968,6 @@ private fun VideoArea(
         )
 
         overlay?.invoke(this) { tap(0) }
-
-        // play/pause flash in the middle
-        AnimatedVisibility(showFlash, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
-            Box(
-                Modifier.background(Color(0x99000000), CircleShape).padding(22.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (paused) PauseIcon(Color.White, diameter = 30.dp) else PlayIcon(Color.White, diameter = 30.dp)
-            }
-        }
 
         // end of episode: offer the next one in the folder
         AnimatedVisibility(
