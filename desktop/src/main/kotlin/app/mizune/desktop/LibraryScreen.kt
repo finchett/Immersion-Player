@@ -47,6 +47,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import app.mizune.library.NaturalOrder
 import app.mizune.library.Titles
@@ -111,7 +114,10 @@ fun LibraryHeader(
         .takeWhile { root != null && it.path.startsWith(root.path) }
         .toList().reversed()
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).wrapContentWidth(Alignment.Start).widthIn(max = LocalHeaderLead.current).clipToBounds(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             // at the top there's nothing to go back up to; where no traffic lights fill the
             // corner, it says where you are instead of standing empty
             if (above.isEmpty() && ownsFrame) {
