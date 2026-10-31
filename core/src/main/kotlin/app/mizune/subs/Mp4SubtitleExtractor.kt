@@ -125,7 +125,7 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
                 "tref" -> boxes(boxEnd) { child, _, childEnd ->
                     if (child == "chap") while (reader.position + 4 <= childEnd) chapterTracks += reader.readU32()
                 }
-                "edts" -> boxes(boxEnd) { child, _, _ -> if (child == "elst") parseEditList(current) }
+                "edts" -> boxes(boxEnd) { child, _, childEnd -> if (child == "elst") parseEditList(childEnd, current) }
                 "mdia" -> parseMdia(boxEnd, current)
                 "udta" -> boxes(boxEnd) { child, _, childEnd ->
                     if (child == "name") current.name = reader.readString(childEnd - reader.position).ifBlank { null }
@@ -134,10 +134,10 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
         }
     }
 
-    private fun parseEditList(track: Track) {
+    private fun parseEditList(end: Long, track: Track) {
         val version = reader.readU8()
         reader.skip(3)
-        repeat(reader.readU32().toInt()) {
+        repeat(count(if (version == 1) 20 else 12, end)) {
             val duration = if (version == 1) reader.readU64() else reader.readU32()
             val mediaTime = if (version == 1) reader.readU64() else reader.readU32().toInt().toLong()
             reader.skip(4) // rate
@@ -174,7 +174,7 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
 
     private fun parseStbl(end: Long, track: Track) {
         val tables = Tables()
-        boxes(end) { type, _, _ ->
+        boxes(end) { type, _, boxEnd ->
             when (type) {
                 "stsd" -> {
                     reader.skip(4 + 4 + 4)
@@ -182,18 +182,22 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
                     // a video's tables are large, and no use here
                     if (tables.entryType !in TEXT_ENTRIES) return
                 }
-                "stts" -> tables.durations = readTable(2)
-                "stsc" -> tables.chunkRuns = readTable(3).filterIndexed { i, _ -> i % 3 != 2 }.toLongArray()
+                "stts" -> tables.durations = readTable(2, boxEnd)
+                "stsc" -> tables.chunkRuns = readTable(3, boxEnd).filterIndexed { i, _ -> i % 3 != 2 }.toLongArray()
                 "stsz" -> {
                     reader.skip(4)
                     tables.uniformSize = reader.readU32()
-                    tables.sampleCount = reader.readU32().toInt()
-                    if (tables.uniformSize == 0L) tables.sizes = LongArray(tables.sampleCount) { reader.readU32() }
+                    if (tables.uniformSize == 0L) {
+                        tables.sampleCount = count(4, boxEnd)
+                        tables.sizes = LongArray(tables.sampleCount) { reader.readU32() }
+                    } else {
+                        tables.sampleCount = minOf(reader.readU32(), MAX_LINES.toLong()).toInt()
+                    }
                 }
-                "stco" -> tables.chunkOffsets = readTable(1)
+                "stco" -> tables.chunkOffsets = readTable(1, boxEnd)
                 "co64" -> {
                     reader.skip(4)
-                    tables.chunkOffsets = LongArray(reader.readU32().toInt()) { reader.readU64() }
+                    tables.chunkOffsets = LongArray(count(8, boxEnd)) { reader.readU64() }
                 }
             }
         }
@@ -203,10 +207,16 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
     }
 
     /** A full box's table of [columns] 32-bit values per entry, flattened. */
-    private fun readTable(columns: Int): LongArray {
+    private fun readTable(columns: Int, end: Long): LongArray {
         reader.skip(4)
-        return LongArray(reader.readU32().toInt() * columns) { reader.readU32() }
+        return LongArray(count(4 * columns, end) * columns) { reader.readU32() }
     }
+
+    /** An entry count, no more than the entries of [entrySize] bytes that fit before [end]: a damaged file's can be anything. */
+    private fun count(entrySize: Int, end: Long): Int = fitting(reader.readU32(), entrySize, end)
+
+    private fun fitting(claimed: Long, entrySize: Int, end: Long): Int =
+        minOf(claimed, (end - reader.position).coerceAtLeast(0) / entrySize).toInt()
 
     /** Where each sample is and when it plays, from the chunk, size and timing tables. */
     private fun layOut(tables: Tables): List<Sample> {
@@ -214,7 +224,7 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
         val durations = LongArray(count)
         var filled = 0
         for (i in tables.durations.indices step 2) {
-            repeat(tables.durations[i].toInt()) { if (filled < count) durations[filled++] = tables.durations[i + 1] }
+            repeat(minOf(tables.durations[i], (count - filled).toLong()).toInt()) { durations[filled++] = tables.durations[i + 1] }
         }
         val samples = ArrayList<Sample>(count)
         var time = 0L
@@ -237,25 +247,28 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
     }
 
     private fun parseMoof(moofStart: Long, end: Long) {
-        // data with no offset of its own follows on from the last run's
+        // a fragment with no base of its own starts where the one before it ended, so every
+        // track's runs are added up, not just the text's
         var implicitOffset = moofStart
         boxes(end) { type, _, trafEnd ->
             if (type != "traf") return@boxes
             var track: Track? = null
             var base = implicitOffset
+            var next = base // where a run with no offset of its own starts
             var defaultDuration = 0L
             var defaultSize = 0L
-            boxes(trafEnd) { box, _, _ ->
+            boxes(trafEnd) { box, _, boxEnd ->
                 when (box) {
                     "tfhd" -> {
                         val flags = reader.readU32() and 0xFFFFFF
-                        track = tracks[reader.readU32()]?.takeIf { it.isText }
+                        track = tracks[reader.readU32()]
                         if (track == null) return@boxes
                         base = when {
                             flags and 0x1 != 0L -> reader.readU64()
                             flags and 0x20000 != 0L -> moofStart
                             else -> implicitOffset
                         }
+                        next = base
                         if (flags and 0x2 != 0L) reader.skip(4) // sample description index
                         defaultDuration = if (flags and 0x8 != 0L) reader.readU32() else track!!.defaultDuration
                         defaultSize = if (flags and 0x10 != 0L) reader.readU32() else track!!.defaultSize
@@ -267,18 +280,22 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
                     }
                     "trun" -> track?.let {
                         val flags = reader.readU32() and 0xFFFFFF
-                        val count = reader.readU32().toInt()
-                        var offset = if (flags and 0x1 != 0L) base + reader.readU32().toInt() else implicitOffset
+                        val claimed = reader.readU32()
+                        var offset = if (flags and 0x1 != 0L) base + reader.readU32().toInt() else next
                         if (flags and 0x4 != 0L) reader.skip(4) // first sample's flags
+                        // duration, size, flags and time offset, 4 bytes each when present
+                        val entrySize = 4 * (flags shr 8 and 0xF).countOneBits()
+                        val count = if (entrySize == 0) minOf(claimed, MAX_LINES.toLong()).toInt() else fitting(claimed, entrySize, boxEnd)
                         repeat(count) { _ ->
                             val duration = if (flags and 0x100 != 0L) reader.readU32() else defaultDuration
                             val size = if (flags and 0x200 != 0L) reader.readU32() else defaultSize
                             if (flags and 0x400 != 0L) reader.skip(4)
                             if (flags and 0x800 != 0L) reader.skip(4)
-                            it.samples += Sample(offset, size, it.nextTime, duration)
+                            if (it.isText) it.samples += Sample(offset, size, it.nextTime, duration)
                             offset += size
                             it.nextTime += duration
                         }
+                        next = offset
                         implicitOffset = offset
                     }
                 }
@@ -311,8 +328,10 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
 
     /** hdlr's name, unless it only says what kind of track this is ("SubtitleHandler"). */
     private fun handlerName(bytes: ByteArray): String? {
-        // QuickTime writes a length byte first, MP4 a terminating zero
-        val raw = if (bytes.isNotEmpty() && bytes[0].toInt() and 0xFF == bytes.size - 1) bytes.copyOfRange(1, bytes.size) else bytes
+        // QuickTime writes a length byte first and may pad after the name; MP4 ends it with a zero
+        val length = bytes.firstOrNull()?.toInt()?.and(0xFF) ?: return null
+        val pascal = length == bytes.size - 1 || (length < 0x20 && length < bytes.size)
+        val raw = if (pascal) bytes.copyOfRange(1, 1 + length) else bytes
         val name = String(raw, Charsets.UTF_8).substringBefore('\u0000').trim()
         return name.takeUnless { it.isEmpty() || it.endsWith("Handler") || it in GENERIC_HANDLER_NAMES }
     }
@@ -369,6 +388,9 @@ class Mp4SubtitleExtractor(private val channel: FileChannel) {
     companion object {
         // "tx3g" in MP4, "text" in QuickTime; the samples are laid out the same
         private val TEXT_ENTRIES = setOf("tx3g", "text")
+
+        // far more lines than any film has, to stop at when a damaged file's count can't be checked
+        private const val MAX_LINES = 1_000_000
 
         private val GENERIC_HANDLER_NAMES = setOf("Core Media Text", "Apple Text Media Handler")
 

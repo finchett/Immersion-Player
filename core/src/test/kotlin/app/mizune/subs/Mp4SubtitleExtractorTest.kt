@@ -3,6 +3,7 @@ package app.mizune.subs
 import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -76,6 +77,87 @@ class Mp4SubtitleExtractorTest {
         println("extracted ${tracks.size} tracks in ${millis}ms: " + tracks.joinToString { "${it.name} [${it.language}] ${it.cues.size}" })
         assertCues(SrtParser.parse(srt!!.readText()), tracks.first().cues)
     }
+
+    /**
+     * Layouts ffmpeg doesn't write, built box by box: a fragment whose runs say nothing of where
+     * their data is (each follows the last, the text's after the video's), a QuickTime track
+     * name padded after its length byte, and a run claiming far more lines than it holds.
+     */
+    @Test
+    fun readsRunsWithoutOffsets() {
+        val lines = listOf("こんにちは", "元気ですか？").map { text ->
+            val bytes = text.toByteArray()
+            u16(bytes.size) + bytes
+        }
+        val moov = box(
+            "moov",
+            box("mvhd", u32(0, 0, 0, 1000, 0)),
+            track(1, "vide", "avc1", u32(0, 0, 0) + "VideoHandler".toByteArray() + byteArrayOf(0)),
+            // "Core Media Text" with its length byte, then padding
+            track(2, "sbtl", "tx3g", u32(0, 0, 0) + byteArrayOf(15) + "Core Media Text".toByteArray() + ByteArray(3)),
+            box("mvex", box("trex", u32(0, 1, 1, 0, 0, 0)), box("trex", u32(0, 2, 1, 0, 0, 0))),
+        )
+        val ftyp = box("ftyp", "isom".toByteArray() + u32(0) + "isom".toByteArray())
+        fun moof(dataStart: Long, claimed: Long) = box(
+            "moof",
+            box("mfhd", u32(0, 1)),
+            // the video: three 10-byte frames from the start of mdat's data, no offset in the run
+            box("traf", box("tfhd", u32(0x11, 1) + u64(dataStart) + u32(10)), box("trun", u32(0, 3))),
+            // the text: no base and no offset, so straight after the video; a second in, 1.5 s a line
+            box(
+                "traf",
+                box("tfhd", u32(0x8, 2, 1500)),
+                box("tfdt", u32(0, 1000)),
+                box("trun", u32(0x200, claimed) + u32(*lines.map { it.size.toLong() }.toLongArray())),
+            ),
+        )
+        val dataStart = (ftyp.size + moov.size + moof(0, 0).size + 8).toLong()
+        val mdat = box("mdat", ByteArray(30) + lines.reduce { a, b -> a + b })
+
+        for (claimed in listOf(2L, 0xFFFFFFFFL)) {
+            val file = File.createTempFile("runs", ".mp4").apply { deleteOnExit() }
+            file.writeBytes(ftyp + moov + moof(dataStart, claimed) + mdat)
+            val tracks = RandomAccessFile(file, "r").use { Mp4SubtitleExtractor(it.channel).extract() }
+            assertEquals(listOf("Track 2"), tracks.map { it.name })
+            assertEquals("jpn", tracks[0].language)
+            assertCues(listOf(Cue(1.0, 2.5, "こんにちは"), Cue(2.5, 4.0, "元気ですか？")), tracks[0].cues)
+        }
+    }
+
+    private fun track(id: Long, handler: String, entry: String, handlerName: ByteArray) = box(
+        "trak",
+        box("tkhd", u32(0, 0, 0, id)),
+        box(
+            "mdia",
+            // language: "jpn" packed five bits a letter
+            box("mdhd", u32(0, 0, 0, 1000, 0) + u16(('j' - '`' shl 10) or ('p' - '`' shl 5) or ('n' - '`')) + u16(0)),
+            box("hdlr", u32(0, 0) + handler.toByteArray() + handlerName),
+            box(
+                "minf",
+                box(
+                    "stbl",
+                    box("stsd", u32(0, 1, 16) + entry.toByteArray() + ByteArray(8)),
+                    box("stts", u32(0, 0)),
+                    box("stsc", u32(0, 0)),
+                    box("stsz", u32(0, 0, 0)),
+                    box("stco", u32(0, 0)),
+                ),
+            ),
+        ),
+    )
+
+    private fun box(type: String, vararg content: ByteArray): ByteArray {
+        val body = ByteArrayOutputStream().apply { content.forEach(::write) }.toByteArray()
+        return u32(8L + body.size) + type.toByteArray() + body
+    }
+
+    private fun u16(value: Int) = byteArrayOf((value shr 8).toByte(), value.toByte())
+
+    private fun u32(vararg values: Long) = values.fold(ByteArray(0)) { out, v ->
+        out + byteArrayOf((v shr 24).toByte(), (v shr 16).toByte(), (v shr 8).toByte(), v.toByte())
+    }
+
+    private fun u64(value: Long) = u32(value ushr 32, value and 0xFFFFFFFFL)
 
     @Test
     fun skipsQuickTimeChapters() {
