@@ -685,8 +685,8 @@ fun PlayerScreen(
  * [overlay] (the line, with the panel off screen) goes over the video, given what a tap on the
  * video does; while [dismiss] is set, that tap calls it instead of playing or pausing. With
  * [lineGestures] (the panel off screen) it takes the panel's: swipes move a line at a time, a
- * double tap stops at the end of every line, and a hold is reported to [onHold]. Scrubbing is then
- * on the seek line, while paused.
+ * double tap in the middle stops at the end of every line (the edges still jump), and a hold is
+ * reported to [onHold]. Scrubbing is then on the seek line, while paused.
  */
 @Composable
 private fun VideoArea(
@@ -774,12 +774,14 @@ private fun VideoArea(
         val now = SystemClock.uptimeMillis()
         val pending = pendingVideoTap
         when {
-            // as on the panel: play/pause after a short wait, and a second tap within it is
-            // stop at the end of every line
-            lineGestures -> if (pending != null && pending.isActive) {
+            // the middle, as on the panel: play/pause after a short wait, and a second tap within
+            // it is stop at the end of every line
+            lineGestures && zone == 0 -> if (pending != null && pending.isActive && pendingZone == 0) {
                 pending.cancel()
                 toggleStopAtEnd()
             } else {
+                pending?.cancel()
+                pendingZone = 0
                 pendingVideoTap = videoScope.launch {
                     delay(PANEL_DOUBLE_TAP_MS)
                     session.togglePause()
