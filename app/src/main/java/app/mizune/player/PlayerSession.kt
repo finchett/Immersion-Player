@@ -41,10 +41,6 @@ class PlayerSession(
     private val _paused = MutableStateFlow(true)
     val paused: StateFlow<Boolean> = _paused.asStateFlow()
 
-    private val _stoppedAtLine = MutableStateFlow(false)
-    /** Paused by a line ending rather than by the user, so the controls can stay out of the way. */
-    val stoppedAtLine: StateFlow<Boolean> = _stoppedAtLine.asStateFlow()
-
     private val _primary = MutableStateFlow<SubtitleTrack?>(null)
     val primary: StateFlow<SubtitleTrack?> = _primary.asStateFlow()
 
@@ -179,20 +175,16 @@ class PlayerSession(
         view?.setFill(fill)
     }
 
-    // what the user asks for is never a stop at a line's end; pausing again while stopped changes nothing
     fun togglePause() {
         val v = view ?: return
-        _stoppedAtLine.value = false
         v.paused = !v.paused
     }
 
     fun pause() {
-        if (!_paused.value) _stoppedAtLine.value = false
         view?.paused = true
     }
 
     fun play() {
-        _stoppedAtLine.value = false
         view?.paused = false
     }
 
@@ -266,10 +258,7 @@ class PlayerSession(
             val cue = track.cues[index]
             if (time >= cue.end - END_MARGIN && time < cue.end + 1.0) {
                 autoPausedLine = index
-                mainHandler.post {
-                    _stoppedAtLine.value = true
-                    view?.paused = true
-                }
+                mainHandler.post { pause() }
             }
         }
     }

@@ -475,7 +475,6 @@ fun PlayerScreen(
         app.prefs.panelHidden = hidden
     }
     val paused by session.paused.collectAsState()
-    val stoppedAtLine by session.stoppedAtLine.collectAsState()
 
     // with the panel off screen, a word tapped in the line over the video opens its entries over
     // it, until they're closed (a tap on the video, or back) or the line changes. A tap closes them
@@ -629,7 +628,7 @@ fun PlayerScreen(
                             hidePanel(hide)
                             if (!hide) app.prefs.panelFraction = target
                         },
-                        hint = panelHidden && paused && !stoppedAtLine,
+                        hint = panelHidden && paused,
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .offset {
@@ -695,8 +694,7 @@ fun PlayerScreen(
 
 /**
  * Full-bleed video. Tap toggles play/pause; dragging sideways scrubs.
- * A thin progress line sits on the bottom edge; time and a close button show while paused (but not
- * stopped at a line's end, which also plays on without the play/pause flash).
+ * A thin progress line sits on the bottom edge; time and a close button show while paused.
  * [overlay] (the line, with the panel off screen) goes over the video, given what a tap on the
  * video does; while [dismiss] is set, that tap calls it instead of playing or pausing. With
  * [lineGestures] (the panel off screen) it takes the panel's: swipes move a line at a time, a
@@ -726,8 +724,6 @@ private fun VideoArea(
 
     var mpvView by remember { mutableStateOf<MpvView?>(null) }
     val paused by session.paused.collectAsState()
-    // a stop at a line's end isn't a pause the user asked for, so it leaves the controls hidden
-    val stoppedAtLine by session.stoppedAtLine.collectAsState()
     val position by session.position.collectAsState()
     val duration by session.duration.collectAsState()
 
@@ -784,12 +780,6 @@ private fun VideoArea(
         session.seekTo(target.coerceIn(0.0, maxTime))
         jumpShown++
     }
-    // play/pause, with the flash; carrying on from a stop at a line's end isn't worth one
-    fun togglePause() {
-        val stopped = session.stoppedAtLine.value
-        session.togglePause()
-        if (!stopped) flash++
-    }
     /** A tap on the video's left edge (-1), middle (0) or right edge (1). */
     fun tap(zone: Int) {
         currentDismiss?.let {
@@ -809,14 +799,16 @@ private fun VideoArea(
                 pendingZone = 0
                 pendingVideoTap = videoScope.launch {
                     delay(PANEL_DOUBLE_TAP_MS)
-                    togglePause()
+                    session.togglePause()
+                    flash++
                 }
             }
             // middle: instant play/pause. Edges: double tap = jump ±5s (more taps stack);
             // a single edge tap still plays/pauses after a short wait.
             zone == 0 -> {
                 pending?.cancel()
-                togglePause()
+                session.togglePause()
+                flash++
             }
             zone == jumpZone && now - lastJumpTap < JUMP_CONTINUE_MS -> {
                 lastJumpTap = now
@@ -834,7 +826,8 @@ private fun VideoArea(
                 pendingZone = zone
                 pendingVideoTap = videoScope.launch {
                     delay(VIDEO_DOUBLE_TAP_MS)
-                    togglePause()
+                    session.togglePause()
+                    flash++
                 }
             }
         }
@@ -1066,7 +1059,7 @@ private fun VideoArea(
         }
 
         // paused: close, time and options
-        AnimatedVisibility(paused && !stoppedAtLine && scrubTarget == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(paused && scrubTarget == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 Text(
                     "${formatTime(position)} / ${formatTime(duration)}",
@@ -1103,7 +1096,7 @@ private fun VideoArea(
         // playing. While paused it can be tapped or dragged (via an invisible touch strip); it
         // fattens while held.
         AnimatedVisibility(
-            visible = (paused && !stoppedAtLine) || scrubTarget != null,
+            visible = paused || scrubTarget != null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomStart).padding(bottom = bottomClear),
