@@ -146,16 +146,16 @@ class DesktopApp(
         _setupStatus.value = null
     }
 
-    /** Sidecar subtitles next to [video], and the text tracks embedded in a Matroska file in languages they don't cover. */
+    /** Sidecar subtitles next to [video], and the text tracks embedded in it in languages they don't cover. */
     fun loadSubtitles(video: File): List<SubtitleTrack> {
         val languages = listOfNotNull(settings.targetLanguage, settings.peekLanguage)
         val sidecars = sidecarsFor(video).mapNotNull {
             SubtitleFiles.parseSidecar(it.name, SubtitleEncoding.decode(it.readBytes(), it.name, languages))
         }
-        if (!SubtitleFiles.isMatroska(video.name)) return sidecars
+        if (!SubtitleFiles.hasReadableTracks(video.name)) return sidecars
         val embedded = runCatching {
             subtitleCache.load(identity(video)) {
-                RandomAccessFile(video, "r").use { MatroskaSubtitleExtractor(it.channel).extract() }
+                RandomAccessFile(video, "r").use { SubtitleFiles.extractEmbedded(video.name, it.channel) }
             }
         }.getOrElse {
             // the files beside it still play

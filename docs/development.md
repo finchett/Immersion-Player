@@ -66,6 +66,15 @@ MIZUNE_TEST_EN_ASS=episode.en.ass \  # ffmpeg -i episode.mkv -map 0:s:<en> -c:s 
 ./gradlew :core:test
 ```
 
+The MP4 tests run on small files in `core/src/test/resources/mp4`. One more compares a real
+file's first text track with ffmpeg's reading of it:
+
+```sh
+MIZUNE_TEST_MP4=episode.mp4 \
+MIZUNE_TEST_MP4_SRT=episode.srt \  # ffmpeg -i episode.mp4 -map 0:s:0 episode.srt
+./gradlew :core:test
+```
+
 The README's screenshots come from `ReadmeScreenshots`, which renders the real screens at twice
 the size. Its header says what it needs.
 
@@ -84,8 +93,8 @@ adb shell run-as app.mizune cat files/last_crash.txt
 
 ```
 core/       plain Kotlin/JVM, shared by every platform
-  subs/        SRT/ASS parsers, Matroska extractor, embedded-track cache, PGS decoding and
-               line-by-line OCR (the engine is each platform's)
+  subs/        SRT/ASS parsers, Matroska and MP4 extractors, embedded-track cache, PGS decoding
+               and line-by-line OCR (the engine is each platform's)
   media/       audio tracks as mpv lists them
   dictionary/  Yomitan importer, SQLite store (behind Sql), deinflector, lookup, catalogue
   mining/      card model and store for Anki export

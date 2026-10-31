@@ -3,12 +3,14 @@ package app.mizune.subs
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.nio.channels.FileChannel
 import java.security.MessageDigest
 
 /** Platform-free parts of subtitle loading: sidecar parsing, track choice, the embedded-track cache. */
 object SubtitleFiles {
     val SUBTITLE_EXTENSIONS = setOf("srt", "ass", "ssa", "vtt")
     private val MATROSKA_EXTENSIONS = setOf("mkv", "mka", "webm")
+    private val MP4_EXTENSIONS = setOf("mp4", "m4v", "mov")
 
     /**
      * A language users can pick, by its English [name] and its own [native] one, with the tags
@@ -74,6 +76,15 @@ object SubtitleFiles {
 
     fun isMatroska(fileName: String) = fileName.substringAfterLast('.', "").lowercase() in MATROSKA_EXTENSIONS
 
+    fun isMp4(fileName: String) = fileName.substringAfterLast('.', "").lowercase() in MP4_EXTENSIONS
+
+    /** Whether the text tracks inside [fileName] can be read: Matroska and WebM, MP4 and QuickTime. */
+    fun hasReadableTracks(fileName: String) = isMatroska(fileName) || isMp4(fileName)
+
+    /** The text tracks inside [fileName], read through [channel]; see [hasReadableTracks]. */
+    fun extractEmbedded(fileName: String, channel: FileChannel): List<SubtitleTrack> =
+        if (isMp4(fileName)) Mp4SubtitleExtractor(channel).extract() else MatroskaSubtitleExtractor(channel).extract()
+
     /** True when [fileName] is a subtitle file named after the video [videoName]. */
     fun isSidecarFor(videoName: String, fileName: String): Boolean {
         val base = videoName.substringBeforeLast('.')
@@ -116,7 +127,7 @@ object SubtitleFiles {
     }
 }
 
-/** Embedded Matroska tracks, extracted once per file version and kept as JSON in [dir]. */
+/** Embedded text tracks, extracted once per file version and kept as JSON in [dir]. */
 class EmbeddedSubtitleCache(private val dir: File) {
     init {
         dir.mkdirs()
