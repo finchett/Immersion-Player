@@ -65,7 +65,7 @@ object ThumbnailGenerator {
     /** vo=image writes 00000001.jpg once the frame is decoded. */
     private fun waitForFrame(directory: File, timeoutMs: Long = 15_000): File? {
         val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline && !abort) {
+        while (System.currentTimeMillis() < deadline && !abort && !MpvOwner.wanted) {
             val file = directory.listFiles()?.firstOrNull { it.length() > 0 }
             if (file != null) {
                 // let the write finish before reading it
@@ -82,22 +82,35 @@ object ThumbnailGenerator {
     }
 }
 
-/** Serialises access to the process-wide libmpv instance. */
+/**
+ * Serialises access to the process-wide libmpv instance. Whoever waits for it in [acquire] (the
+ * player) goes before [tryAcquire] (thumbnails), which otherwise could take it back between two
+ * thumbnails and keep a video from opening for seconds.
+ */
 object MpvOwner {
     private val lock = Object()
     private var owner: String? = null
+    private var waiting = 0
+
+    /** Someone is waiting in [acquire]: a thumbnail being made gives up so they can have libmpv. */
+    val wanted: Boolean get() = synchronized(lock) { waiting > 0 }
 
     /** Waits for the current owner to finish, then claims libmpv. */
     fun acquire(name: String) {
         synchronized(lock) {
-            while (owner != null) lock.wait()
-            owner = name
+            waiting++
+            try {
+                while (owner != null) lock.wait()
+                owner = name
+            } finally {
+                waiting--
+            }
         }
     }
 
-    /** Claims libmpv only if it's free. */
+    /** Claims libmpv only if it's free and nobody is waiting for it. */
     fun tryAcquire(name: String): Boolean = synchronized(lock) {
-        if (owner != null) return false
+        if (owner != null || waiting > 0) return false
         owner = name
         true
     }

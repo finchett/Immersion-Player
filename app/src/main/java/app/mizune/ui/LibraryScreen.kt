@@ -1,5 +1,6 @@
 package app.mizune.ui
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -69,43 +70,47 @@ import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import app.mizune.App
 import app.mizune.dictionary.BundledDictionaries
+import app.mizune.library.LibraryFile
 import app.mizune.library.NaturalOrder
 import app.mizune.library.Titles
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import app.mizune.library.formatTime
 import app.mizune.library.isVideoName
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
 import app.mizune.update.AppUpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-fun DocumentFile.isVideo(): Boolean = isFile && name?.let(::isVideoName) == true
-
 private data class Listing(
-    val folders: List<DocumentFile>,
-    val videos: List<DocumentFile>,
-    val all: List<DocumentFile>,
+    val folders: List<LibraryFile>,
+    val videos: List<LibraryFile>,
+    val all: List<LibraryFile>,
     val episodeCounts: Map<String, Int>,
     /** The first video inside each folder, whose frame stands for it in the grid. */
-    val covers: Map<String, DocumentFile>,
+    val covers: Map<String, LibraryFile>,
 )
 
 private sealed interface Entry {
-    data class Folder(val file: DocumentFile, val episodes: Int, val cover: DocumentFile?) : Entry
+    data class Folder(val file: LibraryFile, val episodes: Int, val cover: LibraryFile?) : Entry
     /** [number]: its place among the folder's videos, from 1. */
-    data class Video(val file: DocumentFile, val number: Int) : Entry
+    data class Video(val file: LibraryFile, val number: Int) : Entry
 }
 
 @Composable
 fun LibraryScreen(
     app: App,
-    onOpenVideo: (DocumentFile, List<DocumentFile>) -> Unit,
+    onOpenVideo: (LibraryFile, List<LibraryFile>) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     var treeUri by remember { mutableStateOf(app.prefs.libraryTreeUri) }
     val root = remember(treeUri) {
-        treeUri?.let { runCatching { DocumentFile.fromTreeUri(context, Uri.parse(it)) }.getOrNull() }
-            ?.takeIf { it.canRead() }
+        treeUri?.let(Uri::parse)
+            ?.takeIf { runCatching { DocumentFile.fromTreeUri(context, it)?.canRead() == true }.getOrDefault(false) }
+            ?.let(LibraryFile::root)
     }
     var path by remember(root) { mutableStateOf(listOfNotNull(root)) }
     // reopen the folder you were last in (and don't save until that's done)
@@ -116,12 +121,12 @@ fun LibraryScreen(
             restoring = false
             return@LaunchedEffect
         }
-        val start: DocumentFile = root
+        val start: LibraryFile = root
         val restored = withContext(Dispatchers.IO) {
             var current = start
             val stack = mutableListOf(start)
             for (name in names) {
-                current = current.findFile(name)?.takeIf { it.isDirectory } ?: break
+                current = LibraryFile.list(context, current).firstOrNull { it.name == name }?.takeIf { it.isDirectory } ?: break
                 stack.add(current)
             }
             stack
@@ -131,7 +136,7 @@ fun LibraryScreen(
     }
     LaunchedEffect(path, restoring) {
         if (!restoring && path.isNotEmpty()) {
-            app.prefs.libraryPath = path.drop(1).joinToString("/") { it.name.orEmpty() }
+            app.prefs.libraryPath = path.drop(1).joinToString("/") { it.name }
         }
     }
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -177,7 +182,7 @@ fun LibraryScreen(
                         FolderGrid(
                             app = app,
                             folder = it,
-                            title = if (folder.size > 1) app.title(it.name.orEmpty()) else "Your library",
+                            title = if (folder.size > 1) app.title(it.name) else "Your library",
                             controlsVisible = controlsVisible,
                             onOpenFolder = { child -> path = path + child },
                             onOpenVideo = onOpenVideo,
@@ -190,7 +195,7 @@ fun LibraryScreen(
             if (path.size > 1) {
                 FolderChip(
                     visible = controlsVisible,
-                    name = if (path.size > 2) app.title(path[path.size - 2].name.orEmpty()) else "Library",
+                    name = if (path.size > 2) app.title(path[path.size - 2].name) else "Library",
                     onUp = { path = path.dropLast(1) },
                     modifier = Modifier.align(Alignment.TopStart),
                 )
@@ -273,18 +278,18 @@ private object LibraryCache {
 @Composable
 private fun FolderGrid(
     app: App,
-    folder: DocumentFile,
+    folder: LibraryFile,
     title: String,
     controlsVisible: MutableState<Boolean>,
-    onOpenFolder: (DocumentFile) -> Unit,
-    onOpenVideo: (DocumentFile, List<DocumentFile>) -> Unit,
+    onOpenFolder: (LibraryFile) -> Unit,
+    onOpenVideo: (LibraryFile, List<LibraryFile>) -> Unit,
 ) {
     val context = LocalContext.current
     // what this folder held last time, so coming back from a video paints at once; the listing is
     // then refreshed in the background in case the folder has changed
     var listing by remember(folder) { mutableStateOf(LibraryCache[folder.uri.toString()]) }
     LaunchedEffect(folder) {
-        val fresh = withContext(Dispatchers.IO) { list(folder) }
+        val fresh = withContext(Dispatchers.IO) { list(context, folder) }
         LibraryCache[folder.uri.toString()] = fresh
         listing = fresh
     }
@@ -302,6 +307,8 @@ private fun FolderGrid(
         val videos = listing?.let { it.videos + it.covers.values } ?: return@LaunchedEffect
         withContext(Dispatchers.IO) {
             for (video in videos) {
+                // left for another folder: its thumbnails come first
+                if (!isActive) return@withContext
                 val uri = video.uri.toString()
                 val watched = app.prefs.position(uri)
                 val takenAt = app.prefs.thumbnailPosition(uri)
@@ -346,7 +353,7 @@ private fun FolderGrid(
     }
     val tidy = app.prefs.tidyNames
     val videoTitles = remember(shown, tidy) {
-        val names = shown.videos.map { it.name.orEmpty() }
+        val names = shown.videos.map { it.name }
         if (tidy) Titles.episodes(names) else names.map { it.substringBeforeLast('.') }
     }
     val folders = shown.folders.map {
@@ -460,7 +467,7 @@ private fun FolderCard(app: App, folder: Entry.Folder, onClick: () -> Unit) {
         }
         Column(Modifier.padding(start = 2.dp, end = 2.dp, bottom = 4.dp)) {
             Text(
-                app.title(folder.file.name.orEmpty()),
+                app.title(folder.file.name),
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -489,7 +496,7 @@ private fun rememberThumbnail(app: App, uri: String): android.graphics.Bitmap? {
 }
 
 @Composable
-private fun VideoCard(app: App, video: DocumentFile, title: String, number: Int?, onClick: () -> Unit) {
+private fun VideoCard(app: App, video: LibraryFile, title: String, number: Int?, onClick: () -> Unit) {
     val uri = video.uri.toString()
     val position = app.prefs.position(uri)
     val duration = app.prefs.duration(uri)
@@ -587,34 +594,34 @@ private fun count(n: Int, noun: String) = when (n) {
     else -> "$n ${noun}s"
 }
 
-private fun list(folder: DocumentFile): Listing {
-    val all = folder.listFiles().toList()
-    val folders = all.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
-    val videos = all.filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
-    // one level deep only: enough for "12 videos" and a cover under each show without a slow full scan
-    val inside = folders.associate { child ->
-        child.uri.toString() to runCatching { child.listFiles().toList() }.getOrDefault(emptyList())
-    }
-    val insideVideos = inside.mapValues { (_, files) ->
-        files.filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
-    }
-    return Listing(
+private suspend fun list(context: Context, folder: LibraryFile): Listing = coroutineScope {
+    val all = LibraryFile.list(context, folder)
+    val folders = all.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name })
+    val videos = all.filter { it.isVideo }.sortedWith(compareBy(NaturalOrder) { it.name })
+    // one level deep only: enough for "12 videos" and a cover under each show without a slow full
+    // scan. The shows are listed side by side, since each one waits on the storage provider.
+    val shows = folders.map { child ->
+        async(Dispatchers.IO) {
+            val files = LibraryFile.list(context, child)
+            val episodes = files.filter { it.isVideo }.sortedWith(compareBy(NaturalOrder) { it.name })
+            // a show split into seasons has no videos of its own: take the cover from its first season
+            Triple(child.uri.toString(), episodes.size, episodes.firstOrNull() ?: coverIn(context, files))
+        }
+    }.awaitAll()
+    Listing(
         folders, videos, all,
-        episodeCounts = insideVideos.mapValues { it.value.size },
-        // a show split into seasons has no videos of its own: take the cover from its first season
-        covers = inside.mapNotNull { (uri, files) ->
-            (insideVideos[uri]?.firstOrNull() ?: coverIn(files))?.let { uri to it }
-        }.toMap(),
+        episodeCounts = shows.associate { (uri, episodes, _) -> uri to episodes },
+        covers = shows.mapNotNull { (uri, _, cover) -> cover?.let { uri to it } }.toMap(),
     )
 }
 
 /** The first video in the subfolders among [files], looking at most [depth] levels down. */
-private fun coverIn(files: List<DocumentFile>, depth: Int = 3): DocumentFile? {
+private fun coverIn(context: Context, files: List<LibraryFile>, depth: Int = 3): LibraryFile? {
     if (depth == 0) return null
-    return files.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
+    return files.filter { it.isDirectory }.sortedWith(compareBy(NaturalOrder) { it.name })
         .firstNotNullOfOrNull { dir ->
-            val children = runCatching { dir.listFiles().toList() }.getOrDefault(emptyList())
-            children.filter { it.isVideo() }.minWithOrNull(compareBy(NaturalOrder) { it.name.orEmpty() })
-                ?: coverIn(children, depth - 1)
+            val children = LibraryFile.list(context, dir)
+            children.filter { it.isVideo }.minWithOrNull(compareBy(NaturalOrder) { it.name })
+                ?: coverIn(context, children, depth - 1)
         }
 }

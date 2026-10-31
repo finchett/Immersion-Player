@@ -138,7 +138,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.documentfile.provider.DocumentFile
+import app.mizune.library.LibraryFile
 import app.mizune.library.formatTime
 import app.mizune.App
 import app.mizune.dictionary.BundledDictionaries
@@ -288,8 +288,8 @@ private const val SCRUB_MAX_SPEED = 10.0
 @Composable
 fun PlayerScreen(
     app: App,
-    video: DocumentFile,
-    siblings: List<DocumentFile>,
+    video: LibraryFile,
+    siblings: List<LibraryFile>,
     nextEpisodeName: String?,
     onNextEpisode: (() -> Unit)?,
     onBack: () -> Unit,
@@ -297,7 +297,7 @@ fun PlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember(video) {
-        PlayerSession(context.applicationContext, app.prefs, video.uri.toString(), video.name ?: "video")
+        PlayerSession(context.applicationContext, app.prefs, video.uri.toString(), video.name.ifEmpty { "video" })
     }
 
     // pause when the app is backgrounded and when headphones disconnect, but keep playing when

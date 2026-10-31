@@ -1,7 +1,7 @@
 package app.mizune.subs
 
 import android.content.Context
-import androidx.documentfile.provider.DocumentFile
+import app.mizune.library.LibraryFile
 import java.io.File
 import java.io.FileInputStream
 
@@ -11,8 +11,8 @@ class SubtitleLoader(private val context: Context) {
     private val cache = EmbeddedSubtitleCache(File(context.cacheDir, "subtitles"))
 
     /** [languages] (the target and peek language) help tell what a sidecar file's bytes are in. */
-    fun load(video: DocumentFile, siblings: List<DocumentFile>, languages: List<String>): List<SubtitleTrack> {
-        val videoName = video.name ?: return emptyList()
+    fun load(video: LibraryFile, siblings: List<LibraryFile>, languages: List<String>): List<SubtitleTrack> {
+        val videoName = video.name.ifEmpty { return emptyList() }
         val sidecars = sidecarsFor(videoName, siblings).mapNotNull { readSidecar(it, languages) }
         if (!SubtitleFiles.hasReadableTracks(videoName)) return sidecars
         val embedded = runCatching {
@@ -35,8 +35,8 @@ class SubtitleLoader(private val context: Context) {
      * they're played (see [PictureLines]) and kept for next time. Scans the file, so call it off
      * the main thread; [PictureLines.close] them when the player goes.
      */
-    fun openPictureTracks(video: DocumentFile, text: List<SubtitleTrack>, languages: List<String>): List<SubtitleTrack> {
-        val videoName = video.name ?: return emptyList()
+    fun openPictureTracks(video: LibraryFile, text: List<SubtitleTrack>, languages: List<String>): List<SubtitleTrack> {
+        val videoName = video.name.ifEmpty { return emptyList() }
         if (!SubtitleFiles.isMatroska(videoName)) return emptyList()
         val needed = languages.filter { code -> ImageSubtitles.model(code) != null && text.none { SubtitleFiles.isLanguage(it, code) } }
         if (needed.isEmpty()) return emptyList()
@@ -53,13 +53,13 @@ class SubtitleLoader(private val context: Context) {
         }
     }
 
-    private fun sidecarsFor(videoName: String, siblings: List<DocumentFile>) =
-        siblings.filter { file -> file.name?.let { SubtitleFiles.isSidecarFor(videoName, it) } == true }
+    private fun sidecarsFor(videoName: String, siblings: List<LibraryFile>) =
+        siblings.filter { file -> SubtitleFiles.isSidecarFor(videoName, file.name) }
 
-    private fun identity(video: DocumentFile) = "${video.uri}|${video.length()}|${video.lastModified()}"
+    private fun identity(video: LibraryFile) = "${video.uri}|${video.length}|${video.lastModified}"
 
-    private fun readSidecar(file: DocumentFile, languages: List<String>): SubtitleTrack? {
-        val name = file.name ?: return null
+    private fun readSidecar(file: LibraryFile, languages: List<String>): SubtitleTrack? {
+        val name = file.name.ifEmpty { return null }
         val content = context.contentResolver.openInputStream(file.uri)?.use {
             SubtitleEncoding.decode(it.readBytes(), name, languages)
         } ?: return null

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.MotionEvent
+import app.mizune.library.LibraryFile
 import app.mizune.library.NaturalOrder
 import app.mizune.triggers.ShoulderTriggers
 import androidx.activity.ComponentActivity
@@ -23,11 +24,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.documentfile.provider.DocumentFile
 import app.mizune.ui.LibraryScreen
 import app.mizune.ui.PlayerScreen
 import app.mizune.ui.SettingsScreen
-import app.mizune.ui.isVideo
 import app.mizune.update.AppUpdateState
 import kotlinx.coroutines.android.awaitFrame
 import java.io.File
@@ -35,7 +34,7 @@ import java.io.File
 sealed interface Screen {
     data object Library : Screen
     data object Settings : Screen
-    data class Player(val video: DocumentFile, val siblings: List<DocumentFile>) : Screen
+    data class Player(val video: LibraryFile, val siblings: List<LibraryFile>) : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -151,18 +150,18 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
         val video = when (uri.scheme) {
-            "content" -> DocumentFile.fromSingleUri(this, uri)
-            "file" -> uri.path?.let { DocumentFile.fromFile(File(it)) }
+            "content" -> LibraryFile.single(this, uri)
+            "file" -> uri.path?.let { LibraryFile.of(File(it)) }
             else -> null
         } ?: return
         switchTo(Screen.Player(video, siblingsOf(uri)))
     }
 
     /** Sidecar subtitles need the folder listing, which only file:// paths allow here. */
-    private fun siblingsOf(uri: Uri): List<DocumentFile> {
+    private fun siblingsOf(uri: Uri): List<LibraryFile> {
         if (uri.scheme != "file") return emptyList()
         val parent = uri.path?.let { File(it).parentFile } ?: return emptyList()
-        return parent.listFiles()?.map { DocumentFile.fromFile(it) }.orEmpty()
+        return parent.listFiles()?.map { LibraryFile.of(it) }.orEmpty()
     }
 
     private fun switchTo(target: Screen) {
@@ -174,8 +173,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun nextEpisode(video: DocumentFile, siblings: List<DocumentFile>): DocumentFile? {
-        val videos = siblings.filter { it.isVideo() }.sortedWith(compareBy(NaturalOrder) { it.name.orEmpty() })
+    private fun nextEpisode(video: LibraryFile, siblings: List<LibraryFile>): LibraryFile? {
+        val videos = siblings.filter { it.isVideo }.sortedWith(compareBy(NaturalOrder) { it.name })
         val index = videos.indexOfFirst { it.uri == video.uri }
         return if (index >= 0) videos.getOrNull(index + 1) else null
     }
