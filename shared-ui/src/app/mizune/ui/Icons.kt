@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
@@ -31,6 +32,17 @@ fun Cog(color: Color, diameter: Dp = 14.dp) {
                 )
             }
         }
+    }
+}
+
+/** A cross, as heavy as [Cog]'s ring, for closing. */
+@Composable
+fun CloseIcon(color: Color, diameter: Dp = 14.dp) {
+    Canvas(Modifier.size(diameter)) {
+        val stroke = size.minDimension * 0.12f
+        val inset = stroke / 2
+        drawLine(color, Offset(inset, inset), Offset(size.width - inset, size.height - inset), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width - inset, inset), Offset(inset, size.height - inset), stroke, StrokeCap.Round)
     }
 }
 

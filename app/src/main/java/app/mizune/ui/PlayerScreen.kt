@@ -978,15 +978,16 @@ private fun VideoArea(
         ) {
             Column(
                 Modifier
-                    .background(Color(0xCC1E2126), RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(OVER_VIDEO)
                     .clickable { onNextEpisode?.invoke() }
-                    .padding(horizontal = 28.dp, vertical = 18.dp),
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("Next episode  ▶", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Text(
                     nextEpisodeName.orEmpty(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -1002,10 +1003,8 @@ private fun VideoArea(
             Text(
                 if (jumpLabelZone < 0) "« −${jumpLabelTotal}s" else "+${jumpLabelTotal}s »",
                 color = Color.White,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .background(Color(0x99000000), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.videoPill(),
             )
         }
 
@@ -1014,10 +1013,8 @@ private fun VideoArea(
             Text(
                 notice.orEmpty(),
                 color = Color.White,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .background(Color(0xAA000000), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.videoPill(),
             )
         }
 
@@ -1028,11 +1025,8 @@ private fun VideoArea(
             Text(
                 "${formatTime(target)}   $sign${formatTime(abs(scrubOffset))}$speed",
                 color = Color.White,
-                fontSize = 22.sp,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .background(Color(0xAA000000), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                modifier = Modifier.align(Alignment.Center).videoPill(),
             )
         }
 
@@ -1042,30 +1036,13 @@ private fun VideoArea(
                 Text(
                     "${formatTime(position)} / ${formatTime(duration)}",
                     color = Color.White,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 16.dp)
-                        .background(Color(0x88000000), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = VIDEO_INSET, bottom = 16.dp)
+                        .background(OVER_VIDEO, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
-                Text(
-                    "✕",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .background(Color(0x88000000), CircleShape)
-                        .clickable(onClick = onBack)
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                )
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .background(Color(0x88000000), CircleShape)
-                        .clickable { showOptions = true }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                ) { Cog(Color.White, diameter = 20.dp) }
+                VideoButton(onBack, Modifier.align(Alignment.TopStart)) { CloseIcon(Color.White, diameter = 13.dp) }
+                VideoButton({ showOptions = true }, Modifier.align(Alignment.TopEnd)) { Cog(Color.White, diameter = 19.dp) }
             }
         }
         if (showOptions) PlayerOptions(session, onDismiss = { showOptions = false })
@@ -1131,6 +1108,25 @@ private fun VideoArea(
         }
     }
 }
+
+/** The shade behind everything drawn over the video: buttons, the time, notices. */
+private val OVER_VIDEO = Color(0x80000000)
+
+/** How far the buttons and the time sit in from the video's edges. */
+private val VIDEO_INSET = 12.dp
+
+/** A round button over the video, the same size whatever it holds. */
+@Composable
+private fun VideoButton(onClick: () -> Unit, modifier: Modifier, icon: @Composable () -> Unit) {
+    Box(
+        modifier.padding(VIDEO_INSET).size(40.dp).clip(CircleShape).background(OVER_VIDEO).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { icon() }
+}
+
+/** A short notice over the video, in the shade the buttons use. */
+private fun Modifier.videoPill() =
+    background(OVER_VIDEO, RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 8.dp)
 
 /**
  * The line over the video while the panel is off screen, as subtitles: a tapped word (or a
