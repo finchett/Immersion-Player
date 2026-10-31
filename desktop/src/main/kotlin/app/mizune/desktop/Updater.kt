@@ -15,7 +15,8 @@ sealed interface UpdateState {
     /** Not checked yet, or the last check failed (it's tried again later). */
     data object Unknown : UpdateState
     data object UpToDate : UpdateState
-    data class Downloading(val version: String, val progress: Float) : UpdateState
+    /** On its way; [notes] are its release notes. */
+    data class Downloading(val version: String, val notes: String, val progress: Float) : UpdateState
     /** Downloaded and checked; it replaces this app when the app quits. [notes] are its release notes. */
     data class Ready(val version: String, val notes: String) : UpdateState
     /** Out, but this copy can't replace itself (a dev run, a read-only folder, not macOS): a link to it. */
@@ -101,9 +102,13 @@ class Updater(cacheDir: File, dataDir: File, private val logError: (String, Thro
             _state.value = UpdateState.Ready(release.version, release.notes)
             return
         }
-        _state.value = UpdateState.Downloading(release.version, 0f)
+        _state.value = UpdateState.Downloading(release.version, release.notes, 0f)
         val dmg = Updates.download(asset, File(dir, asset.name)) { progress ->
-            _state.value = UpdateState.Downloading(release.version, progress)
+            // a step per percent, not per block read
+            val shown = (progress * 100).toInt() / 100f
+            if ((_state.value as? UpdateState.Downloading)?.progress != shown) {
+                _state.value = UpdateState.Downloading(release.version, release.notes, shown)
+            }
         }
         stage(dmg, release)
         dmg.delete()

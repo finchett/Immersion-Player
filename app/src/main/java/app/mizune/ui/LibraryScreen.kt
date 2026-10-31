@@ -53,7 +53,6 @@ import androidx.compose.foundation.layout.widthIn
 import app.mizune.player.MpvOwner
 import app.mizune.player.ThumbnailGenerator
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -185,26 +184,33 @@ fun LibraryScreen(
                 }
             }
 
-            // the folder's own name is the page title; the chip is the way back up
-            if (path.size > 1) {
-                FolderChip(
-                    visible = controlsVisible,
-                    name = if (path.size > 2) app.title(path[path.size - 2].name.orEmpty()) else "Library",
-                    onUp = { path = path.dropLast(1) },
-                    modifier = Modifier.align(Alignment.TopStart),
-                )
+            AnimatedVisibility(
+                visible = controlsVisible.value,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().safeDrawingPadding().padding(start = 14.dp, end = 10.dp, top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // the folder's own name is the page title; the chip is the way back up, and
+                    // gives up its width first when an update needs room
+                    Box(Modifier.weight(1f)) {
+                        if (path.size > 1) {
+                            FolderChip(
+                                name = if (path.size > 2) app.title(path[path.size - 2].name.orEmpty()) else "Library",
+                                onUp = { path = path.dropLast(1) },
+                            )
+                        }
+                    }
+                    UpdatePill(app)
+                    SettingsButton(onOpenSettings)
+                }
             }
-            SettingsButton(
-                visible = controlsVisible,
-                onOpenSettings = onOpenSettings,
-                modifier = Modifier.align(Alignment.TopEnd),
-            )
 
             val setupStatus by BundledDictionaries.status.collectAsState()
-            // the dictionaries' setup has the same spot while it runs, and goes first
-            if (setupStatus == null) {
-                UpdatePill(app, Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = 12.dp))
-            }
             JustUpdated(app)
             setupStatus?.let {
                 Surface(
@@ -359,47 +365,33 @@ private fun FolderGrid(
 
 /** Current folder, floating over the grid; tapping it goes up. */
 @Composable
-private fun FolderChip(
-    visible: State<Boolean>,
-    name: String,
-    onUp: () -> Unit,
-    modifier: Modifier,
-) {
-    AnimatedVisibility(visible = visible.value, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier
-                .safeDrawingPadding()
-                .padding(start = 14.dp, top = 8.dp)
-                .clickable(onClick = onUp),
-        ) {
-            Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("‹  ", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 320.dp),
-                )
-            }
+private fun FolderChip(name: String, onUp: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.clickable(onClick = onUp),
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("‹  ", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 320.dp),
+            )
         }
     }
 }
 
 @Composable
-private fun SettingsButton(visible: State<Boolean>, onOpenSettings: () -> Unit, modifier: Modifier) {
-    AnimatedVisibility(visible = visible.value, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
-        Box(Modifier.safeDrawingPadding().padding(end = 10.dp, top = 8.dp)) {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                shape = CircleShape,
-                modifier = Modifier.clickable(onClick = onOpenSettings),
-            ) {
-                Box(Modifier.padding(10.dp)) { Cog(MaterialTheme.colorScheme.onSurface, diameter = 20.dp) }
-            }
-        }
+private fun SettingsButton(onOpenSettings: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        shape = CircleShape,
+        modifier = Modifier.clickable(onClick = onOpenSettings),
+    ) {
+        Box(Modifier.padding(10.dp)) { Cog(MaterialTheme.colorScheme.onSurface, diameter = 20.dp) }
     }
 }
 
